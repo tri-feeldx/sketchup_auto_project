@@ -32,7 +32,7 @@ class RubyGeneratorV5:
         ruby = None
         try:
             sys_p = self.prompt_factory.build_full_system_prompt("ruby_generator", region=self.region)
-            usr_p = self.prompt_factory.user_prompt_generate_ruby(model=model, validation=validation_result)
+            usr_p = self.prompt_factory.user_prompt_ruby_generate(model_json=model, profile=None)
             from core.llm_wrapper import call_llm
             resp = call_llm(usr_p, system=sys_p)
             ruby = self._extract_ruby(resp)
@@ -150,6 +150,11 @@ class RubyGeneratorV5:
 
     def _slab_ruby(self, slab: dict, i: int) -> List[str]:
         t = slab.get("thickness_mm") or slab.get("thickness", 120)
+        # SAFEGUARD: coerce thickness to int, fallback 120
+        try:
+            t = int(t)
+        except (ValueError, TypeError):
+            t = 120
         z = slab.get("z_mm") or slab.get("z", 3500)
         bounds = slab.get("bounds", [])
         if bounds and len(bounds) >= 3:
