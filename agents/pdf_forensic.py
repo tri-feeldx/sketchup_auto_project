@@ -1,19 +1,33 @@
 """
-PDF Forensic Analyzer — Pre-LLM PDF intelligence gathering.
-
-Extracts structural metadata from PDFs WITHOUT using LLM calls:
-- Page count, sizes, orientations
-- Text extraction for keyword detection  
-- Drawing conventions (Australian AS/NZS, Vietnamese TCVN, International)
+=============================================================================
+A0: PDF FORENSIC ANALYZER V7 — Pre-LLM PDF Intelligence (UPGRADED)
+=============================================================================
+Extracts structural metadata from PDFs WITHOUT LLM calls:
+- Page count, sizes, orientations, text extraction
+- Drawing conventions (AU AS/NZS, VN TCVN, International)
 - Steel grades, section types, reinforcement notation
-- Grid system detection, level notation
-- Schedule detection
+- Grid system detection, level notation, scale detection
+- Language detection, keyword richness scoring
+- Schedule detection per page
 
-This forensic data feeds into downstream prompts to calibrate LLM extraction.
+Output: pdf_profile dict used by downstream agents.
+
+Upgrades from V5:
+  - Per-page text extraction with keyword context
+  - Grid detection: tim "truc 1", "truc A", "grid 1", "grid A"
+  - Scale detection: tim "1:100", "1:50", "1:200"
+  - Language detection: VN vs EN
+  - Enhanced VN keywords: TCVN, mat bang, mat dung, mat cat
+  - Page-level text fingerprint for routing
+  - level_ssl / level_ffl detection
+=============================================================================
 """
 
 import json
-from typing import Dict, List, Optional
+import re
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
 
 
 # ============================================================
@@ -60,14 +74,25 @@ AU_KEYWORDS = {
 }
 
 VN_KEYWORDS = {
-    "TCVN": ["tcvn", "tiêu chuẩn"],
-    "steel": ["thép", "ct", "thép hình"],
-    "concrete": ["bê tông", "btct", "bê tông cốt thép"],
-    "column": ["cột", "c1", "c2"],
-    "beam": ["dầm", "d1", "d2"],
-    "reinforcement": ["Ø", "ф", "thép chịu lực", "thép đai"],
-    "grid_letters": ["trục", "trục a", "trục b", "trục 1"],
-    "level": ["cao độ", "cốt"],
+    "TCVN": ["tcvn", "tieu chuan"],
+    "steel": ["thep", "ct", "thep hinh"],
+    "concrete": ["be tong", "btct", "be tong cot thep"],
+    "column": ["cot", "c1", "c2"],
+    "beam": ["dam", "d1", "d2"],
+    "slab": ["san", "s1", "s2"],
+    "foundation": ["mong", "m1", "m2"],
+    "reinforcement": ["thep chiu luc", "thep dai", "thep mu"],
+    "grid": ["truc", "truc a", "truc b", "truc 1"],
+    "level": ["cao do", "cot"],
+    "elevation_view": ["mat dung", "mat dung"],
+    "section_view": ["mat cat"],
+    "plan_view": ["mat bang"],
+    "detail_view": ["chi tiet", "cau tao"],
+    "schedule": ["bang thong ke", "bang tong hop", "thong ke cot thep"],
+    "brick": ["gach", "xay", "tuong"],
+    "wood": ["go", "van"],
+    "roof": ["mai", "vi keo"],
+    "stair": ["cau thang"],
 }
 
 INTL_KEYWORDS = {
@@ -80,40 +105,141 @@ INTL_KEYWORDS = {
     "HEB_sections": ["heb"],
 }
 
+# ── SCALE PATTERNS ──────────────────────────────────────────
+SCALE_PATTERNS = [
+    (r"1\s*[:=]\s*200", "1:200"),
+    (r"1\s*[:=]\s*100", "1:100"),
+    (r"1\s*[:=]\s*50", "1:50"),
+    (r"1\s*[:=]\s*20", "1:20"),
+    (r"1\s*[:=]\s*25", "1:25"),
+    (r"1\s*[:=]\s*10", "1:10"),
+    (r"scale\s*1\s*[:=]\s*(\d+)", None),  # capture any scale
+]
+
+# ── GRID DETECTION PATTERNS ─────────────────────────────────
+GRID_X_PATTERNS = [
+    r"truc\s*(\d+)",          # VN: truc 1, truc 2
+    r"grid\s*(\d+)",           # EN: grid 1, grid 2
+    r"gridline\s*(\d+)",       # EN: gridline 1
+    r"axis\s*(\d+)",           # axis 1
+]
+
+GRID_Y_PATTERNS = [
+    r"truc\s*([A-FH-NP-Z])",   # VN: truc A, truc B (exclude G/O common false positives)
+    r"grid\s*([A-FH-NP-Z])",    # EN: grid A, grid B
+    r"gridline\s*([A-FH-NP-Z])",
+    r"axis\s*([A-FH-NP-Z])",
+]
+
+# ── LANGUAGE DETECTION MARKERS ──────────────────────────────
+VN_MARKER_WORDS = [
+    "bang", "dung", "cat", "cot", "dam", "san", "mong",
+    "thep", "be tong", "tuong", "cua", "cau thang",
+    "mat bang", "mat dung", "mat cat", "chi tiet",
+    "bang thong ke", "cao do", "truc", "cot",
+    "chiu luc", "thep dai", "thep mu",
+]
+
+EN_MARKER_WORDS = [
+    "plan", "elevation", "section", "column", "beam", "slab", "footing",
+    "steel", "concrete", "wall", "door", "window", "stair",
+    "schedule", "level", "grid", "detail",
+]
+
 
 # ============================================================
-# FORENSIC RESULT CLASS
+# DATA CLASSES
 # ============================================================
 
+@dataclass
+class PageForensic:
+    """Per-page forensic fingerprint."""
+    page_idx: int = 0
+    width_mm: float = 0.0
+    height_mm: float = 0.0
+    orientation: str = "PORTRAIT"
+    text: str = ""
+    first_line: str = ""
+    text_length: int = 0
+    # Keyword categories
+    has_grid_numbers: bool = False
+    has_grid_letters: bool = False
+    has_dimensions: bool = False
+    has_steel_sections: bool = False
+    has_concrete: bool = False
+    has_levels: bool = False
+    detected_scales: List[str] = field(default_factory=list)
+    # Content hints
+    likely_plan: bool = False
+    likely_elevation: bool = False
+    likely_section: bool = False
+    likely_schedule: bool = False
+    likely_detail: bool = False
+    likely_title: bool = False
+
+    def to_dict(self) -> dict:
+        return {
+            "page_idx": self.page_idx,
+            "width_mm": self.width_mm,
+            "height_mm": self.height_mm,
+            "orientation": self.orientation,
+            "text": self.text,
+            "text_length": self.text_length,
+            "first_line": self.first_line[:120],
+            "has_grid_numbers": self.has_grid_numbers,
+            "has_grid_letters": self.has_grid_letters,
+            "has_dimensions": self.has_dimensions,
+            "has_steel_sections": self.has_steel_sections,
+            "has_concrete": self.has_concrete,
+            "has_levels": self.has_levels,
+            "detected_scales": self.detected_scales,
+            "likely_plan": self.likely_plan,
+            "likely_elevation": self.likely_elevation,
+            "likely_section": self.likely_section,
+            "likely_schedule": self.likely_schedule,
+            "likely_detail": self.likely_detail,
+            "likely_title": self.likely_title,
+        }
+
+
+@dataclass
 class ForensicResult:
-    """Structured forensic analysis result."""
-
-    def __init__(self, pdf_path: str):
-        self.pdf_path = pdf_path
-        self.num_pages: int = 0
-        self.pages: List[Dict] = []
-        self.all_text: str = ""
-        self.keywords: Dict[str, bool] = {}
-        self.region: str = "unknown"
-        self.primary_material: str = "unknown"
-        self.building_type: str = "unknown"
-        self.has_schedules: bool = False
-        self.has_plans: bool = False
-        self.has_elevations: bool = False
-        self.has_sections: bool = False
-        self.has_details: bool = False
-        self.drawing_size: str = "A1"
-        self.estimated_scale_plans: str = "1:100"
-        self.estimated_scale_details: str = "1:20"
-        self.page_texts: List[str] = []
+    """Structured forensic analysis result — V7 UPGRADED."""
+    pdf_path: str = ""
+    num_pages: int = 0
+    pages: List[Dict] = field(default_factory=list)
+    page_forensics: List[PageForensic] = field(default_factory=list)
+    all_text: str = ""
+    keywords: Dict[str, bool] = field(default_factory=dict)
+    keyword_scores: Dict[str, int] = field(default_factory=dict)
+    region: str = "unknown"
+    detected_language: str = "unknown"
+    primary_material: str = "unknown"
+    building_type: str = "unknown"
+    has_schedules: bool = False
+    has_plans: bool = False
+    has_elevations: bool = False
+    has_sections: bool = False
+    has_details: bool = False
+    drawing_size: str = "A1"
+    estimated_scale_plans: str = "1:100"
+    estimated_scale_details: str = "1:20"
+    detected_scales: List[str] = field(default_factory=list)
+    detected_grid_x: List[str] = field(default_factory=list)
+    detected_grid_y: List[str] = field(default_factory=list)
+    page_texts: List[str] = field(default_factory=list)
+    region_confidence: float = 0.0
 
     def to_dict(self) -> dict:
         return {
             "pdf_path": self.pdf_path,
             "num_pages": self.num_pages,
-            "pages": self.pages,
+            "pages": [pf.to_dict() for pf in self.page_forensics] or self.pages,
             "keywords": self.keywords,
+            "keyword_scores": self.keyword_scores,
             "region": self.region,
+            "detected_language": self.detected_language,
+            "region_confidence": self.region_confidence,
             "primary_material": self.primary_material,
             "building_type": self.building_type,
             "has_schedules": self.has_schedules,
@@ -124,33 +250,41 @@ class ForensicResult:
             "drawing_size": self.drawing_size,
             "estimated_scale_plans": self.estimated_scale_plans,
             "estimated_scale_details": self.estimated_scale_details,
+            "detected_scales": self.detected_scales,
+            "detected_grid_x": self.detected_grid_x,
+            "detected_grid_y": self.detected_grid_y,
         }
 
 
 # ============================================================
-# MAIN ANALYZER
+# MAIN ANALYZER V7
 # ============================================================
 
 class PDFForensicAnalyzer:
-    """Pre-LLM PDF analysis — extract structural metadata."""
+    """Pre-LLM PDF analysis — extract structural metadata. V7 UPGRADED."""
 
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
-        self.result = ForensicResult(pdf_path)
+        self.result = ForensicResult(pdf_path=pdf_path)
 
     def analyze(self) -> ForensicResult:
-        """Run full forensic analysis."""
+        """Run full forensic analysis V7."""
         self._extract_pages()
+        self._analyze_page_forensics()
         self._detect_keywords()
+        self._detect_language()
         self._derive_region()
         self._derive_material()
         self._derive_building_type()
         self._derive_has_types()
+        self._detect_scales()
+        self._detect_grids()
         return self.result
 
+    # ── STAGE 1: PAGE EXTRACTION ────────────────────────────
     def _extract_pages(self):
         try:
-            import fitz
+            import fitz  # PyMuPDF
         except ImportError:
             print("[FORENSIC] PyMuPDF not available, skipping page extraction")
             return
@@ -168,6 +302,17 @@ class PDFForensicAnalyzer:
             orientation = "LANDSCAPE" if w_pt > h_pt else "PORTRAIT"
             first_line = text.strip().split("\n")[0] if text.strip() else "(empty)"
 
+            pf = PageForensic(
+                page_idx=i,
+                width_mm=round(w_mm, 0),
+                height_mm=round(h_mm, 0),
+                orientation=orientation,
+                text=text,
+                first_line=first_line[:120],
+                text_length=len(text.strip()),
+            )
+            self.result.page_forensics.append(pf)
+
             self.result.pages.append({
                 "index": i,
                 "width_mm": round(w_mm, 0),
@@ -180,6 +325,7 @@ class PDFForensicAnalyzer:
         self.result.all_text = "\n".join(all_texts).lower()
         doc.close()
 
+        # Determine drawing size
         if self.result.pages:
             first = self.result.pages[0]
             w, h = first["width_mm"], first["height_mm"]
@@ -192,148 +338,242 @@ class PDFForensicAnalyzer:
             else:
                 self.result.drawing_size = f"{w:.0f}x{h:.0f}mm"
 
+    # ── STAGE 2: PER-PAGE FORENSICS ─────────────────────────
+    def _analyze_page_forensics(self):
+        """Per-page keyword analysis for routing hints."""
+        # VN content keywords
+        vn_plan_words = ["mat bang", "mat bang tang", "bang bo tri", "so do"]
+        vn_elevation_words = ["mat dung", "mat dung truc", "dung"]
+        vn_section_words = ["mat cat", "mat cat a", "mat cat b", "cat doc", "cat ngang"]
+        vn_schedule_words = ["bang thong ke", "bang tong hop", "thong ke", "bang tinh"]
+        vn_detail_words = ["chi tiet", "cau tao", "mat cat chi tiet"]
+        vn_title_words = ["ban ve", "ho so", "thuyet minh", "tong mat bang"]
+
+        en_plan_words = ["plan", "floor plan", "ground floor", "layout"]
+        en_elevation_words = ["elevation", "north elevation", "south elevation"]
+        en_section_words = ["section", "cross section", "longitudinal section"]
+        en_schedule_words = ["schedule", "table", "bill of", "list of"]
+        en_detail_words = ["detail", "connection detail", "typical detail"]
+        en_title_words = ["drawing list", "sheet index", "general notes"]
+
+        concrete_words = ["concrete", "reinforced", "be tong", "btct", "cot thep"]
+        level_words = ["rl ", "ffl", "ssl", "cao do", "cot ", "level"]
+
+        for pf in self.result.page_forensics:
+            t = pf.text.lower()
+
+            # Grid detection
+            pf.has_grid_numbers = bool(re.search(r"(?:truc|grid|gridline|axis)\s*\d+", t, re.IGNORECASE))
+            pf.has_grid_letters = bool(re.search(r"(?:truc|grid|gridline|axis)\s*[A-FH-NP-Z]", t, re.IGNORECASE))
+
+            # Dimensions
+            pf.has_dimensions = bool(re.search(r"\d{3,5}\s*(?:mm|m|mm)", t))
+
+            # Steel sections
+            steel_pats = ["ub", "uc", "pfc", "rhs", "shs", "chs", "zb", "zc", "thep hinh"]
+            pf.has_steel_sections = any(p in t for p in steel_pats)
+
+            # Concrete
+            pf.has_concrete = any(w in t for w in concrete_words)
+
+            # Levels
+            pf.has_levels = any(w in t for w in level_words)
+
+            # Scale detection per page
+            for pat, label in SCALE_PATTERNS:
+                m = re.search(pat, t, re.IGNORECASE)
+                if m:
+                    scale_val = label if label else f"1:{m.group(1)}"
+                    if scale_val not in pf.detected_scales:
+                        pf.detected_scales.append(scale_val)
+
+            # Content type hints - VN
+            if any(w in t for w in vn_plan_words):
+                pf.likely_plan = True
+            if any(w in t for w in vn_elevation_words):
+                pf.likely_elevation = True
+            if any(w in t for w in vn_section_words):
+                pf.likely_section = True
+            if any(w in t for w in vn_schedule_words):
+                pf.likely_schedule = True
+            if any(w in t for w in vn_detail_words):
+                pf.likely_detail = True
+            if any(w in t for w in vn_title_words):
+                pf.likely_title = True
+
+            # Content type hints - EN (override/add)
+            if any(w in t for w in en_plan_words):
+                pf.likely_plan = True
+            if any(w in t for w in en_elevation_words):
+                pf.likely_elevation = True
+            if any(w in t for w in en_section_words):
+                pf.likely_section = True
+            if any(w in t for w in en_schedule_words):
+                pf.likely_schedule = True
+            if any(w in t for w in en_detail_words):
+                pf.likely_detail = True
+            if any(w in t for w in en_title_words):
+                pf.likely_title = True
+
+            # Empty page or very short -> likely title/cover
+            if pf.text_length < 80 and not pf.likely_plan and not pf.likely_section:
+                pf.likely_title = True
+
+    # ── STAGE 3: KEYWORD DETECTION ──────────────────────────
     def _detect_keywords(self):
-        full = self.result.all_text
-        au_hits = self._detect(full, AU_KEYWORDS)
-        vn_hits = self._detect(full, VN_KEYWORDS)
-        intl_hits = self._detect(full, INTL_KEYWORDS)
-        self.result.keywords = {**au_hits, **vn_hits, **intl_hits}
+        t = self.result.all_text
+        scores = {}
 
-    def _detect(self, text: str, keyword_map: dict) -> dict:
-        hits = {}
-        for key, patterns in keyword_map.items():
-            hits[key] = any(p in text for p in patterns)
-        return hits
+        for kw_set, name in [(AU_KEYWORDS, "AU"), (VN_KEYWORDS, "VN"), (INTL_KEYWORDS, "INTL")]:
+            for key, patterns in kw_set.items():
+                count = sum(1 for pat in patterns if pat in t)
+                if count > 0:
+                    self.result.keywords[f"{name}_{key}"] = True
+                    scores[f"{name}_{key}"] = count
+                else:
+                    self.result.keywords[f"{name}_{key}"] = False
+                    scores[f"{name}_{key}"] = 0
 
+        self.result.keyword_scores = scores
+
+    # ── STAGE 4: LANGUAGE DETECTION ─────────────────────────
+    def _detect_language(self):
+        t = self.result.all_text
+        vn_count = sum(1 for w in VN_MARKER_WORDS if w in t)
+        en_count = sum(1 for w in EN_MARKER_WORDS if w in t)
+
+        if vn_count > en_count and vn_count >= 2:
+            self.result.detected_language = "vn"
+        elif en_count > vn_count and en_count >= 2:
+            self.result.detected_language = "en"
+        else:
+            self.result.detected_language = "vn" if vn_count > 0 else "unknown"
+
+    # ── STAGE 5: REGION DERIVATION ──────────────────────────
     def _derive_region(self):
-        k = self.result.keywords
-        au_score = sum([
-            k.get("AS_NZS", False), k.get("AS4100", False), k.get("AS3600", False),
-            k.get("level_rl", False), k.get("UB_sections", False),
-            k.get("portal_frame", False), k.get("purlin", False),
-        ])
-        vn_score = sum([
-            k.get("TCVN", False), k.get("concrete", False) and k.get("reinforcement", False),
-        ])
-        intl_score = sum([k.get("ISO", False)])
-        if au_score >= 3:
-            self.result.region = "au"
-        elif vn_score >= 2:
-            self.result.region = "vn"
-        elif intl_score >= 1:
-            self.result.region = "intl"
-        elif k.get("AS_NZS", False) or k.get("UB_sections", False):
-            self.result.region = "au"
-        else:
-            self.result.region = "unknown"
+        au_score = sum(
+            v for k, v in self.result.keyword_scores.items() if k.startswith("AU_")
+        )
+        vn_score = sum(
+            v for k, v in self.result.keyword_scores.items() if k.startswith("VN_")
+        )
+        intl_score = sum(
+            v for k, v in self.result.keyword_scores.items() if k.startswith("INTL_")
+        )
 
+        scores = {"au": au_score, "vn": vn_score, "intl": intl_score}
+        best = max(scores, key=scores.get)
+        best_score = scores[best]
+
+        if best_score >= 2:
+            self.result.region = best
+            total = au_score + vn_score + intl_score or 1
+            self.result.region_confidence = round(best_score / total, 2)
+        else:
+            # Fallback: use language
+            if self.result.detected_language == "vn":
+                self.result.region = "vn"
+                self.result.region_confidence = 0.5
+            elif self.result.detected_language == "en":
+                self.result.region = "au"
+                self.result.region_confidence = 0.3
+
+    # ── STAGE 6: MATERIAL DERIVATION ────────────────────────
     def _derive_material(self):
-        k = self.result.keywords
-        is_steel = (
-            k.get("UB_sections", False) or k.get("UC_sections", False) or
-            k.get("PFC_sections", False) or k.get("RHS_SHS", False) or
-            k.get("EA_sections", False) or k.get("Z_purlin", False) or
-            k.get("portal_frame", False) or k.get("bolted", False)
+        t = self.result.all_text
+        steel_count = sum(
+            v for k, v in self.result.keyword_scores.items()
+            if "steel" in k and not k.startswith("INTL")
         )
-        is_concrete = (
-            k.get("concrete", False) or k.get("reinforcement", False) or
-            k.get("masonry", False) or k.get("footing", False)
+        concrete_count = sum(
+            v for k, v in self.result.keyword_scores.items() if "concrete" in k
         )
-        if is_steel and is_concrete:
-            self.result.primary_material = "mixed"
-        elif is_steel:
+        if steel_count > concrete_count * 1.5:
             self.result.primary_material = "steel"
-        elif is_concrete:
+        elif concrete_count > steel_count * 1.5:
             self.result.primary_material = "concrete"
+        elif steel_count > 0 or concrete_count > 0:
+            self.result.primary_material = "composite"
         else:
-            text = self.result.all_text
-            if "steel" in text or "ub" in text or "universal" in text:
-                self.result.primary_material = "steel"
-            elif "concrete" in text or "reinforc" in text:
-                self.result.primary_material = "concrete"
-            else:
-                self.result.primary_material = "unknown"
+            self.result.primary_material = "unknown"
 
+    # ── STAGE 7: BUILDING TYPE ──────────────────────────────
     def _derive_building_type(self):
-        k = self.result.keywords
-        text = self.result.all_text
-        if k.get("portal_frame", False) or "portal" in text:
+        t = self.result.all_text
+        if any(w in t for w in ["portal", "shed", "warehouse", "nha xuong", "nha thep"]):
             self.result.building_type = "portal_frame"
-        elif "multi" in text or any(f"level {i}" in text for i in range(1, 10)):
-            self.result.building_type = "multi_storey"
-        elif "warehouse" in text or "shed" in text or "factory" in text:
-            self.result.building_type = "industrial"
-        elif "residential" in text or "unit" in text or "apartment" in text:
+        elif any(w in t for w in ["residential", "apartment", "chung cu", "nha o"]):
             self.result.building_type = "residential"
-        elif "school" in text or "classroom" in text:
-            self.result.building_type = "educational"
+        elif any(w in t for w in ["office", "commercial", "van phong"]):
+            self.result.building_type = "commercial"
+        elif any(w in t for w in ["factory", "plant", "nha may"]):
+            self.result.building_type = "industrial"
         else:
-            if self.result.num_pages >= 20:
-                self.result.building_type = "commercial_industrial"
-            elif self.result.num_pages >= 8:
-                self.result.building_type = "multi_storey"
-            else:
-                self.result.building_type = "small_building"
+            self.result.building_type = "general"
 
+    # ── STAGE 8: HAS-TYPE FLAGS ─────────────────────────────
     def _derive_has_types(self):
-        k = self.result.keywords
-        self.result.has_schedules = (
-            k.get("column_schedule", False) or k.get("beam_schedule", False) or
-            k.get("footing_schedule", False) or k.get("bolt_schedule", False)
-        )
-        text = self.result.all_text
-        self.result.has_plans = any(
-            w in text for w in ["plan", "ground floor", "first floor", "floor plan",
-                               "framing plan", "footing plan", "roof plan"]
-        )
-        self.result.has_elevations = any(
-            w in text for w in ["elevation", "section a", "section b",
-                               "north elevation", "south elevation"]
-        )
-        self.result.has_sections = any(
-            w in text for w in ["section", "detail a", "detail b", "typical detail"]
-        )
-        self.result.has_details = any(
-            w in text for w in ["detail", "connection", "splice", "base plate",
-                               "stiffener", "hold down"]
-        )
+        self.result.has_plans = any(pf.likely_plan for pf in self.result.page_forensics)
+        self.result.has_elevations = any(pf.likely_elevation for pf in self.result.page_forensics)
+        self.result.has_sections = any(pf.likely_section for pf in self.result.page_forensics)
+        self.result.has_schedules = any(pf.likely_schedule for pf in self.result.page_forensics)
+        self.result.has_details = any(pf.likely_detail for pf in self.result.page_forensics)
 
-    def print_report(self):
-        r = self.result
-        print(f"\n{'='*60}")
-        print(f"FORENSIC REPORT: {self.pdf_path}")
-        print(f"{'='*60}")
-        print(f"  Pages: {r.num_pages}")
-        print(f"  Region: {r.region.upper()}")
-        print(f"  Material: {r.primary_material}")
-        print(f"  Building: {r.building_type}")
-        print(f"  Drawing Size: {r.drawing_size}")
-        print(f"  Has Plans: {r.has_plans}")
-        print(f"  Has Elevations: {r.has_elevations}")
-        print(f"  Has Sections: {r.has_sections}")
-        print(f"  Has Details: {r.has_details}")
-        print(f"  Has Schedules: {r.has_schedules}")
-        print(f"\n  Keywords Detected:")
-        for k, v in sorted(r.keywords.items()):
-            if v:
-                print(f"    [YES] {k}")
-        print(f"{'='*60}\n")
+    # ── STAGE 9: SCALE DETECTION ────────────────────────────
+    def _detect_scales(self):
+        t = self.result.all_text
+        seen = set()
+        for pat, label in SCALE_PATTERNS:
+            for m in re.finditer(pat, t, re.IGNORECASE):
+                scale_val = label if label else f"1:{m.group(1)}"
+                if scale_val not in seen:
+                    seen.add(scale_val)
+                    self.result.detected_scales.append(scale_val)
+
+        # Estimate defaults based on region
+        if not self.result.detected_scales:
+            if self.result.region == "vn":
+                self.result.estimated_scale_plans = "1:100"
+                self.result.estimated_scale_details = "1:25"
+            else:
+                self.result.estimated_scale_plans = "1:100"
+                self.result.estimated_scale_details = "1:20"
+        else:
+            # Use smallest detected for details, largest for plans
+            nums = []
+            for s in self.result.detected_scales:
+                try:
+                    nums.append(int(s.split(":")[1]))
+                except (IndexError, ValueError):
+                    pass
+            if nums:
+                self.result.estimated_scale_plans = f"1:{max(nums)}"
+                self.result.estimated_scale_details = f"1:{min(nums)}"
+
+    # ── STAGE 10: GRID DETECTION ────────────────────────────
+    def _detect_grids(self):
+        t = self.result.all_text
+        grid_x = set()
+        grid_y = set()
+
+        for pat in GRID_X_PATTERNS:
+            for m in re.finditer(pat, t, re.IGNORECASE):
+                grid_x.add(m.group(1))
+
+        for pat in GRID_Y_PATTERNS:
+            for m in re.finditer(pat, t, re.IGNORECASE):
+                grid_y.add(m.group(1).upper())
+
+        self.result.detected_grid_x = sorted(grid_x, key=lambda x: int(x) if x.isdigit() else 999)
+        self.result.detected_grid_y = sorted(grid_y)
 
 
-def run_forensic(pdf_path: str, verbose: bool = True) -> ForensicResult:
-    """Quick one-shot forensic analysis."""
+# ============================================================
+# PUBLIC HELPER
+# ============================================================
+
+def quick_forensic(pdf_path: str) -> dict:
+    """Run forensic analysis and return dict. Convenience wrapper."""
     analyzer = PDFForensicAnalyzer(pdf_path)
     result = analyzer.analyze()
-    if verbose:
-        analyzer.print_report()
-    return result
-
-
-__all__ = [
-    "PDFForensicAnalyzer",
-    "ForensicResult",
-    "run_forensic",
-    "AU_KEYWORDS",
-    "VN_KEYWORDS",
-    "INTL_KEYWORDS",
-]
+    return result.to_dict()

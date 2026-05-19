@@ -195,6 +195,8 @@ def call_llm(
     _call_type: str = "text",
     # Backward-compat: many agents use "images" instead of "image_parts"
     images: list | None = None,
+    # System prompt (used by ScannerV6, SynthesizerV7 etc.)
+    system: str | None = None,
 ) -> str:
     # Normalize: "images" kwarg is an alias for "image_parts"
     if images is not None and image_parts is None:
@@ -221,15 +223,18 @@ def call_llm(
     for attempt in range(retries):
         try:
             rprint(f"  [dim]LLM call -> Vertex AI (attempt {attempt+1}/{retries})[/]")
+            cfg = genai.types.GenerateContentConfig(
+                temperature=GENERATION_CONFIG["temperature"],
+                top_p=GENERATION_CONFIG["top_p"],
+                top_k=GENERATION_CONFIG["top_k"],
+                max_output_tokens=GENERATION_CONFIG["max_output_tokens"],
+            )
+            if system:
+                cfg.system_instruction = system
             response = _client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=_build_contents(prompt, image_parts),
-                config=genai.types.GenerateContentConfig(
-                    temperature=GENERATION_CONFIG["temperature"],
-                    top_p=GENERATION_CONFIG["top_p"],
-                    top_k=GENERATION_CONFIG["top_k"],
-                    max_output_tokens=GENERATION_CONFIG["max_output_tokens"],
-                ),
+                config=cfg,
             )
             text = response.text
             with _state_lock:

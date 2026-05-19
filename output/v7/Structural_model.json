@@ -1,0 +1,924 @@
+{
+  "project": {},
+  "grid_system": {
+    "x_axes": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "2.29",
+      "2.71",
+      "A"
+    ],
+    "y_axes": [
+      "A",
+      "B",
+      "C",
+      "C.8",
+      "D",
+      "D.2",
+      "T"
+    ],
+    "spacing_x_mm": 6000,
+    "spacing_y_mm": 6000
+  },
+  "levels": [
+    {
+      "type": "level",
+      "name": "LEVEL 03"
+    }
+  ],
+  "members": {
+    "columns": [
+      {
+        "type": "column",
+        "id": "C1",
+        "grid_x": "1",
+        "grid_y": "B",
+        "x_mm": 0,
+        "y_mm": 10000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C2",
+        "grid_x": "2",
+        "grid_y": "B",
+        "x_mm": 7000,
+        "y_mm": 10000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C3",
+        "grid_x": "3",
+        "grid_y": "B",
+        "x_mm": 14000,
+        "y_mm": 10000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C4",
+        "grid_x": "4",
+        "grid_y": "B",
+        "x_mm": 21000,
+        "y_mm": 10000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C5",
+        "grid_x": "1",
+        "grid_y": "C",
+        "x_mm": 0,
+        "y_mm": 5000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C6",
+        "grid_x": "2",
+        "grid_y": "C",
+        "x_mm": 7000,
+        "y_mm": 5000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C7",
+        "grid_x": "3",
+        "grid_y": "C",
+        "x_mm": 14000,
+        "y_mm": 5000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C8",
+        "grid_x": "4",
+        "grid_y": "C",
+        "x_mm": 21000,
+        "y_mm": 5000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C9",
+        "grid_x": "1",
+        "grid_y": "D",
+        "x_mm": 0,
+        "y_mm": 0,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C10",
+        "grid_x": "2",
+        "grid_y": "D",
+        "x_mm": 7000,
+        "y_mm": 0,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C11",
+        "grid_x": "3",
+        "grid_y": "D",
+        "x_mm": 14000,
+        "y_mm": 0,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C12",
+        "grid_x": "4",
+        "grid_y": "D",
+        "x_mm": 21000,
+        "y_mm": 0,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C_core_1",
+        "grid_x": "2.29",
+        "grid_y": "C.8",
+        "x_mm": 9000,
+        "y_mm": 4000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C_core_2",
+        "grid_x": "2.71",
+        "grid_y": "C.8",
+        "x_mm": 12000,
+        "y_mm": 4000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C_core_3",
+        "grid_x": "2.29",
+        "grid_y": "D.2",
+        "x_mm": 9000,
+        "y_mm": 1000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "type": "column",
+        "id": "C_core_4",
+        "grid_x": "2.71",
+        "grid_y": "D.2",
+        "x_mm": 12000,
+        "y_mm": 1000,
+        "section": "unknown_section",
+        "material": "unknown"
+      },
+      {
+        "id": "C13",
+        "grid_x": "4",
+        "grid_y": "A",
+        "coordinate_x_mm": 19000,
+        "coordinate_y_mm": 19000,
+        "type": "square",
+        "material": "concrete"
+      },
+      {
+        "id": "C14",
+        "grid_x": "4",
+        "grid_y": "B",
+        "coordinate_x_mm": 19000,
+        "coordinate_y_mm": 14000,
+        "type": "square",
+        "material": "concrete"
+      },
+      {
+        "id": "C15",
+        "grid_x": "4",
+        "grid_y": "C",
+        "coordinate_x_mm": 19000,
+        "coordinate_y_mm": 7000,
+        "type": "square",
+        "material": "concrete"
+      },
+      {
+        "id": "C16",
+        "grid_x": "4",
+        "grid_y": "D",
+        "coordinate_x_mm": 19000,
+        "coordinate_y_mm": 0,
+        "type": "square",
+        "material": "concrete"
+      },
+      {
+        "type": "column",
+        "id": "CH40b_Col",
+        "section": "CHS400b",
+        "grid_x": "2",
+        "grid_y": "D"
+      },
+      {
+        "type": "column",
+        "id": "CH35a_Col",
+        "section": "CHS350a",
+        "grid_x": "2",
+        "grid_y": "D"
+      },
+      {
+        "type": "column",
+        "id": "CH13c_Col",
+        "section": "CHS130c",
+        "grid_x": "2",
+        "grid_y": "D"
+      },
+      {
+        "type": "column",
+        "id": "CH15c_Col",
+        "section": "CHS150c",
+        "grid_x": "2",
+        "grid_y": "D"
+      },
+      {
+        "type": "steel_facade_column",
+        "id": "CH35a",
+        "section": "CH35a",
+        "height_mm": 5000,
+        "material": "steel",
+        "grid_x": "A",
+        "grid_y": "T",
+        "base_connection": "Assumed embedded or base plate to foundation (not detailed)",
+        "top_connection": "To roof structure at Level 03"
+      }
+    ],
+    "beams": [
+      {
+        "type": "beam",
+        "id": "CH32a_Bm",
+        "section": "CHS320a",
+        "connected_to_columns": [
+          "CH40b_Col"
+        ]
+      },
+      {
+        "type": "beam",
+        "id": "UB36c_Bm",
+        "section": "UB360c",
+        "connected_to_columns": [
+          "CH35a_Col",
+          "CH15c_Col"
+        ]
+      },
+      {
+        "type": "beam",
+        "id": "SH15b_Bm",
+        "section": "SHS150b",
+        "connected_to_columns": [
+          "CH13c_Col",
+          "CH15c_Col"
+        ]
+      },
+      {
+        "type": "beam",
+        "id": "PF15a_Purlin",
+        "section": "PF150a"
+      },
+      {
+        "type": "beam",
+        "id": "PF25a_Purlin",
+        "section": "PF250a"
+      }
+    ],
+    "slabs": [
+      {
+        "type": "slab",
+        "material": "concrete",
+        "thickness_mm": null,
+        "boundary": [
+          [
+            0,
+            0
+          ],
+          [
+            11700,
+            0
+          ],
+          [
+            11700,
+            11700
+          ],
+          [
+            0,
+            11700
+          ],
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "type": "slab",
+        "id": "Slab_03",
+        "material": "concrete",
+        "grade": "unknown_grade",
+        "thickness_mm": "unknown_thickness",
+        "boundary_points_mm": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 21000,
+            "y": 0
+          },
+          {
+            "x": 21000,
+            "y": 10000
+          },
+          {
+            "x": 0,
+            "y": 10000
+          }
+        ]
+      },
+      {
+        "id": "Slab_01",
+        "type": "floor_slab",
+        "thickness_mm": null,
+        "material": "concrete",
+        "boundary_points_mm": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 19000,
+            "y": 0
+          },
+          {
+            "x": 19000,
+            "y": 19000
+          },
+          {
+            "x": 0,
+            "y": 19000
+          },
+          {
+            "x": 0,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "walls": [
+      {
+        "type": "core_wall",
+        "material": "concrete",
+        "boundary": [
+          [
+            4600,
+            1700
+          ],
+          [
+            7100,
+            1700
+          ],
+          [
+            7100,
+            4200
+          ],
+          [
+            4600,
+            4200
+          ],
+          [
+            4600,
+            1700
+          ]
+        ]
+      },
+      {
+        "type": "stairwell_wall",
+        "material": "concrete",
+        "boundary": [
+          [
+            0,
+            1600
+          ],
+          [
+            2500,
+            1600
+          ],
+          [
+            2500,
+            10100
+          ],
+          [
+            0,
+            10100
+          ],
+          [
+            0,
+            1600
+          ]
+        ]
+      },
+      {
+        "type": "stairwell_wall",
+        "material": "concrete",
+        "boundary": [
+          [
+            9200,
+            1600
+          ],
+          [
+            11700,
+            1600
+          ],
+          [
+            11700,
+            10100
+          ],
+          [
+            9200,
+            10100
+          ],
+          [
+            9200,
+            1600
+          ]
+        ]
+      },
+      {
+        "type": "wall",
+        "id": "W_core_1",
+        "start_x_mm": 9000,
+        "start_y_mm": 1000,
+        "end_x_mm": 12000,
+        "end_y_mm": 1000,
+        "thickness_mm": "unknown_thickness",
+        "material": "concrete"
+      },
+      {
+        "type": "wall",
+        "id": "W_core_2",
+        "start_x_mm": 12000,
+        "start_y_mm": 1000,
+        "end_x_mm": 12000,
+        "end_y_mm": 4000,
+        "thickness_mm": "unknown_thickness",
+        "material": "concrete"
+      },
+      {
+        "type": "wall",
+        "id": "W_core_3",
+        "start_x_mm": 12000,
+        "start_y_mm": 4000,
+        "end_x_mm": 9000,
+        "end_y_mm": 4000,
+        "thickness_mm": "unknown_thickness",
+        "material": "concrete"
+      },
+      {
+        "type": "wall",
+        "id": "W_core_4",
+        "start_x_mm": 9000,
+        "start_y_mm": 4000,
+        "end_x_mm": 9000,
+        "end_y_mm": 1000,
+        "thickness_mm": "unknown_thickness",
+        "material": "concrete"
+      },
+      {
+        "id": "Wall_EW_1",
+        "type": "external_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 0,
+          "y": 0
+        },
+        "end_point_mm": {
+          "x": 0,
+          "y": 19000
+        }
+      },
+      {
+        "id": "Wall_EW_2",
+        "type": "external_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 19000,
+          "y": 0
+        },
+        "end_point_mm": {
+          "x": 19000,
+          "y": 19000
+        }
+      },
+      {
+        "id": "Wall_EW_3",
+        "type": "external_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 0,
+          "y": 19000
+        },
+        "end_point_mm": {
+          "x": 19000,
+          "y": 19000
+        }
+      },
+      {
+        "id": "Wall_EW_4",
+        "type": "external_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 0,
+          "y": 0
+        },
+        "end_point_mm": {
+          "x": 19000,
+          "y": 0
+        }
+      },
+      {
+        "id": "Wall_IW_1",
+        "type": "internal_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 7000,
+          "y": 7000
+        },
+        "end_point_mm": {
+          "x": 7000,
+          "y": 19000
+        }
+      },
+      {
+        "id": "Wall_IW_2",
+        "type": "internal_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 14000,
+          "y": 7000
+        },
+        "end_point_mm": {
+          "x": 14000,
+          "y": 19000
+        }
+      },
+      {
+        "id": "Wall_IW_3",
+        "type": "internal_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 7000,
+          "y": 7000
+        },
+        "end_point_mm": {
+          "x": 14000,
+          "y": 7000
+        }
+      },
+      {
+        "id": "Wall_IW_4",
+        "type": "internal_core_wall",
+        "material": "concrete",
+        "thickness_mm": 300,
+        "start_point_mm": {
+          "x": 7000,
+          "y": 14000
+        },
+        "end_point_mm": {
+          "x": 14000,
+          "y": 14000
+        }
+      },
+      {
+        "type": "wall_detail",
+        "id": "Corner Detail",
+        "description": "Typical corner detail for double-layer reinforced concrete wall.",
+        "material": "Reinforced Concrete",
+        "reinforcement": [
+          {
+            "type": "vertical_bars",
+            "notes": "Minimum 3 vertical bars inside U-bars"
+          },
+          {
+            "type": "horizontal_bars",
+            "bar_shape": "U-bars",
+            "notes": "Same size and spacing as horizontal reinforcement"
+          },
+          {
+            "type": "lap",
+            "notes": "Tension lap"
+          }
+        ]
+      },
+      {
+        "type": "wall_detail",
+        "id": "Junction",
+        "description": "Typical T-junction detail for double-layer reinforced concrete wall.",
+        "material": "Reinforced Concrete",
+        "reinforcement": [
+          {
+            "type": "horizontal_bars",
+            "bar_shape": "U-bars",
+            "notes": "Same size and spacing as horizontal reinforcement"
+          },
+          {
+            "type": "lap",
+            "notes": "Tension lap"
+          }
+        ]
+      },
+      {
+        "type": "wall_detail",
+        "id": "End of Wall",
+        "description": "Typical end of wall detail for double-layer reinforced concrete wall.",
+        "material": "Reinforced Concrete",
+        "reinforcement": [
+          {
+            "type": "trimmers",
+            "bar_size_mm": 16,
+            "notes": "Same size as vertical reinforcement, N16 minimum"
+          },
+          {
+            "type": "horizontal_bars",
+            "bar_shape": "U-bars",
+            "notes": "Same size and spacing as horizontal reinforcement"
+          }
+        ]
+      },
+      {
+        "type": "wall_detail",
+        "id": "Between Doorways",
+        "description": "Typical wall detail between doorways for double-layer reinforced concrete wall.",
+        "material": "Reinforced Concrete",
+        "reinforcement": [
+          {
+            "type": "horizontal_bars",
+            "bar_shape": "U-bars",
+            "notes": "Same size and spacing as horizontal reinforcement"
+          },
+          {
+            "type": "lap",
+            "notes": "Tension lap"
+          }
+        ]
+      },
+      {
+        "type": "wall_detail",
+        "id": "Long Corner",
+        "description": "Typical long corner detail for double-layer reinforced concrete wall.",
+        "material": "Reinforced Concrete",
+        "reinforcement": [
+          {
+            "type": "trimmers",
+            "bar_size_mm": 16,
+            "notes": "Same size as vertical reinforcement, N16 minimum"
+          },
+          {
+            "type": "horizontal_bars",
+            "bar_shape": "U-bars",
+            "notes": "Same size and spacing as horizontal reinforcement"
+          },
+          {
+            "type": "lap",
+            "notes": "Tension lap"
+          }
+        ],
+        "dimensions_mm": {
+          "wall_segment_length_max": 2000
+        }
+      },
+      {
+        "type": "wall_detail",
+        "id": "Short Corner",
+        "description": "Typical short corner detail for double-layer reinforced concrete wall.",
+        "material": "Reinforced Concrete",
+        "reinforcement": [
+          {
+            "type": "ties",
+            "bar_size_mm": 12,
+            "spacing_mm": 200,
+            "notes": "Closed ties"
+          },
+          {
+            "type": "trimmers",
+            "bar_size_mm": 16,
+            "notes": "Same size as vertical reinforcement, N16 minimum"
+          },
+          {
+            "type": "lap",
+            "notes": "Tension lap"
+          }
+        ],
+        "dimensions_mm": {
+          "wall_segment_length_max": 1000
+        }
+      },
+      {
+        "type": "wall_detail",
+        "id": "Wall to Column Wall One Side Only",
+        "description": "Typical connection detail of a double-layer reinforced concrete wall to a concrete column, with the wall on one side.",
+        "material": "Reinforced Concrete",
+        "connection_type": "Scabble surface",
+        "reinforcement": [
+          {
+            "type": "horizontal_bars",
+            "bar_shape": "L-bars",
+            "notes": "Same size and spacing as horizontal reinforcement"
+          },
+          {
+            "type": "lap",
+            "notes": "Tension lap"
+          }
+        ]
+      },
+      {
+        "type": "wall_detail",
+        "id": "Wall to Column Wall Both Sides",
+        "description": "Typical connection detail of a double-layer reinforced concrete wall to a concrete column, with walls on both sides.",
+        "material": "Reinforced Concrete",
+        "connection_type": "Scabble surface",
+        "reinforcement": [
+          {
+            "type": "horizontal_bars",
+            "bar_shape": "L-bars",
+            "notes": "Same size and spacing as horizontal reinforcement"
+          },
+          {
+            "type": "lap",
+            "notes": "Tension lap"
+          }
+        ]
+      },
+      {
+        "id": "W1",
+        "type": "wall",
+        "location_description": "Horizontal wall segment between grid A and B",
+        "grid_x_span": [
+          "2",
+          "4"
+        ],
+        "grid_y_bounding_grids": [
+          "A",
+          "B"
+        ],
+        "thickness_mm": 250,
+        "material": "Concrete",
+        "concrete_grade": "50MPa",
+        "reinforcement": {
+          "vertical": "N16-200 E.F.",
+          "horizontal": "N16-250 E.F."
+        }
+      },
+      {
+        "id": "W2",
+        "type": "wall",
+        "location_description": "Vertical wall segment along grid 4",
+        "grid_x_reference": "4",
+        "grid_y_span": [
+          "B",
+          "D"
+        ],
+        "thickness_mm": 250,
+        "material": "Concrete",
+        "concrete_grade": "50MPa",
+        "reinforcement": {
+          "vertical": "N16-200 E.F.",
+          "horizontal": "N16-250 E.F."
+        }
+      },
+      {
+        "id": "W3",
+        "type": "wall",
+        "location_description": "Horizontal wall segment along grid D",
+        "grid_x_span": [
+          "1",
+          "2"
+        ],
+        "grid_y_reference": "D",
+        "thickness_mm": 250,
+        "material": "Concrete",
+        "concrete_grade": "50MPa",
+        "reinforcement": {
+          "vertical": "N16-200 E.F.",
+          "horizontal": "N16-250 E.F."
+        }
+      },
+      {
+        "id": "Core_Wall_X1",
+        "type": "wall",
+        "location_description": "Vertical wall segment along grid 2, part of core",
+        "grid_x_reference": "2",
+        "grid_y_span": [
+          "C",
+          "D"
+        ],
+        "thickness_mm": 250,
+        "material": "Concrete",
+        "concrete_grade": "50MPa",
+        "reinforcement": {
+          "vertical": "N16-200 E.F.",
+          "horizontal": "N16-250 E.F."
+        }
+      },
+      {
+        "id": "Core_Wall_X2",
+        "type": "wall",
+        "location_description": "Vertical wall segment along grid 3, part of core",
+        "grid_x_reference": "3",
+        "grid_y_span": [
+          "C",
+          "D"
+        ],
+        "thickness_mm": 250,
+        "material": "Concrete",
+        "concrete_grade": "50MPa",
+        "reinforcement": {
+          "vertical": "N16-200 E.F.",
+          "horizontal": "N16-250 E.F."
+        }
+      },
+      {
+        "id": "Core_Wall_Y1",
+        "type": "wall",
+        "location_description": "Horizontal wall segment along grid C, part of core",
+        "grid_x_span": [
+          "2",
+          "3"
+        ],
+        "grid_y_reference": "C",
+        "thickness_mm": 250,
+        "material": "Concrete",
+        "concrete_grade": "50MPa",
+        "reinforcement": {
+          "vertical": "N16-200 E.F.",
+          "horizontal": "N16-250 E.F."
+        }
+      },
+      {
+        "id": "Core_Wall_Y2",
+        "type": "wall",
+        "location_description": "Horizontal wall segment along grid D, part of core",
+        "grid_x_span": [
+          "2",
+          "3"
+        ],
+        "grid_y_reference": "D",
+        "thickness_mm": 250,
+        "material": "Concrete",
+        "concrete_grade": "50MPa",
+        "reinforcement": {
+          "vertical": "N16-200 E.F.",
+          "horizontal": "N16-250 E.F."
+        }
+      }
+    ],
+    "footings": [],
+    "bracing": []
+  },
+  "materials": {
+    "primary": "steel",
+    "region": "au",
+    "building_type": "general"
+  },
+  "summary": {
+    "total_columns": 25,
+    "total_beams": 5,
+    "total_slabs": 3,
+    "total_walls": 30,
+    "total_footings": 0,
+    "total_bracing": 0,
+    "num_levels": 1,
+    "grid_x_axes": 7,
+    "grid_y_axes": 7
+  },
+  "synthesis_method": "deterministic",
+  "elapsed_s": 73.6
+}
