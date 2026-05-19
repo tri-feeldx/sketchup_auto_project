@@ -1,0 +1,144 @@
+================================================================================
+  DAILY REPORT -- 18/05/2026 (Monday)
+  Project: SketchUp Auto -- PDF to SketchUp LOD 300 Pipeline
+================================================================================
+
+
+----------------------------------------------------------------------
+TODAY'S ACCOMPLISHMENTS
+----------------------------------------------------------------------
+
+  1. FULL CODEBASE AUDIT [COMPLETED]
+     * Read & analyzed all 35+ files across the project
+     * Mapped the entire architecture: agents/, core/, pipelines V1-V5
+     * Identified code duplication across 7 pipeline versions
+
+  2. ROOT CAUSE DIAGNOSIS [COMPLETED]
+     Found 5 critical root causes behind ~1% model accuracy:
+
+     [CRITICAL] GRID LABEL NOISE
+        X-axis: spurious numbers (21, 90, 0, 02, 61, 40) leak through filter
+        Y-axis: only 2 labels detected (A, C) instead of 6+ (A through F/G)
+        -> All structural member positions are wrong
+
+     [CRITICAL] MEMBER DETECTION = ZERO
+        0 columns, 0 beams detected across all floors
+        Schedule data not linked to element placement
+        -> Output is empty geometry / placeholders only
+
+     [CRITICAL] LEVEL MARKERS MISSING
+        Only ROOF/BASE/GROUND detected
+        No FL1-FL9 elevation markers from elevation pages
+        -> No Z-height data per floor
+
+     [HIGH] NO MULTI-PAGE CONSENSUS
+        Each page analyzed independently
+        No cross-page data merging or spatial stability filtering
+
+     [HIGH] PIPELINE PROLIFERATION
+        7 half-baked pipeline variants (V1-V5 + phase1 + pipeline_v5)
+        No single complete end-to-end working path
+
+  3. BUG FIX -- PIPELINE V5 IMPORT [FIXED]
+     * File "pipeline_v5" had no .py extension -> import failed in Streamlit
+     * Fix: renamed to pipeline_v5.py
+     * Verified: "from pipeline_v5 import run_pipeline_v5" -> OK
+
+  4. V6 ARCHITECTURE DESIGNED [COMPLETED]
+     New pipeline: Programmatic-First + LLM Verifier
+
+     Phase 0 -> PDF Structured Parser (pdfplumber)
+     Phase 1 -> Page Classifier (rule-based, 5 types)
+     Phase 2 -> Multi-Page Consensus Engine (cross-page fusion)
+     Phase 3 -> LLM Verifier (Gemini fills gaps only)
+     Phase 4 -> Ruby Generator (template-based LOD300/350/400)
+
+     Key principles:
+       * Programmatic extraction first (pdfplumber), LLM only for gaps
+       * Cross-page consensus for grid, dimensions, level markers
+       * Single unified code path replacing all V1-V5
+
+  5. PROJECT RETROSPECTIVE DOCUMENT [COMPLETED]
+     * Full history: V1 -> V5 journey
+     * All bugs fixed vs remaining
+     * Architecture evolution (diagram included)
+     * Risk matrix + mitigation strategies
+     * 6 key lessons learned
+     -> Saved as PROJECT_RETROSPECTIVE.txt
+
+
+----------------------------------------------------------------------
+TOMORROW'S PLAN -- 19/05/2026 (Tuesday)
+----------------------------------------------------------------------
+
+  FOCUS: SPRINT 1 -- PDF Structured Parser + Page Classifier Rewrite
+
+  TASK 1 -- Rewrite PDF Structured Parser (ETA: 2h)
+    [ ] Implement robust pdfplumber token extraction on every page
+    [ ] Extract text with: content, position (x,y), font name, font size
+    [ ] Extract vector lines, rectangles and curves
+    [ ] Group tokens by spatial proximity into "text blocks"
+    [ ] Output: RawPageData dataclass per page
+    [ ] Test on Structural.pdf -- verify text completeness
+
+  TASK 2 -- Upgrade Page Classifier (ETA: 1h)
+    [ ] 5 classification types: plan, elevation, section, schedule, title
+    [ ] Rule-based heuristics:
+        - plan:      grid labels + column marks + large rect lines
+        - elevation: vertical dimension chains + level markers
+        - section:   hatching patterns + detail callouts
+        - schedule:  table lines + column headers
+        - title:     large font text only, no structural content
+    [ ] Line density metric (>=3000 lines = drawing page)
+    [ ] Text pattern matching for each type
+    [ ] Output: ClassifiedPage[] with type + confidence
+
+  TASK 3 -- Integration Test (ETA: 30min)
+    [ ] Run new parser + classifier on Structural.pdf
+    [ ] Verify: all pages classified correctly
+    [ ] Verify: grid text tokens detected on plan pages
+    [ ] Verify: level markers detected on elevation pages
+
+  TARGET BY END OF DAY:
+    [DONE] All 25+ pages classified correctly
+    [DONE] All text tokens extracted with positions
+    [DONE] Ready for Sprint 2 (Grid Consensus Engine)
+
+
+----------------------------------------------------------------------
+METRICS TRACKING
+----------------------------------------------------------------------
+
+  +------------------------------+----------------+----------------+
+  | Metric                       | Current        | Target (V6)    |
+  +------------------------------+----------------+----------------+
+  | Page classification accuracy | 100%           | 100%           |
+  | Grid X labels (clean)        | 10/10 (noisy)  | 10/10 (clean)  |
+  | Grid Y labels                | 2/6 (A,C)      | 6/6 (A-F)      |
+  | Level markers per floor      | 3 (ROOF etc)   | All floors     |
+  | Columns detected             | 0%             | >80%           |
+  | Beams detected               | 0%             | >70%           |
+  | Model similarity to PDF      | ~1%            | >70%           |
+  +------------------------------+----------------+----------------+
+
+
+----------------------------------------------------------------------
+BLOCKERS / DEPENDENCIES
+----------------------------------------------------------------------
+
+  None currently. All tools available (pdfplumber, Gemini API, Python 3.x).
+
+
+----------------------------------------------------------------------
+NOTES
+----------------------------------------------------------------------
+
+  * Streamlit UI is functional with V5 pipeline after today's import fix
+  * However V5 still has the same core issues (grid noise, 0 members)
+  * V6 is the strategic fix -- programmatic-first approach will solve root causes
+  * Target: working V6 pipeline within 2 weeks, >70% model accuracy
+
+
+================================================================================
+  END OF DAILY REPORT
+================================================================================

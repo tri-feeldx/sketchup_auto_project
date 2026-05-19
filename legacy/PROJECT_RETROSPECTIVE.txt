@@ -1,0 +1,363 @@
+================================================================================
+  SKETCHUP AUTO PROJECT -- FULL RETROSPECTIVE & ROADMAP
+  PDF -> SketchUp LOD 300/350/400 Automated Pipeline
+================================================================================
+  Date:        18/05/2026
+  Author:      AI Engineering Lead (Feeldx Team)
+  Project:     sketchup_auto_project
+  Status:      Active Development -- Transitioning to V6
+================================================================================
+
+
+----------------------------------------------------------------------
+1. PROJECT VISION & OBJECTIVE
+----------------------------------------------------------------------
+
+  Goal: Build an automated pipeline that converts ANY construction PDF
+  (structural, architectural, multi-floor buildings) into a SketchUp
+  3D model at LOD 300-400 fidelity, output as executable Ruby (.rb) script.
+
+  Input:   PDF ban ve xay dung (structural plans, elevations, sections,
+           schedules)
+  Output:  SketchUp Ruby script -> load directly into SketchUp -> 3D model
+
+  Target accuracy: > 70% visual similarity to source PDF
+  Current accuracy: ~1% (critical gap identified, V6 plan in place)
+
+
+----------------------------------------------------------------------
+2. JOURNEY THROUGH 5 VERSIONS
+----------------------------------------------------------------------
+
+  +---------+-------------------------------------+--------------------------+
+  | Version | Description                         | Status                   |
+  +---------+-------------------------------------+--------------------------+
+  | V1      | Pre-refactor: scanner ->            | ABANDONED                |
+  |         | parser -> mapper -> coder -> auditor| Output: ~1% accuracy     |
+  |         |                                     | Ruby script mostly empty |
+  +---------+-------------------------------------+--------------------------+
+  | V2      | Attempted improvements on V1        | ABANDONED                |
+  |         |                                     | No significant gains     |
+  +---------+-------------------------------------+--------------------------+
+  | V3      | Grid-based extraction + LLM prompts | PARTIALLY FUNCTIONAL     |
+  |         | 9 floors (down from 18 after fixes) | Grid noise still severe  |
+  |         | Classifier: 100% accuracy           | 0 columns/beams detected |
+  +---------+-------------------------------------+--------------------------+
+  | V4      | Dual-mode: grid_based +             | DEPLOYED (current live)  |
+  |         | gridless_architectural + hybrid     | DPI=120, strategy=hybrid |
+  |         | Architectural: doors/windows/stairs | Still ~1% model match    |
+  +---------+-------------------------------------+--------------------------+
+  | V5      | Vision-First: Gemini 2.5 Flash      | PARTIALLY FUNCTIONAL     |
+  |         | analyzes 300 DPI page images        | Import bug fixed 18/05   |
+  |         | Multi-floor, type-specific prompts  | Not yet end-to-end       |
+  +---------+-------------------------------------+--------------------------+
+
+
+----------------------------------------------------------------------
+3. BUGS FIXED (Phase 0-1 Debugging)
+----------------------------------------------------------------------
+
+  1. PAGE CLASSIFIER BUG
+     - Schedule page 25 classified as "plan" -> 25 ghost floors
+     - Fix: Added line density heuristic (>3000 vector lines = drawing page)
+     - Result: 100% classification accuracy
+
+  2. DOUBLE-APPEND FLOORS
+     - parse_all() called twice -> 18 floors instead of 9
+     - Fix: self.pages = [] at start of parse_all()
+     - Result: Correct floor count
+
+  3. Y-AXIS DIMENSION CALLOUT FILTER
+     - Dimension numbers (>20) at page edges treated as grid labels
+     - Fix: Numbers at left/right margins -> score = 0 (filtered)
+     - Result: Cleaner Y-axis, but still only 2 labels (A, C)
+
+  4. FLOOR LAYOUT -> DICT CONVERTER
+     - Coder received FloorLayout objects instead of dicts
+     - Fix: Added conversion layer
+     - Result: Coder can now consume floor data
+
+  5. PIPELINE V5 IMPORT BUG (18/05/2026)
+     - File named "pipeline_v5" (no .py extension) -> import failed
+     - Fix: Renamed to pipeline_v5.py
+     - Result: V5 pipeline importable
+
+
+----------------------------------------------------------------------
+4. CRITICAL BUGS REMAINING (Root Causes of 1% Accuracy)
+----------------------------------------------------------------------
+
+  [CRITICAL] 1. GRID LABEL NOISE
+     - X-axis: Numbers 21, 90, 0, 02, 61, 40 leak through filter
+     - Y-axis: Only 2 labels detected (A, C) -- should be A,B,C,D,E,F,G
+     - Impact: All column/beam positions are wrong -> model disconnected
+
+  [CRITICAL] 2. MEMBER DETECTION = ZERO
+     - 0 columns detected, 0 beams detected across all floors
+     - Schedule extraction doesn't feed into element placement
+     - Impact: Output is empty geometry / placeholders only
+
+  [CRITICAL] 3. LEVEL MARKERS MISSING
+     - Only ROOF, BASE, GROUND detected
+     - No FL1-FL9 elevation markers extracted from elevation pages
+     - Impact: Wrong Z-heights per floor
+
+  [HIGH] 4. NO MULTI-PAGE CONSENSUS
+     - Each page analyzed independently -- no cross-page data merging
+     - Grid from page 1 might differ from page 2 -> inconsistent model
+     - No spatial clustering or stability filter
+
+  [HIGH] 5. PIPELINE PROLIFERATION
+     - 7 pipeline variants exist (V1, V2, V3, V4, V5 + phase1 + pipeline_v5)
+     - All half-baked, no single complete end-to-end path
+     - Maintenance nightmare, bugs repeat across versions
+
+
+----------------------------------------------------------------------
+5. ARCHITECTURE EVOLUTION
+----------------------------------------------------------------------
+
+  CURRENT (V4/V5 Architecture):
+
+    PDF -> Phase 0: Classifier -> Phase 1: Scanner -> Phase 2: Extractor
+        -> Phase 3: Coder (Ruby Generator) -> .rb file
+
+  PROBLEMS WITH CURRENT ARCH:
+    * LLM does all heavy lifting -> hallucination, inconsistency
+    * No structured PDF parsing (pdfplumber unused effectively)
+    * No cross-page data fusion
+    * Single-pass extraction -> no verification loop
+
+
+  TARGET (V6 Architecture -- Programmatic-First + LLM Verifier):
+
+    PDF INPUT
+        |
+        v
+    +----------------------------------------------+
+    | PHASE 0: PDF STRUCTURED PARSER               |
+    |  * pdfplumber: extract all text tokens        |
+    |  * Extract vector lines per page             |
+    |  * Output: RawPageData[]                     |
+    +----------------------+-----------------------+
+                           |
+                           v
+    +----------------------------------------------+
+    | PHASE 1: PAGE CLASSIFIER (rule-based)        |
+    |  * plan | elevation | section | schedule     |
+    |  * Line density + text patterns              |
+    |  * Output: ClassifiedPage[]                  |
+    +----------------------+-----------------------+
+                           |
+             +-------------+----+--------+--------+
+             v             v    v        v
+    +---------+  +---------+ +-------+ +----------+
+    |  PLAN   |  |  ELEV   | | SECT  | | SCHEDULE |
+    |  EXTR   |  |  EXTR   | | EXTR  | | EXTRACT  |
+    +----+----+  +----+----+ +---+---+ +----+-----+
+         |            |          |          |
+         +------------+----------+----------+
+                      |
+                      v
+    +----------------------------------------------+
+    | PHASE 2: CROSS-PAGE CONSENSUS ENGINE         |
+    |  * Merge grid labels from ALL pages           |
+    |  * Spatial clustering + stability             |
+    |  * Dimension chain -> mm resolution           |
+    |  * Level markers -> Z-height assignment       |
+    |  * Output: UnifiedBuildingModel              |
+    +----------------------+-----------------------+
+                           |
+                           v
+    +----------------------------------------------+
+    | PHASE 3: LLM VERIFIER (lightweight)           |
+    |  * Send page image + extracted data           |
+    |  * LLM only FILLS GAPS, not primary extract   |
+    |  * Output: VerifiedBuildingModel             |
+    +----------------------+-----------------------+
+                           |
+                           v
+    +----------------------------------------------+
+    | PHASE 4: RUBY GENERATOR (template-based)      |
+    |  * LOD300: Columns + Beams + Slabs           |
+    |  * LOD350: + Connections + Openings          |
+    |  * LOD400: + Bolts + Welds + Details         |
+    |  * Output: lod300_model.rb                   |
+    +----------------------------------------------+
+
+  KEY PRINCIPLES:
+    * PROGRAMMATIC-FIRST: pdfplumber + math engine -> fast, cheap, deterministic
+    * LLM AS VERIFIER: Gemini only to fill gaps, not primary extraction
+    * CROSS-PAGE FUSION: Merge data from all pages for consistency
+    * SINGLE PIPELINE: One code path, no more V1-V5 proliferation
+
+
+----------------------------------------------------------------------
+6. CURRENT TECH STACK
+----------------------------------------------------------------------
+
+  Language:     Python 3.x
+  UI:           Streamlit (app.py)
+  LLM:          Google Gemini 2.5 Flash (via Vertex AI)
+  PDF Parsing:  pdfplumber, PyMuPDF (fitz), pdf2image (poppler)
+  Output:       SketchUp Ruby API (.rb script)
+
+  Key Files:
+    app.py                          - Streamlit web UI
+    config.py                       - Paths, API keys, settings
+    core/llm_wrapper.py             - Gemini API wrapper + caching
+    core/pdf_utils.py               - PDF to image conversion
+    core/pdf_structured_parser.py   - pdfplumber text extraction
+    core/vision_renderer.py         - High-DPI PDF rendering
+    core/analysis_context.py        - Shared analysis state
+
+    agents/pdf_classifier.py        - PDF type detection
+    agents/scanner.py               - V1 scanner
+    agents/scanner_v4.py            - V4 scanner (schedule-aware)
+    agents/extractor_v4.py          - V4 structural+arch extraction
+    agents/ruby_generator_v3.py     - V3 Ruby code generator
+    agents/ruby_generator_v4.py     - V4 Ruby code generator
+    agents/structural_scanner.py    - Grid/dimension detection
+    agents/structural_extractor.py  - Member extraction from plan
+    agents/architectural_extractor  - Walls/doors/windows
+    agents/grid_math_engine.py      - Grid math utilities
+    agents/schedule_parser.py       - Schedule table parsing
+    agents/spatial_parser.py        - Spatial relationship mapping
+    agents/mapper.py                - Element mapping
+    agents/coder.py                 - Ruby code generation
+    agents/auditor.py               - Quality checking
+    agents/analyze_pdf.py           - PDF analysis entry point
+
+    pipeline_v2.py, pipeline_v3.py, pipeline_v4.py, pipeline_v5.py
+    main.py                         - Legacy pipeline entry
+
+
+----------------------------------------------------------------------
+7. SPRINT PLAN -- V6 IMPLEMENTATION
+----------------------------------------------------------------------
+
+  SPRINT 1 -- PDF Structured Parser + Page Classifier (ETA: 2h)
+    [ ] Rewrite pdf_structured_parser.py with robust pdfplumber integration
+    [ ] Extract text tokens with positions, fonts, sizes
+    [ ] Extract vector lines, rectangles, curves
+    [ ] Upgrade page classifier: plan/elevation/section/schedule/title
+    [ ] Output: RawPageData[] per page, cleanly typed
+
+  SPRINT 2 -- Multi-Page Grid Consensus Engine (ETA: 3h)
+    [ ] Implement grid label extraction from text tokens
+    [ ] X-axis: numeric labels (1,2,3...) with position clustering
+    [ ] Y-axis: alphabetic labels (A,B,C...) with position clustering
+    [ ] Spatial stability filter: remove outliers (21, 90, etc.)
+    [ ] Cross-page union: merge grids from all plan pages
+    [ ] Dimension chain resolver -> mm scale factor
+    [ ] Verify: Grid X clean (1-10), Grid Y complete (A-F/G), scale correct
+
+  SPRINT 3 -- Member Detection + Level Markers (ETA: 3h)
+    [ ] Column detection: text marks (C1,C2...) at grid intersections
+    [ ] Beam detection: connect columns along grid lines
+    [ ] Wall detection: line patterns on plan
+    [ ] Slab detection: page boundaries / dimension annotations
+    [ ] Level markers: extract from elevation/section pages
+    [ ] Pattern matching: RL/FFL/EL/FL + number + unit
+    [ ] Z-height assignment per floor
+
+  SPRINT 4 -- LLM Verifier + Ruby Generator (ETA: 2h)
+    [ ] Build lightweight LLM verifier: page image + extracted data -> gap fill
+    [ ] Template-based Ruby generator for LOD300/350/400
+    [ ] Proper SketchUp API: groups, layers, materials, IFC attributes
+    [ ] Generate valid .rb script
+
+  SPRINT 5 -- End-to-End + Web UI (ETA: 2h)
+    [ ] Single unified pipeline: upload PDF -> .rb script
+    [ ] Streamlit UI: progress bars, live logs, download button
+    [ ] Test with diverse drawings (single floor, multi-floor, industrial)
+    [ ] Target: >70% model similarity
+
+
+----------------------------------------------------------------------
+8. METRICS & TARGETS
+----------------------------------------------------------------------
+
+  +------------------------------+----------------+----------------+
+  | Metric                       | Current        | Target (V6)    |
+  +------------------------------+----------------+----------------+
+  | Page classification accuracy | 100%           | 100%           |
+  | Grid X labels detected       | 10/10 (noisy)  | 10/10 (clean)  |
+  | Grid Y labels detected       | 2/6 (A,C)      | 6/6 (A-F)      |
+  | Level markers detected       | 3 (ROOF,BASE)  | All floors     |
+  | Columns detected             | 0%             | >80%           |
+  | Beams detected               | 0%             | >70%           |
+  | Ruby script validity         | Not tested     | Loads in SU    |
+  | Model similarity to PDF      | ~1%            | >70%           |
+  +------------------------------+----------------+----------------+
+
+
+----------------------------------------------------------------------
+9. RISKS & MITIGATION
+----------------------------------------------------------------------
+
+  +-----------------------+-----------------+----------------------------+
+  | Risk                  | Impact          | Mitigation                 |
+  +-----------------------+-----------------+----------------------------+
+  | Poor PDF scan quality | Grid/dim fail   | LLM fallback with page     |
+  |                       |                 | image                      |
+  | Complex drawings      | Text fragments  | Spatial clustering +       |
+  | (nested blocks)       |                 | font-size grouping         |
+  | Mixed units           | Wrong scale     | Unit detection from        |
+  | (mm, cm, m)           |                 | dimension text             |
+  | Vietnamese + English  | Pattern mismatch| Dual-language patterns     |
+  | text                  |                 |                            |
+  | LLM cost explosion    | Budget overrun  | Programmatic-first; LLM    |
+  |                       |                 | only for gap-filling       |
+  | Multi-floor buildings | Undetected      | Elevation page analysis    |
+  |                       | levels          | + cross-reference          |
+  +-----------------------+-----------------+----------------------------+
+
+
+----------------------------------------------------------------------
+10. LESSONS LEARNED
+----------------------------------------------------------------------
+
+  1. LLM-FIRST EXTRACTION FAILS
+     * Gemini hallucinates positions, invents members, misses obvious elements
+     * Solution: Programmatic extraction first, LLM only for verification
+
+  2. GRID IS THE FOUNDATION
+     * Without accurate grid, ALL positions are wrong
+     * Grid must be the FIRST thing perfected, not an afterthought
+
+  3. CROSS-PAGE CONSENSUS IS ESSENTIAL
+     * Construction PDFs spread data across multiple pages
+     * Single-page analysis = incomplete/inconsistent data
+
+  4. PIPELINE PROLIFERATION KILLS PROGRESS
+     * 7 half-baked pipelines = zero working pipelines
+     * Must consolidate to ONE clean code path
+
+  5. SCHEDULE PAGES ARE GOLD
+     * Member dimensions, materials, marks all in schedule tables
+     * Currently underutilized -- schedule extraction must feed member placement
+
+  6. PDFPLUMBER > IMAGE-ONLY
+     * Text extraction from PDF vectors is deterministic and accurate
+     * Image-based (Vision API) should be fallback, not primary
+
+
+----------------------------------------------------------------------
+11. NEXT STEPS (IMMEDIATE)
+----------------------------------------------------------------------
+
+  [DONE]  Fix: pipeline_v5.py import (18/05/2026)
+  [TODO]  Begin Sprint 1: Rewrite PDF Structured Parser
+  [TODO]  Begin Sprint 1: Upgrade Page Classifier
+  [TODO]  Sprint 2: Grid Consensus Engine (highest priority fix)
+  [TODO]  Sprint 3: Member Detection from clean grid
+  [TODO]  Sprint 4-5: LLM Verifier + Ruby Generator + End-to-end
+
+  Target: Working V6 pipeline within 1-2 weeks
+          > 70% model similarity for standard structural PDFs
+
+
+================================================================================
+  END OF RETROSPECTIVE
+================================================================================

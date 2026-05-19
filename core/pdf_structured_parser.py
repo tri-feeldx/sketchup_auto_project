@@ -153,6 +153,7 @@ class PDFStructuredParser:
 
     def parse_all(self) -> list[StructuredPageData]:
         """Parse all pages of the PDF."""
+        self.pages = []  # Clear to prevent double-append on re-call
         with pdfplumber.open(self.pdf_path) as pdf:
             for i, page in enumerate(pdf.pages):
                 spd = self._parse_page(page, i)
@@ -262,8 +263,16 @@ class PDFStructuredParser:
     def _classify_page(self, spd: StructuredPageData) -> str:
         """Classify page as plan, elevation, section, schedule, or unknown."""
         all_text_lower = " ".join(t.text.lower() for t in spd.all_text)
+        num_lines = len(spd.raw_lines)
         
-        # Strong schedule indicators
+        # ── LINE DENSITY HEURISTIC ──
+        # Drawing pages (plan, elevation, section) have MANY vector lines.
+        # Schedule pages are text-heavy tables with few lines (<2000).
+        # Pages with >3000 lines are DEFINITELY drawing pages, not schedules.
+        IS_DRAWING_PAGE = num_lines > 3000
+        IS_LIKELY_DRAWING = num_lines > 1000
+        
+        # Strong schedule indicators — only apply if NOT a drawing page
         schedule_keywords = [
             "steel schedule", "member schedule", "bill of materials",
             "bảng thép", "bảng kê", "danh sách", "quantity", "length",
@@ -271,34 +280,62 @@ class PDFStructuredParser:
         ]
         schedule_score = sum(1 for kw in schedule_keywords if kw in all_text_lower)
         
-        # Also check for tabular structure
-        if schedule_score >= 3:
-            return "schedule"
-        if schedule_score >= 1 and self._has_table_structure(spd):
-            return "schedule"
+        # If high line density, it's a drawing — skip schedule classification
+        if not IS_DRAWING_PAGE:
+            if schedule_score >= 3:
+                return "schedule"
+            if schedule_score >= 1 and self._has_table_structure(spd):
+                return "schedule"
 
         # Elevation/section indicators
         elev_keywords = [
-            "elevation", "mặt đứng", "section", "mặt cắt",
-            "rl", "ffl", "top of", "finished floor", "ridge", "eave",
-            "cốt", "cao độ", "tầng",
+            "elevation", "mặt đứng", "mặt cắt",
+            "rl", "ffl", "top of", "finished floor",
+            "cốt", "cao độ",
         ]
         elev_score = sum(1 for kw in elev_keywords if kw in all_text_lower)
-
-        # Plan indicators
-        plan_keywords = [
-            "plan", "floor plan", "mặt bằng", "layout",
-            "grid", "trục", "column", "beam", "cột", "dầm",
-        ]
-        plan_score = sum(1 for kw in plan_keywords if kw in all_text_lower)
-
-        if elev_score > plan_score:
-            if "section" in all_text_lower or "mặt cắt" in all_text_lower:
+        
+        # Section-specific
+        if "section" in all_text_lower or "mặt cắt" in all_text_lower or "chi tiết" in all_text_lower:
+            if IS_LIKELY_DRAWING:
                 return "section"
+
+        # Plan indicators (only count the STRONG indicators for plan classification)
+        # "column", "beam", "cột", "dầm",... appear on schedules too — only use for plan if drawing page
+        strong_plan_keywords = ["plan", "floor plan", "mặt bằng", "layout", "grid", "trục", "sàn", "tầng", "foundation", "móng", "deck"]
+        weak_plan_keywords = ["column", "beam", "cột", "dầm"]  # can appear on schedules/elevations too
+        strong_plan_score = sum(1 for kw in strong_plan_keywords if kw in all_text_lower)
+        weak_plan_score = sum(1 for kw in weak_plan_keywords if kw in all_text_lower)
+        
+        # Has grid labels? Strongest plan indicator
+        has_grid = len(spd.grid_labels) >= 2
+        
+        # Ridge/eave keywords → likely elevation
+        if any(kw in all_text_lower for kw in ["ridge", "eave", "mái", "roof"]):
+            if IS_LIKELY_DRAWING:
+                return "elevation"
+
+        if elev_score > strong_plan_score + weak_plan_score and IS_LIKELY_DRAWING:
             return "elevation"
         
-        if plan_score > 0:
+        # PLAN classification — requires STRONG evidence with drawing confirmation
+        # 1. Explicit "plan"/"mặt bằng" keywords on a drawing page → plan
+        # 2. Grid labels on a drawing page → plan (grid systems are on plans)
+        # 3. "trục" (grid in Vietnamese) + drawing page → plan
+        if (strong_plan_score >= 1 or has_grid) and IS_DRAWING_PAGE:
             return "plan"
+        
+        # Anything with weak plan keywords but no drawing structure → likely schedule or unknown
+        if weak_plan_score > 0 and not IS_DRAWING_PAGE:
+            # Could be a schedule page listing columns/beams
+            return "schedule"
+        
+        # If many lines but no clear classification → could be detail/elevation, not automatically plan
+        if IS_DRAWING_PAGE:
+            if any(kw in all_text_lower for kw in ["cột", "dầm", "column", "beam"]) and strong_plan_score >= 1:
+                return "plan"
+            else:
+                return "elevation"  # default drawing pages to elevation (safer than plan)
 
         if "title" in all_text_lower or "cover" in all_text_lower:
             return "title"
@@ -321,69 +358,222 @@ class PDFStructuredParser:
 
     # Grid label patterns
     GRID_LETTER_PATTERN = re.compile(r'^[A-Za-z]$')  # Single letter
-    GRID_NUMBER_PATTERN = re.compile(r'^\d{1,3}$')   # 1-3 digit number
+    GRID_NUMBER_PATTERN = re.compile(r'^\d{1,2}$')   # 1-2 digit number (grid IDs, not dimensions)
     GRID_VIET_PATTERN = re.compile(r'^TR[UỤ]C\s*[A-Za-z0-9]', re.IGNORECASE)
+    
+    # Noise patterns: words that look like grid labels but are NOT
+    NOISE_WORDS = {'REV', 'NO', 'DWG', 'DR', 'ST', 'TTW', 'DAB', 'PH', 'JO', 'SSO', 'NSW',
+                   'PM', 'AM', 'RL', 'FFL', 'TOC', 'NTS', 'A1', 'A2', 'A3', 'A0', 'P1', 'P2'}
+
+    @staticmethod
+    def _is_vertical_text_cluster(token, all_tokens, max_neighbor_dist=20):
+        """
+        Detect if a token is part of a vertical text cluster (like title block revision letters).
+        Vertical text has neighbors stacked above/below within a narrow horizontal band.
+        Returns number of vertical neighbors (0 = isolated).
+        """
+        cx, cy = token.cx, token.cy
+        neighbors = 0
+        for other in all_tokens:
+            if other is token:
+                continue
+            # Same narrow X band, stacked vertically
+            if abs(other.cx - cx) < max_neighbor_dist and 5 < abs(other.cy - cy) < 30:
+                neighbors += 1
+        return neighbors
 
     def _extract_grid_labels(self, spd: StructuredPageData) -> list[GridLabel]:
         """
         Extract grid bubble labels from text layer.
         
-        Strategy:
-        - Grid labels appear near page borders (top/bottom/left/right 15% margins)
-        - Letters near top/bottom → X-axis; numbers → could be either
-        - Numbers near left/right → Y-axis
-        - Use position clustering to separate X vs Y
+        Strategy (revised):
+        - Grid labels are ISOLATED single characters/numbers near page borders
+        - Filter OUT: vertical text clusters (title blocks), multi-word text, known noise words
+        - Grid labels are evenly spaced along an axis (not randomly clustered)
+        - Use spacing regularity to validate candidates
         """
         labels = []
         pw, ph = spd.page_width, spd.page_height
-        x_candidates: list[tuple[str, float, float]] = []  # (label, cx, cy)
-        y_candidates: list[tuple[str, float, float]] = []
+
+        # Pre-filter: build noise exclusion list from title block text
+        # Title blocks typically have dense text at page bottom
+        titleblock_tokens = set()
+        for t in spd.all_text:
+            text = t.text.strip().upper()
+            # Mark tokens in title block area (bottom 8% of page with dense text)
+            if t.cy > ph * 0.92:
+                titleblock_tokens.add(id(t))
+
+        x_candidates: list[tuple[str, float, float, float]] = []  # (label, cx, cy, score)
+        y_candidates: list[tuple[str, float, float, float]] = []
 
         for t in spd.all_text:
+            if id(t) in titleblock_tokens:
+                continue
+                
             text = t.text.strip()
             cx, cy = t.cx, t.cy
 
-            # Near top or bottom border → potential X-axis label
-            if cy < ph * 0.15 or cy > ph * 0.85:
-                if self.GRID_LETTER_PATTERN.match(text):
-                    x_candidates.append((text.upper(), cx, cy))
-                elif self.GRID_NUMBER_PATTERN.match(text):
-                    x_candidates.append((text, cx, cy))
+            # Skip multi-word text, long text, empty
+            if len(text) > 3 or len(text) == 0:
+                continue
+            
+            # Skip known noise words
+            if text.upper() in self.NOISE_WORDS:
+                continue
 
-            # Near left or right border → potential Y-axis label
-            elif cx < pw * 0.15 or cx > pw * 0.85:
-                if self.GRID_LETTER_PATTERN.match(text):
-                    y_candidates.append((text.upper(), cx, cy))
-                elif self.GRID_NUMBER_PATTERN.match(text):
-                    y_candidates.append((text, cx, cy))
+            # Skip vertical text clusters (title block columns)
+            if len(text) == 1 and self._is_vertical_text_cluster(t, spd.all_text) >= 3:
+                continue
+
+            # ── Check border regions ──
+            # TOP border: X-axis grid labels (typically letters, but can be numbers)
+            # BOTTOM border: X-axis grid labels (same, but exclude title block zone)
+            near_top = cy < ph * 0.12
+            near_bot = ph * 0.85 < cy < ph * 0.92  # exclude extreme bottom (title block)
+            
+            # LEFT/RIGHT border: Y-axis grid labels (typically numbers, but can be letters)
+            near_left = cx < pw * 0.12
+            near_right = cx > pw * 0.88
+
+            is_grid_char = (self.GRID_LETTER_PATTERN.match(text) and len(text) == 1)
+            is_grid_num = (self.GRID_NUMBER_PATTERN.match(text) and 1 <= len(text) <= 2)
+
+            if not (is_grid_char or is_grid_num):
+                continue
+
+            if near_top or near_bot:
+                # X-axis: prefer single letters at top/bottom
+                score = 1.0
+                if is_grid_char:
+                    score = 1.2  # letters are strong X-axis signal
+                elif is_grid_num:
+                    # Numbers at top/bottom: check if they look like grid IDs (small numbers)
+                    try:
+                        val = int(text)
+                        if val <= 20:
+                            score = 0.9  # likely grid number
+                        else:
+                            score = 0.0  # >20 → definitely dimension callout, SKIP
+                    except ValueError:
+                        score = 0.5
+                if score > 0:
+                    x_candidates.append((text.upper() if is_grid_char else text, cx, cy, score))
+
+            if near_left or near_right:
+                # Y-axis
+                score = 1.0
+                if is_grid_num:
+                    try:
+                        val = int(text)
+                        if val <= 9:
+                            score = 1.2  # strong Y-axis signal (grids rarely have >9)
+                        elif val <= 20:
+                            score = 0.4  # weak — could be dimension
+                        else:
+                            score = 0.0  # definitely dimension callout, skip
+                    except ValueError:
+                        score = 0.8
+                elif is_grid_char:
+                    score = 0.8
+                if score > 0:
+                    y_candidates.append((text.upper() if is_grid_char else text, cx, cy, score))
+
+            # ── EXPANDED Y-AXIS DETECTION ──
+            # Y-axis grid labels can appear in the MIDDLE zone of the page
+            # (not just extreme left/right). They form a vertical column of
+            # isolated single characters along the left or right side.
+            mid_left = pw * 0.12 <= cx < pw * 0.30
+            mid_right = pw * 0.70 < cx <= pw * 0.88
+            if (mid_left or mid_right) and not near_top and not near_bot:
+                score = 0.0
+                if is_grid_char:
+                    # Single letter in mid-left/right zone → strong Y-axis
+                    score = 0.9
+                elif is_grid_num:
+                    try:
+                        val = int(text)
+                        if val <= 9:
+                            score = 0.7
+                        elif val <= 20:
+                            score = 0.3
+                        else:
+                            score = 0.0
+                    except ValueError:
+                        score = 0.5
+                if score > 0:
+                    y_candidates.append((text.upper() if is_grid_char else text, cx, cy, score))
+
+        # ── Filter by spatial regularity ──
+        # Grid labels on the same axis should be roughly evenly spaced
+        x_candidates = self._filter_by_spacing(x_candidates, axis="x", pw=pw)
+        y_candidates = self._filter_by_spacing(y_candidates, axis="y", ph=ph)
 
         # Also check Vietnamese "Trục A" style labels
         for t in spd.all_text:
             text = t.text.strip().upper()
             if text.startswith("TRỤC") or text.startswith("TRUC"):
-                # Look for adjacent number/letter
                 for t2 in spd.all_text:
                     if abs(t2.cy - t.cy) < 15 and abs(t2.cx - t.cx - t.width) < 50:
                         label = t2.text.strip()
-                        if self.GRID_LETTER_PATTERN.match(label) or self.GRID_NUMBER_PATTERN.match(label):
+                        if self.GRID_LETTER_PATTERN.match(label) or (self.GRID_NUMBER_PATTERN.match(label) and len(label) <= 2):
                             if t.cy < ph * 0.15 or t.cy > ph * 0.85:
-                                x_candidates.append((label.upper() if label.isalpha() else label, t2.cx, t2.cy))
+                                x_candidates.append((label.upper() if label.isalpha() else label, t2.cx, t2.cy, 1.0))
                             else:
-                                y_candidates.append((label.upper() if label.isalpha() else label, t2.cx, t2.cy))
+                                y_candidates.append((label.upper() if label.isalpha() else label, t2.cx, t2.cy, 1.0))
 
-        # Deduplicate and sort
+        # Deduplicate and build GridLabel objects
         seen_x, seen_y = set(), set()
-        for label, cx, cy in sorted(x_candidates, key=lambda v: v[1]):
+        for label, cx, cy, score in sorted(x_candidates, key=lambda v: v[1]):
             if label not in seen_x:
                 seen_x.add(label)
                 labels.append(GridLabel(label=label, axis="X", px=cx, py=cy, page=spd.page_index))
 
-        for label, cx, cy in sorted(y_candidates, key=lambda v: v[2]):
-            if label not in seen_y and label not in seen_x:  # avoid double-counting
+        for label, cx, cy, score in sorted(y_candidates, key=lambda v: v[2]):
+            if label not in seen_y and label not in seen_x:
                 seen_y.add(label)
                 labels.append(GridLabel(label=label, axis="Y", px=cx, py=cy, page=spd.page_index))
 
         return labels
+
+    @staticmethod
+    def _filter_by_spacing(candidates: list, axis: str, pw: float = 0, ph: float = 0) -> list:
+        """
+        Filter candidates by spatial regularity.
+        Real grid lines are roughly evenly spaced; noise is randomly distributed.
+        Returns filtered list.
+        """
+        if len(candidates) <= 2:
+            return candidates
+        
+        # Sort by position
+        sort_idx = 1 if axis == "x" else 2
+        sorted_cands = sorted(candidates, key=lambda v: v[sort_idx])
+        
+        # Compute gaps
+        gaps = []
+        for i in range(1, len(sorted_cands)):
+            gap = sorted_cands[i][sort_idx] - sorted_cands[i-1][sort_idx]
+            gaps.append(gap)
+        
+        if not gaps:
+            return candidates
+        
+        median_gap = sorted(gaps)[len(gaps) // 2] if gaps else 100
+        
+        # Filter: keep candidates that have at least one neighbor within 2x median gap
+        filtered = []
+        for i, cand in enumerate(sorted_cands):
+            pos = cand[sort_idx]
+            keep = False
+            if i > 0 and abs(pos - sorted_cands[i-1][sort_idx]) < median_gap * 2.5:
+                keep = True
+            if i < len(sorted_cands) - 1 and abs(pos - sorted_cands[i+1][sort_idx]) < median_gap * 2.5:
+                keep = True
+            if keep or len(sorted_cands) <= 3:
+                filtered.append(cand)
+        
+        return filtered
 
     # ── Dimension Chain Extraction ────────────────────────────────────────────
 

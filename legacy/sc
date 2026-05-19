@@ -1,0 +1,864 @@
+"""
+=============================================================================
+SCANNER V5 — Vision-First PDF Analysis Agent
+=============================================================================
+Khác biệt cốt lõi: Gửi ảnh high-res (300 DPI) của bản vẽ cho Gemini Vision,
+thay vì text thô từ PyMuPDF. Gemini nhìn thấy grid lines, dimension lines,
+ký hiệu kiến trúc, và trích xuất structure chính xác.
+
+Hỗ trợ đa dạng bản vẽ:
+  - Structural plans (mặt bằng kết cấu)
+  - Architectural plans (mặt bằng kiến trúc)  
+  - Elevations (mặt đứng)
+  - Sections (mặt cắt)
+  - Schedules (bảng thống kê)
+
+Multi-floor: phân biệt từng tầng với floor plan riêng biệt.
+=============================================================================
+"""
+import json
+import re
+from pathlib import Path
+from typing import Optional
+
+from core.vision_renderer import VisionRenderer
+from core.llm_wrapper import call_llm
+
+
+# ── DOMAIN: Structural & Architectural Drawing Knowledge Base ─────────────────
+DRAWING_CONVENTIONS = """
+## BUILDING DRAWING CONVENTIONS - VIETNAMESE & INTERNATIONAL STANDARDS
+
+### GRID SYSTEMS
+- Grid lines are long dashed lines (centerlines) labeled with numbers (1,2,3...) horizontally
+  and letters (A,B,C...) or numbers vertically
+- Grid intersections define column positions
+- Typical residential spacing: 3-6m apart
+- Typical commercial/industrial spacing: 6-12m apart
+- Grid bubbles are circles at line ends containing labels
+
+### STRUCTURAL ELEMENTS
+- COLUMNS: Solid filled or hatched rectangles at grid intersections
+  - RC column sizes: 200x200 to 600x600mm typical
+  - Steel columns: marked with section labels (e.g., H200x200, UB305)
+- BEAMS: Lines connecting columns along grid axes
+  - RC beams: typically rectangular cross-section, depth = span/8 to span/12
+  - Steel beams: I-beam shapes, labeled UB, UC, W, H sections
+- SLABS: Indicated by hatch patterns or diagonal text (e.g., S1, S2)
+  - Thickness: 100-250mm RC typical
+
+### ARCHITECTURAL ELEMENTS
+- WALLS: Double parallel lines on plans; thickness 100-300mm
+  - Solid fill = concrete/brick wall
+  - Diagonal hatch = block wall
+- DOORS: Arc line showing swing direction + gap in wall
+  - Single swing: quarter-circle arc
+  - Double swing: two symmetric arcs
+  - Sliding: arrow in wall gap
+  - Standard width: 800-1200mm; height: 2100-2400mm
+- WINDOWS: Thin rectangles breaking wall lines
+  - Often labeled with dimensions (e.g., W1200x1500)
+  - Sill height: 900-1200mm from floor
+- STAIRS: Parallel lines with arrow indicating up direction
+  - Straight: rectangular block with parallel lines
+  - L-shaped/U-shaped: multiple rectangular blocks
+  - Circular: curved parallel lines
+  - Riser: 150-175mm; Tread: 250-300mm
+
+### DIMENSION CONVENTIONS
+- Dimension lines have tick marks or arrows at ends
+- Numbers along dimension lines show mm or cm
+- Chain dimensions show cumulative distances
+- Grid-to-grid dimensions are primary references
+
+### FLOOR LEVELS
+- Each floor plan page represents one level
+- Floor elevation marks: +0.000 (ground), +3.500 (1st floor), etc.
+- Floor height: 3000-4500mm typical residential; 3500-5000mm typical commercial
+- Stair annotations often indicate floor levels
+
+### SCALE
+- Common architectural scales: 1:50, 1:100, 1:200
+- Common structural scales: 1:50, 1:100
+- Scale bar is often present on drawings
+"""
+
+
+# ── PROMPT: Page Classification ───────────────────────────────────────────────
+PAGE_CLASSIFY_PROMPT = """You are an expert architectural drawing analyst. 
+Classify this drawing page into one of these types:
+
+1. **plan** — Floor plan showing structural grid, columns, walls, rooms (top-down view)
+2. **elevation** — Building facade, side view showing heights, openings, roof profile
+3. **section** — Cut-through view showing floor levels, structural members vertically
+4. **schedule** — Table/spreadsheet of structural members, door/window lists, material specs
+5. **detail** — Close-up drawing of a specific connection, joint, or detail
+6. **title_block** — Cover page, project info, index sheet
+7. **other** — None of the above
+
+Examine the drawing carefully. Look for:
+- Plan: walls drawn as parallel lines, doors as arcs, grid bubbles, rooms labeled
+- Elevation: horizontal ground line, vertical height markers, roof profile
+- Section: multiple horizontal floor lines, cut materials shown with hatch
+- Schedule: table with rows and columns of data
+- Detail: enlarged view with dimension callouts
+
+Output JSON:
+{{
+  "page_type": "plan|elevation|section|schedule|detail|title_block|other",
+  "confidence": 0.0-1.0,
+  "description": "Brief description of what you see",
+  "orientation": "landscape|portrait",
+  "notes": "Any special observations"
+}}
+
+Return ONLY valid JSON. No markdown, no explanations."""
+
+
+# ── PROMPT: Floor Plan Analysis ───────────────────────────────────────────────
+FLOOR_PLAN_PROMPT = """You are a structural & architectural engineer analyzing a floor plan.
+Extract ALL structural and architectural elements with their EXACT positions.
+
+{DRAWING_RULES}
+
+### STEP 1: IDENTIFY GRID SYSTEM
+Look for grid line labels (numbers 1,2,3... horizontally; letters A,B,C... vertically).
+If grid bubbles are visible, extract ALL labels and their positions.
+
+### STEP 2: IDENTIFY COLUMNS
+Find ALL column positions (solid rectangles at grid intersections).
+For EACH column, determine:
+- Grid position (e.g., 1-A, 2-B) or approximate coordinates
+- Section size estimate (width x depth in mm)
+- Material (concrete = usually hatched/filled; steel = usually outline)
+
+### STEP 3: IDENTIFY BEAMS
+Find lines connecting columns along grid axes. For each beam:
+- Start and end grid positions
+- Type: main beam (thicker, connecting columns) vs secondary beam
+- Estimated section (width x depth mm)
+
+### STEP 4: IDENTIFY WALLS
+Find all wall lines (double lines or thick single lines on plan).
+- Architectural walls (non-structural) vs structural walls
+- Wall thickness estimate
+- Position relative to grid
+
+### STEP 5: IDENTIFY DOORS
+Find ALL door symbols (arcs with swing direction).
+For each door:
+- Position (which wall it's in)
+- Type: single_swing, double_swing, sliding
+- Width estimate (mm)
+- Swing direction (inward/outward/left/right)
+
+### STEP 6: IDENTIFY WINDOWS
+Find ALL window symbols.
+For each window:
+- Position (which wall)
+- Width and height estimates (mm)
+- Sill height from floor (mm)
+- Type: sliding, casement, fixed
+
+### STEP 7: IDENTIFY STAIRS
+Find stair symbols (parallel lines with arrow).
+- Position
+- Type: straight, L-shaped, U-shaped, spiral
+- Width, number of risers, direction (up/down)
+- Floor-to-floor height
+
+### STEP 8: IDENTIFY SLABS / FLOOR BOUNDARY
+Determine the overall building outline/footprint.
+- External boundary dimensions
+- Any internal openings/voids
+
+## OUTPUT FORMAT
+Return a JSON object with this EXACT structure:
+
+{{
+  "floor_level": {{
+    "name": "Ground Floor or floor name found on drawing",
+    "elevation_z_mm": 0,
+    "floor_height_mm": 3500
+  }},
+  "grid_system": {{
+    "detected": true/false,
+    "grid_x_labels": ["1", "2", "3", ...],
+    "grid_y_labels": ["A", "B", "C", ...],
+    "spacing_x_mm": [6000, 6000, ...],
+    "spacing_y_mm": [5000, 5000, ...],
+    "origin_mm": {{"x": 0, "y": 0}}
+  }},
+  "building_outline": {{
+    "overall_width_mm": 12000,
+    "overall_depth_mm": 10000,
+    "corners": [[0,0], [12000,0], [12000,10000], [0,10000]]
+  }},
+  "columns": [
+    {{
+      "mark": "C1",
+      "grid_x": 0,
+      "grid_y": 0,
+      "grid_label": "1-A",
+      "position_mm": {{"x": 0, "y": 0}},
+      "section_label": "400x400",
+      "section_width_mm": 400,
+      "section_depth_mm": 400,
+      "material": "Concrete",
+      "confidence": 0.9
+    }}
+  ],
+  "beams": [
+    {{
+      "mark": "B1",
+      "grid_x_start": 0,
+      "grid_y_start": 0,
+      "grid_x_end": 1,
+      "grid_y_end": 0,
+      "section_label": "UB305x165x40",
+      "section_width_mm": 165,
+      "section_depth_mm": 305,
+      "material": "Steel",
+      "confidence": 0.85
+    }}
+  ],
+  "walls": [
+    {{
+      "mark": "W1",
+      "grid_x_start": 0,
+      "grid_y_start": 0,
+      "grid_x_end": 1,
+      "grid_y_end": 0,
+      "thickness_mm": 200,
+      "type": "brick/concrete/glass_curtain",
+      "is_structural": false,
+      "confidence": 0.85
+    }}
+  ],
+  "doors": [
+    {{
+      "mark": "D1",
+      "type": "single_swing",
+      "width_mm": 900,
+      "height_mm": 2100,
+      "position_mm": {{"x": 3000, "y": 0}},
+      "direction": "inward",
+      "wall_ref": "W1",
+      "confidence": 0.85
+    }}
+  ],
+  "windows": [
+    {{
+      "mark": "WIN1",
+      "type": "sliding",
+      "width_mm": 2000,
+      "height_mm": 1500,
+      "sill_height_mm": 900,
+      "position_mm": {{"x": 5000, "y": 0}},
+      "wall_ref": "W2",
+      "confidence": 0.85
+    }}
+  ],
+  "stairs": [
+    {{
+      "mark": "ST1",
+      "type": "straight",
+      "width_mm": 1000,
+      "rise_total_mm": 3500,
+      "run_total_mm": 4000,
+      "num_risers": 20,
+      "position_mm": {{"x": 1000, "y": 3000}},
+      "direction": "up",
+      "confidence": 0.8
+    }}
+  ],
+  "slabs": [
+    {{
+      "name": "Floor Slab",
+      "thickness_mm": 200,
+      "z_mm": 0,
+      "boundary_points_mm": [[0,0], [12000,0], [12000,10000], [0,10000]]
+    }}
+  ],
+  "dimensions_summary": {{
+    "length_unit": "mm",
+    "scale_estimate": "1:100",
+    "overall_width_mm": 12000,
+    "overall_depth_mm": 10000
+  }}
+}}
+
+Return ONLY the JSON object. NO markdown, NO backticks, NO explanations.
+If you cannot determine a value, use reasonable estimates based on standard building practices.
+For positions, use mm relative to grid origin (bottom-left corner)."""
+
+
+# ── PROMPT: Elevation Analysis ────────────────────────────────────────────────
+ELEVATION_PROMPT = """You are an architectural engineer analyzing a building elevation drawing.
+Extract the building's external appearance and height information.
+
+{DRAWING_RULES}
+
+## TASKS:
+1. **ROOF**: Identify roof type (gable, hip, flat, mansard) and profile
+2. **FLOOR LEVELS**: Find all horizontal floor/level markers
+3. **OPENINGS**: Doors and windows visible on the facade
+4. **OVERALL DIMENSIONS**: Building height, width of facade
+5. **MATERIALS**: Notes about facade materials if visible
+
+## OUTPUT FORMAT:
+{{
+  "elevation_face": "front/rear/left/right",
+  "total_height_mm": 12000,
+  "total_width_mm": 30000,
+  "floor_levels": [
+    {{"name": "Ground", "elevation_mm": 0}},
+    {{"name": "Level 1", "elevation_mm": 3500}},
+    {{"name": "Roof", "elevation_mm": 10500}}
+  ],
+  "roof": {{
+    "type": "gable/hip/flat/mansard",
+    "eaves_height_mm": 10000,
+    "ridge_height_mm": 12000,
+    "confidence": 0.9
+  }},
+  "openings": [
+    {{
+      "type": "window/door",
+      "width_mm": 2000,
+      "height_mm": 1500,
+      "sill_height_mm": 900,
+      "position_x_mm": 5000,
+      "floor_index": 0,
+      "confidence": 0.85
+    }}
+  ]
+}}
+
+Return ONLY JSON."""
+
+
+# ── PROMPT: Section Analysis ──────────────────────────────────────────────────
+SECTION_PROMPT = """You are a structural engineer analyzing a building section/cross-section.
+This drawing shows the vertical structure of the building.
+
+{DRAWING_RULES}
+
+## TASKS:
+1. **FLOOR LEVELS**: All horizontal floor lines with elevation values
+2. **COLUMNS in section**: Vertical structural elements
+3. **BEAMS in section**: Horizontal members at floor/roof levels
+4. **SLABS**: Floor slab representation
+5. **FOUNDATION**: Foundation type and depth
+6. **ROOF STRUCTURE**: Roof framing visible in section
+
+## OUTPUT FORMAT:
+{{
+  "section_type": "longitudinal/cross",
+  "floor_levels": [
+    {{"name": "Ground", "elevation_mm": 0, "slab_thickness_mm": 200}},
+    {{"name": "Level 1", "elevation_mm": 3500, "slab_thickness_mm": 200}}
+  ],
+  "total_building_height_mm": 10500,
+  "foundation_depth_mm": -1500,
+  "columns_visible": [
+    {{"floor": 0, "width_mm": 400, "depth_perpendicular_mm": 400}}
+  ],
+  "beams_visible": [
+    {{"floor": 0, "depth_mm": 500, "width_mm": 300, "span_mm": 6000}}
+  ],
+  "roof_structure": {{
+    "type": "truss/rafter/flat_slab",
+    "max_height_mm": 12000
+  }}
+}}
+
+Return ONLY JSON."""
+
+
+# ── PROMPT: Multi-Floor Synthesis ─────────────────────────────────────────────
+MULTI_FLOOR_SYNTHESIS_PROMPT = """You are a BIM coordinator. Synthesize data from multiple floor plans
+into a unified building model.
+
+## INPUT: Floor plan analysis results for each level
+{floor_data_summary}
+
+## TASKS:
+1. Verify column continuity across floors (same grid position → same column)
+2. Align grid systems (floors may have slightly different grid labels)
+3. Detect building vertical structure (load path from roof → foundation)
+4. Identify structural changes between floors (column sizes may reduce at upper floors)
+5. Determine beam framing at each level
+
+## OUTPUT FORMAT:
+{{
+  "building_name": "Extracted or inferred name",
+  "building_type": "residential/commercial/industrial/...",
+  "num_floors": 3,
+  "total_height_mm": 10500,
+  "grid_system": {{
+    "x_labels": ["1","2","3"],
+    "y_labels": ["A","B","C"],
+    "x_spacings_mm": [6000,6000],
+    "y_spacings_mm": [5000,5000]
+  }},
+  "floors": [
+    {{
+      "floor_index": 0,
+      "name": "Ground Floor",
+      "elevation_z_mm": 0,
+      "floor_height_mm": 3500,
+      "columns": [...],
+      "beams": [...],
+      "walls": [...],
+      "doors": [...],
+      "windows": [...],
+      "stairs": [...],
+      "slab": {{...}}
+    }}
+  ],
+  "roof": {{
+    "type": "gable",
+    "eaves_z_mm": 10500,
+    "ridge_z_mm": 12500
+  }},
+  "confidence_summary": {{
+    "structural_grid_confidence": 0.9,
+    "overall_model_confidence": 0.85
+  }}
+}}
+
+Return ONLY JSON."""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCANNER V5 CLASS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ScannerV5:
+    """
+    Vision-first scanner that sends PDF page images directly to Gemini Vision.
+    
+    Pipeline:
+    1. Render PDF → high-res PNG images (300 DPI)
+    2. Classify each page (plan/elevation/section/schedule)
+    3. Analyze each page with type-specific prompt
+    4. Synthesize multi-floor data into unified building model
+    """
+    
+    def __init__(self, pdf_path: str | Path, dpi: int = 300):
+        self.pdf_path = Path(pdf_path)
+        self.dpi = dpi
+        self.renderer = None
+        self.page_images = []       # List[PIL.Image]
+        self.page_classifications = []  # List[dict]
+        self.page_analyses = []     # List[dict] — per-page analysis results
+        self.building_model = None  # Final synthesized model
+        
+    def run(self) -> dict:
+        """Execute full V5 scanning pipeline."""
+        print("\n" + "=" * 70)
+        print("SCANNER V5 — Vision-First Analysis")
+        print("=" * 70)
+        
+        # Phase 1: Render
+        print("\n[1/4] Rendering PDF pages...")
+        self._render_pages()
+        print(f"  → Rendered {len(self.page_images)} pages @ {self.dpi} DPI")
+        
+        # Phase 2: Classify
+        print("\n[2/4] Classifying pages...")
+        self._classify_pages()
+        for i, c in enumerate(self.page_classifications):
+            print(f"  Page {i}: {c.get('page_type', '?')} | {c.get('description', '')[:60]}")
+        
+        # Phase 3: Analyze each page
+        print("\n[3/4] Analyzing pages...")
+        self._analyze_pages()
+        
+        # Phase 4: Synthesize
+        print("\n[4/4] Synthesizing multi-floor model...")
+        self._synthesize_model()
+        print(f"  → Building: {self.building_model.get('building_name', '?')}")
+        print(f"  → Floors: {self.building_model.get('num_floors', '?')}")
+        print(f"  → Total height: {self.building_model.get('total_height_mm', '?')}mm")
+        
+        return self.building_model
+    
+    def _render_pages(self):
+        """Render all PDF pages as PIL Images."""
+        self.renderer = VisionRenderer(self.pdf_path, self.dpi)
+        self.page_images = []
+        for i in range(self.renderer.num_pages):
+            img = self.renderer.render_page_as_pil(i)
+            self.page_images.append(img)
+    
+    def _classify_pages(self):
+        """Classify each page type using Gemini Vision."""
+        self.page_classifications = []
+        
+        for i, img in enumerate(self.page_images):
+            print(f"  Classifying page {i+1}/{len(self.page_images)}...")
+            try:
+                response = call_llm(
+                    PAGE_CLASSIFY_PROMPT,
+                    image_parts=[img],
+                    retries=3,
+                    retry_delay=5.0,
+                )
+                data = _extract_json(response)
+                if data:
+                    classification = json.loads(data)
+                else:
+                    classification = {"page_type": "unknown", "confidence": 0.0}
+            except Exception as e:
+                print(f"    [WARN] Classification error page {i}: {e}")
+                classification = {"page_type": "unknown", "confidence": 0.0, "error": str(e)}
+            
+            classification["page_index"] = i
+            self.page_classifications.append(classification)
+    
+    def _analyze_pages(self):
+        """Analyze each page with type-specific prompt."""
+        self.page_analyses = []
+        
+        for i, (img, classification) in enumerate(zip(self.page_images, self.page_classifications)):
+            page_type = classification.get("page_type", "unknown")
+            print(f"  Analyzing page {i} [{page_type}]...")
+            
+            if page_type == "plan":
+                analysis = self._analyze_floor_plan(img, i)
+            elif page_type == "elevation":
+                analysis = self._analyze_elevation(img, i)
+            elif page_type == "section":
+                analysis = self._analyze_section(img, i)
+            elif page_type in ("schedule", "detail", "title_block", "other", "unknown"):
+                analysis = {"page_type": page_type, "analysis": "not_processed"}
+            else:
+                analysis = {"page_type": page_type, "analysis": "not_processed"}
+            
+            analysis["page_index"] = i
+            analysis["page_type"] = page_type
+            self.page_analyses.append(analysis)
+    
+    def _analyze_floor_plan(self, img, page_idx: int) -> dict:
+        """Analyze a floor plan image with the full structural+architectural prompt."""
+        prompt = FLOOR_PLAN_PROMPT.format(DRAWING_RULES=DRAWING_CONVENTIONS)
+        
+        try:
+            response = call_llm(
+                prompt,
+                image_parts=[img],
+                retries=3,
+                retry_delay=10.0,
+            )
+            data = _extract_json(response)
+            if data:
+                plan_data = json.loads(data)
+                # Ensure all required keys exist
+                plan_data.setdefault("columns", [])
+                plan_data.setdefault("beams", [])
+                plan_data.setdefault("walls", [])
+                plan_data.setdefault("doors", [])
+                plan_data.setdefault("windows", [])
+                plan_data.setdefault("stairs", [])
+                plan_data.setdefault("slabs", [])
+                plan_data.setdefault("grid_system", {"detected": False})
+                plan_data.setdefault("building_outline", {})
+                plan_data.setdefault("floor_level", {})
+                return plan_data
+        except Exception as e:
+            print(f"    [ERROR] Floor plan analysis: {e}")
+        
+        return {"error": "analysis_failed", "columns": [], "beams": [], "walls": [],
+                "doors": [], "windows": [], "stairs": [], "slabs": []}
+    
+    def _analyze_elevation(self, img, page_idx: int) -> dict:
+        """Analyze an elevation drawing."""
+        prompt = ELEVATION_PROMPT.format(DRAWING_RULES=DRAWING_CONVENTIONS)
+        
+        try:
+            response = call_llm(prompt, image_parts=[img], retries=3, retry_delay=10.0)
+            data = _extract_json(response)
+            if data:
+                return json.loads(data)
+        except Exception as e:
+            print(f"    [ERROR] Elevation analysis: {e}")
+        
+        return {"error": "analysis_failed"}
+    
+    def _analyze_section(self, img, page_idx: int) -> dict:
+        """Analyze a section drawing."""
+        prompt = SECTION_PROMPT.format(DRAWING_RULES=DRAWING_CONVENTIONS)
+        
+        try:
+            response = call_llm(prompt, image_parts=[img], retries=3, retry_delay=10.0)
+            data = _extract_json(response)
+            if data:
+                return json.loads(data)
+        except Exception as e:
+            print(f"    [ERROR] Section analysis: {e}")
+        
+        return {"error": "analysis_failed"}
+    
+    def _synthesize_model(self):
+        """Synthesize all page analyses into unified building model."""
+        plan_analyses = [a for a in self.page_analyses if a.get("page_type") == "plan"]
+        elevation_analyses = [a for a in self.page_analyses if a.get("page_type") == "elevation"]
+        section_analyses = [a for a in self.page_analyses if a.get("page_type") == "section"]
+        
+        # If multiple plan pages, assume each is a different floor
+        if len(plan_analyses) >= 2:
+            self._synthesize_multi_floor(plan_analyses, elevation_analyses, section_analyses)
+        elif len(plan_analyses) == 1:
+            self._synthesize_single_floor(plan_analyses[0], elevation_analyses, section_analyses)
+        else:
+            # Fallback: no plan pages detected
+            self.building_model = _empty_model()
+    
+    def _synthesize_multi_floor(self, plan_analyses, elevation_analyses, section_analyses):
+        """Synthesize multi-floor building model."""
+        # Use multi-floor synthesis prompt
+        floors_summary = []
+        for i, pa in enumerate(plan_analyses):
+            floor_info = pa.get("floor_level", {})
+            floors_summary.append({
+                "floor_index": i,
+                "name": floor_info.get("name", f"Floor {i}"),
+                "elevation_z_mm": floor_info.get("elevation_z_mm", i * 3500),
+                "floor_height_mm": floor_info.get("floor_height_mm", 3500),
+                "num_columns": len(pa.get("columns", [])),
+                "num_beams": len(pa.get("beams", [])),
+                "num_walls": len(pa.get("walls", [])),
+                "num_doors": len(pa.get("doors", [])),
+                "num_windows": len(pa.get("windows", [])),
+            })
+        
+        # Build model directly from plan analyses
+        self.building_model = _build_model_from_analyses(
+            plan_analyses, elevation_analyses, section_analyses
+        )
+    
+    def _synthesize_single_floor(self, plan_analysis, elevation_analyses, section_analyses):
+        """Single floor building model."""
+        self.building_model = _build_model_from_analyses(
+            [plan_analysis], elevation_analyses, section_analyses
+        )
+    
+    def close(self):
+        if self.renderer:
+            self.renderer.close()
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *args):
+        self.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _extract_json(text: str) -> str | None:
+    """Extract JSON from LLM response."""
+    text = text.strip()
+    # Remove markdown code fences
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```") or lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines)
+    
+    try:
+        json.loads(text)
+        return text
+    except (json.JSONDecodeError, ValueError):
+        # Try to find JSON object in text
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            try:
+                json.loads(match.group())
+                return match.group()
+            except json.JSONDecodeError:
+                pass
+        return None
+
+
+def _build_model_from_analyses(plan_analyses, elevation_analyses, section_analyses) -> dict:
+    """Build unified building model from per-page analyses."""
+    
+    floors = []
+    for i, pa in enumerate(plan_analyses):
+        floor_info = pa.get("floor_level", {})
+        
+        # Convert columns to standardized format
+        columns = []
+        for col in pa.get("columns", []):
+            columns.append({
+                "mark": col.get("mark", f"C{len(columns)+1}"),
+                "grid_x": col.get("grid_x", 0),
+                "grid_y": col.get("grid_y", 0),
+                "grid_label": col.get("grid_label", ""),
+                "x_mm": col.get("position_mm", {}).get("x", 0),
+                "y_mm": col.get("position_mm", {}).get("y", 0),
+                "z_start_mm": floor_info.get("elevation_z_mm", i * 3500),
+                "z_end_mm": floor_info.get("elevation_z_mm", i * 3500) + floor_info.get("floor_height_mm", 3500),
+                "section_label": col.get("section_label", "400x400"),
+                "section_width_mm": col.get("section_width_mm", 400),
+                "section_depth_mm": col.get("section_depth_mm", 400),
+                "material": col.get("material", "Concrete"),
+                "confidence": col.get("confidence", 0.8),
+            })
+        
+        # Convert beams to standardized format
+        beams = []
+        for beam in pa.get("beams", []):
+            gx1, gy1 = beam.get("grid_x_start", 0), beam.get("grid_y_start", 0)
+            gx2, gy2 = beam.get("grid_x_end", 1), beam.get("grid_y_end", 0)
+            length_mm = beam.get("length_mm", 6000)
+            if not length_mm:
+                # Estimate from grid spacing
+                length_mm = abs(gx2 - gx1) * 6000 if abs(gx2 - gx1) > 0 else abs(gy2 - gy1) * 5000
+            
+            beams.append({
+                "mark": beam.get("mark", f"B{len(beams)+1}"),
+                "grid_x": gx1, "grid_y": gy1,
+                "grid_x2": gx2, "grid_y2": gy2,
+                "x_mm": gx1 * 6000, "y_mm": gy1 * 5000,
+                "x2_mm": gx2 * 6000, "y2_mm": gy2 * 5000,
+                "z_start_mm": floor_info.get("elevation_z_mm", i * 3500) + floor_info.get("floor_height_mm", 3500) - 400,
+                "z_end_mm": floor_info.get("elevation_z_mm", i * 3500) + floor_info.get("floor_height_mm", 3500),
+                "section_label": beam.get("section_label", "UB305x165x40"),
+                "material": beam.get("material", "Steel"),
+                "length_mm": length_mm,
+                "confidence": beam.get("confidence", 0.8),
+            })
+        
+        # Walls
+        walls = []
+        for wall in pa.get("walls", []):
+            gx1, gy1 = wall.get("grid_x_start", 0), wall.get("grid_y_start", 0)
+            gx2, gy2 = wall.get("grid_x_end", 1), wall.get("grid_y_end", 0)
+            length_mm = wall.get("length_mm", abs(gx2 - gx1) * 6000 + abs(gy2 - gy1) * 5000)
+            
+            walls.append({
+                "mark": wall.get("mark", f"W{len(walls)+1}"),
+                "grid_x": gx1, "grid_y": gy1,
+                "grid_x2": gx2, "grid_y2": gy2,
+                "x_mm": gx1 * 6000, "y_mm": gy1 * 5000,
+                "x2_mm": gx2 * 6000, "y2_mm": gy2 * 5000,
+                "z_start_mm": floor_info.get("elevation_z_mm", i * 3500),
+                "z_end_mm": floor_info.get("elevation_z_mm", i * 3500) + floor_info.get("floor_height_mm", 3500),
+                "thickness_mm": wall.get("thickness_mm", 200),
+                "type": wall.get("type", "brick"),
+                "is_structural": wall.get("is_structural", False),
+                "confidence": wall.get("confidence", 0.8),
+            })
+        
+        floor_data = {
+            "floor_index": i,
+            "name": floor_info.get("name", f"Floor {i}"),
+            "elevation_z_mm": floor_info.get("elevation_z_mm", i * 3500),
+            "floor_height_mm": floor_info.get("floor_height_mm", 3500),
+            "columns": columns,
+            "beams": beams,
+            "walls": walls,
+            "arch_doors": pa.get("doors", []),
+            "arch_windows": pa.get("windows", []),
+            "arch_stairs": pa.get("stairs", []),
+            "arch_slabs": pa.get("slabs", []),
+            "grid_system": pa.get("grid_system", {"detected": False}),
+            "building_outline": pa.get("building_outline", {}),
+        }
+        floors.append(floor_data)
+    
+    # Extract grid system from first plan
+    grid_x = {"labels": [], "spacings_mm": []}
+    grid_y = {"labels": [], "spacings_mm": []}
+    if plan_analyses:
+        gs = plan_analyses[0].get("grid_system", {})
+        if gs.get("detected"):
+            grid_x = {"labels": gs.get("grid_x_labels", []), "spacings_mm": gs.get("spacing_x_mm", [])}
+            grid_y = {"labels": gs.get("grid_y_labels", []), "spacings_mm": gs.get("spacing_y_mm", [])}
+    
+    # Extract roof from elevation
+    roof = {"type": "flat", "eaves_z_mm": 3500, "ridge_z_mm": 5500}
+    if elevation_analyses:
+        elev = elevation_analyses[0]
+        roof = elev.get("roof", roof)
+    
+    # Calculate total height
+    total_height_mm = floors[-1]["elevation_z_mm"] + floors[-1]["floor_height_mm"] if floors else 3500
+    
+    building_name = "Building"
+    for pa in plan_analyses:
+        if pa.get("floor_level", {}).get("name"):
+            building_name = pa["floor_level"]["name"].replace(" Floor", "").replace(" Plan", "")
+    
+    return {
+        "building_name": building_name,
+        "building_type": "mixed",
+        "num_floors": len(floors),
+        "total_height_mm": total_height_mm,
+        "grid_x": grid_x,
+        "grid_y": grid_y,
+        "scale_x_mm_per_px": 3.0,
+        "scale_confidence": 0.7,
+        "floors": floors,
+        "roof": roof,
+        "levels": [
+            {
+                "name": f["name"],
+                "elevation_mm": f["elevation_z_mm"],
+                "floor_height_mm": f["floor_height_mm"],
+                "plan_page_index": f.get("plan_page_index", i),
+            }
+            for i, f in enumerate(floors)
+        ],
+        "plan_page_indices": list(range(len(floors))),
+        "elevation_page_indices": [],
+        "schedule_page_indices": [],
+        "member_db": {},
+        "wall_types": [],
+        "door_types": [],
+        "window_types": [],
+        "building_outline": floors[0].get("building_outline", {}) if floors else {},
+        "page_classifications": {},
+        "num_pages": len(floors),
+        "pdf_type": "structural-architectural",
+        "version": "v5-vision-first",
+    }
+
+
+def _empty_model() -> dict:
+    return {
+        "building_name": "Unknown",
+        "building_type": "unknown",
+        "num_floors": 1,
+        "total_height_mm": 3500,
+        "grid_x": {"labels": [], "spacings_mm": []},
+        "grid_y": {"labels": [], "spacings_mm": []},
+        "scale_x_mm_per_px": 3.0,
+        "scale_confidence": 0.0,
+        "floors": [{"floor_index": 0, "name": "Ground", "elevation_z_mm": 0,
+                     "floor_height_mm": 3500, "columns": [], "beams": [],
+                     "walls": [], "arch_doors": [], "arch_windows": [],
+                     "arch_stairs": [], "arch_slabs": []}],
+        "roof": {"type": "flat", "eaves_z_mm": 3500, "ridge_z_mm": 5500},
+        "levels": [{"name": "Ground", "elevation_mm": 0, "floor_height_mm": 3500, "plan_page_index": 0}],
+        "plan_page_indices": [0],
+        "elevation_page_indices": [],
+        "schedule_page_indices": [],
+        "member_db": {},
+        "wall_types": [],
+        "door_types": [],
+        "window_types": [],
+        "building_outline": {},
+        "page_classifications": {"0": "plan"},
+        "num_pages": 1,
+        "pdf_type": "unknown",
+        "version": "v5-fallback",
+    }

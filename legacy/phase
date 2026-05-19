@@ -1,0 +1,113 @@
+"""Phase 1 test: Scale + Grid + Levels + Generate Ruby model"""
+import sys
+sys.path.insert(0, '.')
+
+from core.pdf_structured_parser import PDFStructuredParser
+from agents.grid_math_engine import GridMathEngine, build_grid_from_structured_pages
+from pipeline_phase3 import build_per_floor_layouts
+from agents.coder import build_ruby_script
+
+
+def _layouts_to_member_dicts(layouts, grid_system) -> list[dict]:
+    """Convert FloorLayout objects to the dict format build_ruby_script expects."""
+    members = []
+    for layout in layouts:
+        z_bot = layout.z_bottom_mm
+        z_top = layout.z_top_mm
+
+        for col in layout.columns:
+            pos = (0, 0)
+            if hasattr(col, 'position'):
+                pos = col.position
+            elif hasattr(col, 'cx'):
+                pos = (col.cx, col.cy)
+            members.append({
+                'mark': getattr(col, 'mark', 'C?'),
+                'type': 'column',
+                'position': list(pos),
+                'z_bottom_mm': z_bot,
+                'z_top_mm': z_top,
+                'width_mm': getattr(col, 'width_mm', 400),
+                'depth_mm': getattr(col, 'depth_mm', 400),
+                'section': getattr(col, 'section', '400x400'),
+                'material': getattr(col, 'material', 'RC'),
+                'page_source': getattr(col, 'page_source', layout.floor_index),
+            })
+
+        for beam in layout.beams:
+            pos = (0, 0)
+            if hasattr(beam, 'position'):
+                pos = beam.position
+            elif hasattr(beam, 'cx'):
+                pos = (beam.cx, beam.cy)
+            members.append({
+                'mark': getattr(beam, 'mark', 'B?'),
+                'type': 'beam',
+                'position': list(pos),
+                'z_bottom_mm': z_top - 600,  # beam at top of floor
+                'z_top_mm': z_top,
+                'width_mm': getattr(beam, 'width_mm', 300),
+                'depth_mm': getattr(beam, 'depth_mm', 600),
+                'section': getattr(beam, 'section', '300x600'),
+                'material': getattr(beam, 'material', 'RC'),
+                'page_source': getattr(beam, 'page_source', layout.floor_index),
+            })
+
+    return members
+
+
+def main():
+    pdf_path = 'data/input_pdf/structural.pdf'
+    output_rb = 'output/final_ruby_scripts/phase1_model.rb'
+
+    print("=" * 60)
+    print("PHASE 1: Scale Fix + Grid + Generate Model")
+    print("=" * 60)
+
+    # 1. Parse PDF
+    parser = PDFStructuredParser(pdf_path)
+    pages = parser.parse_all()
+    plan_pages = [p for p in pages if p.page_type == "plan"]
+    elev_count = len([p for p in pages if p.page_type in ('elevation', 'section')])
+    sched_count = len([p for p in pages if p.page_type == 'schedule'])
+    print(f"\nPages: {len(pages)} total ({len(plan_pages)} plan, {elev_count} elev/section, {sched_count} schedule)")
+
+    # 2. Build grid system
+    engine = GridMathEngine(pages)
+    gs = engine.build()
+    print(f"\nScale: X={gs.scale_x:.2f} Y={gs.scale_y:.2f} mm/pt")
+    print(f"Grid X ({len(gs.grids_x)} lines): {gs.grids_x}")
+    print(f"Grid Y ({len(gs.grids_y)} lines): {gs.grids_y}")
+    print(f"Levels ({len(gs.levels)}):")
+    for lm in gs.levels:
+        print(f"  {lm.name}: z={lm.z_mm:.0f}mm")
+
+    # 3. Check scale text
+    for page in pages:
+        if page.scale_text:
+            print(f"\nScale text found on page {page.page_index}: '{page.scale_text}'")
+
+    # 4. Build floor layouts
+    print("\n--- Building floor layouts ---")
+    layouts = build_per_floor_layouts(parser, gs, {})
+    print(f"Floor layouts: {len(layouts)}")
+    for fl in layouts:
+        print(f"  Floor {fl.floor_index} '{fl.floor_name}': z={fl.z_bottom_mm:.0f}-{fl.z_top_mm:.0f}mm, columns={len(fl.columns)}, beams={len(fl.beams)}, walls={len(fl.walls)}")
+
+    # 5. Convert layouts to member dicts
+    members = _layouts_to_member_dicts(layouts, gs)
+    n_cols = sum(1 for m in members if m['type'] == 'column')
+    n_beams = sum(1 for m in members if m['type'] == 'beam')
+    print(f"\nMembers for coder: {len(members)} total ({n_cols} columns, {n_beams} beams)")
+
+    # 6. Generate Ruby script
+    print(f"\n--- Generating Ruby script: {output_rb} ---")
+    ruby = build_ruby_script(members)
+    with open(output_rb, 'w', encoding='utf-8') as f:
+        f.write(ruby)
+    print(f"Generated {len(ruby)} chars of Ruby code")
+    print("DONE! Open SketchUp -> Ruby Console -> Load this file")
+
+
+if __name__ == '__main__':
+    main()

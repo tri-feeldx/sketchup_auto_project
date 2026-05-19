@@ -1,0 +1,11 @@
+Page 0: 2384x1684px, 892495 bytes
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [4e48f059]
+RESP: ```json
+{
+  "columns_seen": 100,
+  "beams_seen": 250,
+  "walls_seen": 10,
+  "notes": "The count for beams and columns is an approximation due to the complexity and partial visibility of the steel framework and concrete elements. Walls are primarily concrete shear walls or core walls."
+}
+```

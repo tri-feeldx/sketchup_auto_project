@@ -149,6 +149,66 @@ class GridMathEngine:
             for page in self.elevation_pages:
                 all_labels.extend(page.grid_labels)
         
+        # ── CROSS-PAGE SMART FILTER ──────────────────────────────
+        # Strategy: UNION + STABILITY
+        #   - Union all unique labels across pages (each floor may have different grids)
+        #   - But FILTER OUT labels that are clearly dimension callouts:
+        #     * Labels like '21','90' that appear on ALL pages but have different
+        #       spatial neighbors on each page are dimension refs, not grid lines
+        #     * Labels that appear on EVERY page AND are spatially isolated
+        #       (different row group than main grid) → dimension callout
+        #   - Keep labels that are PART OF THE SPATIAL CLUSTER on their page
+        # ──────────────────────────────────────────────────────────
+        if len(self.plan_pages) >= 2:
+            # Count pages each label appears on
+            label_page_counts = defaultdict(set)
+            label_page_positions = defaultdict(list)  # (label,axis) -> [(page, py, px)]
+            
+            for label in all_labels:
+                key = (label.label, label.axis)
+                label_page_counts[key].add(label.page)
+                label_page_positions[key].append((label.page, label.py, label.px))
+            
+            # ── DIMENSION CALLOUT DETECTION ───────────────────
+            # Dimension labels appear on EVERY page (like real grid)
+            # but float at different spatial positions on each page.
+            # Real grid labels have consistent spatial position across pages.
+            dimension_labels = set()
+            for key, positions in label_page_positions.items():
+                if len(positions) >= len(self.plan_pages):
+                    # Appears on all pages — could be grid OR dimension
+                    # Check spatial consistency:
+                    # Real grid: same py (or px for Y) across pages (±10% page height)
+                    pys = [p[1] for p in positions]
+                    pxs = [p[2] for p in positions]
+                    
+                    # Use coefficient of variation to measure spread
+                    if len(pys) >= 2:
+                        mean_py = sum(pys) / len(pys)
+                        if mean_py > 0:
+                            cv_y = (sum((y - mean_py)**2 for y in pys) / len(pys))**0.5 / mean_py
+                            # High CV = inconsistent position = likely dimension callout
+                            if cv_y > 0.15:  # 15% variation threshold
+                                dimension_labels.add(key)
+                    
+                    if len(pxs) >= 2 and key not in dimension_labels:
+                        mean_px = sum(pxs) / len(pxs)
+                        if mean_px > 0:
+                            cv_x = (sum((x - mean_px)**2 for x in pxs) / len(pxs))**0.5 / mean_px
+                            if cv_x > 0.15:
+                                dimension_labels.add(key)
+            
+            # ── UNION FILTER ──────────────────────────────────
+            # Keep labels that are NOT dimension callouts
+            # AND appear on at least 1 page (union strategy)
+            filtered = []
+            for label in all_labels:
+                key = (label.label, label.axis)
+                if key not in dimension_labels:
+                    filtered.append(label)
+            
+            all_labels = filtered
+        
         return all_labels
 
     # ── Separate X vs Y Axes ─────────────────────────────────────────────────
@@ -176,40 +236,92 @@ class GridMathEngine:
         else:
             avg_w, avg_h = 595, 842  # A4 default
 
+        # ── SPATIAL ROW-GROUPING ─────────────────────────────────
+        # Strategy:
+        #   Group labels by their py (Y-position) for X-axis candidates.
+        #   Real grid labels form a tight horizontal row (same py),
+        #   while dimension callouts float at different heights.
+        #   Keep ONLY the largest row group for each axis.
+        # ──────────────────────────────────────────────────────────
+        
+        def row_key(py_pos, tolerance=8.0):
+            """Quantize a position into a row bucket."""
+            return round(py_pos / tolerance) * tolerance
+        
+        def col_key(px_pos, tolerance=8.0):
+            """Quantize a position into a column bucket."""
+            return round(px_pos / tolerance) * tolerance
+        
+        # First pass: classify all labels and build row/col groups
+        x_candidates = []  # (label, row_bucket)
+        y_candidates = []  # (label, col_bucket)
+        
         for label in labels:
-            # If already classified by the parser
-            if label.axis == "X":
-                x_labels.append(label)
-            elif label.axis == "Y":
-                y_labels.append(label)
+            if label.label == "0":
+                continue
+            
+            py = label.py
+            px = label.px
+            page = self._get_page(label.page)
+            if page:
+                ph = page.page_height
+                pw = page.page_width
             else:
-                # Use position-based heuristic
-                py = label.py
-                px = label.px
-                page = self._get_page(label.page)
-                
-                if page:
-                    ph = page.page_height
-                    pw = page.page_width
-                else:
-                    ph, pw = avg_h, avg_w
-
+                ph, pw = avg_h, avg_w
+            
+            # Classify by position
+            is_x = False
+            is_y = False
+            
+            if label.axis == "X":
+                is_x = True
+            elif label.axis == "Y":
+                is_y = True
+            elif py < ph * 0.2 or py > ph * 0.8:
                 # Near top/bottom → X axis
-                if py < ph * 0.2 or py > ph * 0.8:
-                    label.axis = "X"
-                    x_labels.append(label)
+                is_x = True
+                label.axis = "X"
+            elif px < pw * 0.2 or px > pw * 0.8:
                 # Near left/right → Y axis
-                elif px < pw * 0.2 or px > pw * 0.8:
-                    label.axis = "Y"
-                    y_labels.append(label)
-                else:
-                    # Ambiguous: use label type
-                    if label.label.isalpha():
-                        label.axis = "X"
-                        x_labels.append(label)
-                    else:
-                        label.axis = "Y"
-                        y_labels.append(label)
+                is_y = True
+                label.axis = "Y"
+            elif label.label.isalpha():
+                is_x = True
+                label.axis = "X"
+            else:
+                is_y = True
+                label.axis = "Y"
+            
+            if is_x:
+                x_candidates.append((label, row_key(py)))
+            if is_y:
+                y_candidates.append((label, col_key(px)))
+        
+        # ── ROW-GROUP FILTER for X-axis ──────────────────────
+        # Keep only the largest row group (most labels at same py)
+        # This eliminates dimension callouts floating at different heights.
+        if x_candidates:
+            row_groups = defaultdict(list)
+            for label, rk in x_candidates:
+                row_groups[rk].append(label)
+            # Sort groups by size descending
+            sorted_rows = sorted(row_groups.items(), key=lambda x: -len(x[1]))
+            largest_row = sorted_rows[0][1]
+            x_labels = largest_row
+        else:
+            x_labels = []
+        
+        # ── COLUMN-GROUP FILTER for Y-axis ──────────────────
+        # Keep only the largest column group (most labels at same px)
+        if y_candidates:
+            col_groups = defaultdict(list)
+            for label, ck in y_candidates:
+                col_groups[ck].append(label)
+            sorted_cols = sorted(col_groups.items(), key=lambda x: -len(x[1]))
+            largest_col = sorted_cols[0][1]
+            y_labels = largest_col
+        else:
+            y_labels = []
 
         return x_labels, y_labels
 
@@ -251,78 +363,91 @@ class GridMathEngine:
 
     def _compute_scale(self) -> tuple[float, float]:
         """
-        Compute scale factor (mm per px) from dimension chains, 
-        comparing px distances between grid labels with mm distances.
+        Compute scale factor (mm per px) using multiple strategies.
+        Priority: scale text > dimension chains > grid label spacing > typical
 
-        Strategy:
-        1. Try to match dimension chains with grid labels
-        2. scale = mm_distance / px_distance
-        3. Fallback: parse scale text (e.g., "1:100" → 100/25.4 * screen_dpi_factor)
-        4. Fallback: typical architectural scale
+        Architectural scales:
+          1:50   → 50 * 0.3528 = 17.64 mm/point
+          1:100  → 100 * 0.3528 = 35.28 mm/point
+          1:200  → 200 * 0.3528 = 70.56 mm/point
+        Formula: scale_factor = denominator * DRAWING_SCALE_MM_PER_POINT (0.3528)
         """
+        DRAWING_SCALE_MM_PER_POINT = 0.3528  # 1 point = 0.3528mm at 72 DPI
+
         scale_x = 1.0
         scale_y = 1.0
 
-        # Collect dimension chains
-        all_chains = []
+        # PRIORITY 1: Scale text from page (most reliable — architect wrote it!)
+        # e.g., "SCALE 1:100", "TỶ LỆ 1:100", "SCALE: 1/100"
         for page in self.pages:
-            all_chains.extend(page.dimension_chains)
-
-        # Collect grid labels for reference points
-        all_labels = self._collect_grid_labels()
-        x_labels = [l for l in all_labels if l.axis == "X"]
-        y_labels = [l for l in all_labels if l.axis == "Y"]
-
-        # Try to compute scale from dimension chain + grid label correspondence
-        for chain in all_chains:
-            if chain.axis == "X" and len(x_labels) >= 2 and chain.values:
-                # Compute px distance between first and last X grid label
-                x_sorted = sorted(x_labels, key=lambda l: l.px)
-                px_dist = x_sorted[-1].px - x_sorted[0].px
-                mm_dist = sum(chain.values[:len(x_labels)-1]) if len(chain.values) >= len(x_labels)-1 else sum(chain.values)
-                if px_dist > 10 and mm_dist > 0:
-                    candidate = mm_dist / px_dist
-                    if 0.5 < candidate < 100:  # realistic range
-                        scale_x = candidate
+            if page.scale_text:
+                m = re.search(r'1\s*[:/]\s*(\d+)', page.scale_text, re.IGNORECASE)
+                if m:
+                    denominator = int(m.group(1))
+                    scale_mm_per_pt = denominator * DRAWING_SCALE_MM_PER_POINT
+                    if 1 < scale_mm_per_pt < 200:
+                        scale_x = scale_mm_per_pt
+                        scale_y = scale_mm_per_pt
                         break
 
-            if chain.axis == "Y" and len(y_labels) >= 2 and chain.values:
-                y_sorted = sorted(y_labels, key=lambda l: l.py, reverse=True)
-                py_dist = abs(y_sorted[-1].py - y_sorted[0].py)
-                mm_dist = sum(chain.values[:len(y_labels)-1]) if len(chain.values) >= len(y_labels)-1 else sum(chain.values)
-                if py_dist > 10 and mm_dist > 0:
-                    candidate = mm_dist / py_dist
-                    if 0.5 < candidate < 100:
-                        scale_y = candidate
-                        break
-
-        # Fallback: use scale text
-        if scale_x == 1.0 or scale_y == 1.0:
+        # PRIORITY 2: Dimension chains matched to grid labels
+        if scale_x <= 1.0 or scale_y <= 1.0:
+            all_chains = []
             for page in self.pages:
-                if page.scale_text:
-                    m = re.search(r'1[:\s](\d+)', page.scale_text)
-                    if m:
-                        denominator = int(m.group(1))
-                        # Standard scale: 1:100 means 100px = 100*25.4mm / 72dpi ≈ 35.3mm/px
-                        # But these are PDF points (1pt = 1/72 inch), so:
-                        # 1:100 means 1mm real = 100mm on drawing
-                        # On PDF at 200 DPI: 100mm on paper = 100/25.4*200 = 787 px
-                        # mm_per_px = 1 / 787 * 100 = 0.127
-                        # Simpler: mm_per_px = denominator / (25.4 / 72 * DPI_scale)
-                        # But we don't know the DPI. Use heuristic:
-                        # For 1:100 drawing: 1px ≈ 3-5mm (typical CAD output)
-                        scale_candidate = denominator * 0.035  # heuristic
-                        if 0.1 < scale_candidate < 50:
-                            if scale_x == 1.0:
-                                scale_x = scale_candidate
-                            if scale_y == 1.0:
-                                scale_y = scale_candidate
+                all_chains.extend(page.dimension_chains)
 
-        # Final fallback: typical architectural scale
-        if scale_x <= 0.1 or scale_x > 100:
-            scale_x = 3.5  # ~1:100 typical
-        if scale_y <= 0.1 or scale_y > 100:
-            scale_y = 3.5
+            all_labels = self._collect_grid_labels()
+            x_labels = [l for l in all_labels if l.axis == "X"]
+            y_labels = [l for l in all_labels if l.axis == "Y"]
+
+            for chain in all_chains:
+                if scale_x <= 1.0 and chain.axis == "X" and len(x_labels) >= 2 and chain.values:
+                    x_sorted = sorted(x_labels, key=lambda l: l.px)
+                    px_dist = x_sorted[-1].px - x_sorted[0].px
+                    mm_dist = sum(chain.values[:len(x_labels)-1]) if len(chain.values) >= len(x_labels)-1 else sum(chain.values)
+                    if px_dist > 10 and mm_dist > 0:
+                        candidate = mm_dist / px_dist
+                        if 1 < candidate < 200:
+                            scale_x = candidate
+
+                if scale_y <= 1.0 and chain.axis == "Y" and len(y_labels) >= 2 and chain.values:
+                    y_sorted = sorted(y_labels, key=lambda l: l.py, reverse=True)
+                    py_dist = abs(y_sorted[-1].py - y_sorted[0].py)
+                    mm_dist = sum(chain.values[:len(y_labels)-1]) if len(chain.values) >= len(y_labels)-1 else sum(chain.values)
+                    if py_dist > 10 and mm_dist > 0:
+                        candidate = mm_dist / py_dist
+                        if 1 < candidate < 200:
+                            scale_y = candidate
+
+        # PRIORITY 3: Grid label px spacing × 6000mm typical bay
+        TYPICAL_GRID_SPACING_MM = 6000.0
+        if scale_x <= 1.0 or scale_x > 200:
+            all_labels = self._collect_grid_labels()
+            x_labels = [l for l in all_labels if l.axis == "X"]
+            x_sorted = sorted(x_labels, key=lambda l: l.px)
+            if len(x_sorted) >= 2:
+                px_gaps = [x_sorted[i].px - x_sorted[i-1].px for i in range(1, len(x_sorted)) if x_sorted[i].px - x_sorted[i-1].px > 5]
+                if px_gaps:
+                    median_gap = sorted(px_gaps)[len(px_gaps)//2]
+                    if median_gap > 0:
+                        scale_x = TYPICAL_GRID_SPACING_MM / median_gap
+
+        if scale_y <= 1.0 or scale_y > 200:
+            all_labels = self._collect_grid_labels()
+            y_labels = [l for l in all_labels if l.axis == "Y"]
+            y_sorted = sorted(y_labels, key=lambda l: l.py, reverse=True)
+            if len(y_sorted) >= 2:
+                px_gaps = [abs(y_sorted[i].py - y_sorted[i-1].py) for i in range(1, len(y_sorted)) if abs(y_sorted[i].py - y_sorted[i-1].py) > 5]
+                if px_gaps:
+                    median_gap = sorted(px_gaps)[len(px_gaps)//2]
+                    if median_gap > 0:
+                        scale_y = TYPICAL_GRID_SPACING_MM / median_gap
+
+        # PRIORITY 4: Final fallback — assume 1:100 scale
+        if scale_x <= 1.0 or scale_x > 200:
+            scale_x = 35.28  # 1:100 typical
+        if scale_y <= 1.0 or scale_y > 200:
+            scale_y = 35.28
 
         return scale_x, scale_y
 
@@ -394,10 +519,83 @@ class GridMathEngine:
                         seen.add(lm.name)
                         all_levels.append(lm)
 
+        # SYNTHETIC LEVEL GENERATION:
+        # If still no levels found, generate from plan page count.
+        # Each plan page typically represents one floor level.
+        # If pages have labels with level info (e.g., "LEVEL 1", "FLOOR 2"), use those.
+        # Otherwise, assign sequential floors at typical heights.
+        if not all_levels and len(self.plan_pages) >= 1:
+            typical_floor_height_mm = 3500.0
+            level_names_from_pages = []
+
+            for page in self.plan_pages:
+                # Try to extract level from page title/label
+                name = self._extract_level_name_from_page(page)
+                level_names_from_pages.append(name)
+
+            # If all names are "LEVEL N", reduce to just LEVEL N
+            # If mixed or no pattern, use sequential
+            for i, name in enumerate(level_names_from_pages):
+                z_mm = i * typical_floor_height_mm
+                all_levels.append(LevelMarker(
+                    name=name,
+                    z_mm=z_mm,
+                    py=0,
+                    page=self.plan_pages[i].page_index,
+                    confidence=0.4,
+                ))
+
         # Sort by z_mm
         all_levels.sort(key=lambda l: l.z_mm)
 
         return all_levels
+
+    def _extract_level_name_from_page(self, page: StructuredPageData) -> str:
+        """Try to extract a floor/level name from a plan page's text tokens."""
+        # Look for patterns like "LEVEL 1", "FLOOR 2", "1F", "2ND FLOOR"
+        # Also Vietnamese patterns: "TẦNG 1", "LẦU 1"
+        level_keywords = [
+            r'(?:LEVEL|FLOOR|LVL|FL)\s*[-:.]?\s*(\d+)',
+            r'(\d+)(?:ST|ND|RD|TH)\s*(?:FLOOR|FL)',
+            r'(?:TẦNG|LẦU|TANG|LAU)\s*(\d+)',
+            r'(?:BASEMENT|BSMT|BM|HẦM)\s*(\d+)',
+            r'(?:ROOF|MÁI|MAI)',
+            r'(?:GROUND|GRND|TRỆT|TRET)',
+        ]
+
+        # Collect all text tokens sorted by position
+        texts = sorted(page.text_tokens, key=lambda t: (t.py, t.px))
+
+        for token in texts:
+            text = token.text.strip().upper()
+            for pattern in level_keywords:
+                m = re.search(pattern, text)
+                if m:
+                    groups = m.groups()
+                    if groups and groups[0]:
+                        # Has a number
+                        try:
+                            n = int(groups[0])
+                            if 'BASEMENT' in text or 'BSMT' in text or 'HẦM' in text:
+                                return f"B{n}"
+                            elif 'ROOF' in text or 'MÁI' in text:
+                                return f"ROOF"
+                            else:
+                                return f"LEVEL {n}"
+                        except ValueError:
+                            pass
+                    else:
+                        # No number — ground or roof
+                        if 'ROOF' in text or 'MÁI' in text:
+                            return "ROOF"
+                        elif 'GROUND' in text or 'GRND' in text or 'TRỆT' in text:
+                            return "GROUND"
+                        else:
+                            return text[:20]
+
+        # For page groups: pages 0-2 = site plan, pages 3-5 = ground floor, etc.
+        # When unclear, use sequential
+        return f"LEVEL {page.page_index + 1}"
 
     # ── Confidence Score ─────────────────────────────────────────────────────
 

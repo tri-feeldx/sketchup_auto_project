@@ -215,6 +215,24 @@ def extract_all_text(pdf_path: str) -> dict[int, str]:
     return result
 
 
+def pdf_to_images_bytes(pdf_path: str, dpi: int = PDF_DPI) -> list[bytes]:
+    """
+    Render ALL pages of a PDF to PNG bytes in memory.
+    Returns list of bytes, one per page.
+    Used by Vision LLM agents that need raw image bytes for API calls.
+    """
+    doc = load_pdf(pdf_path)
+    result: list[bytes] = []
+    for i in range(len(doc)):
+        pix = doc[i].get_pixmap(
+            matrix=fitz.Matrix(dpi / 72, dpi / 72),
+            colorspace=fitz.csRGB,
+        )
+        result.append(pix.tobytes("png"))
+    doc.close()
+    return result
+
+
 # ==========================================================================
 # FIX 1 — Deterministic RC dimension extraction from schedule pages
 # ==========================================================================

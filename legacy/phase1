@@ -1,0 +1,32 @@
+"""Phase 1 quick test: Scale + Grid only (no LLM)"""
+import sys
+sys.path.insert(0, '.')
+
+from core.pdf_structured_parser import PDFStructuredParser
+from agents.grid_math_engine import GridMathEngine
+
+pdf_path = 'data/input_pdf/structural.pdf'
+
+parser = PDFStructuredParser(pdf_path)
+pages = parser.parse_all()
+
+tc = __import__('collections').Counter(p.page_type for p in pages)
+print(f"Classifier: {dict(tc)}")
+
+engine = GridMathEngine(pages)
+gs = engine.build()
+
+print(f"\nScale: X={gs.scale_x:.2f} Y={gs.scale_y:.2f} mm/pt")
+print(f"Grid X ({len(gs.grids_x)}): {gs.grids_x}")
+print(f"Grid Y ({len(gs.grids_y)}): {gs.grids_y}")
+print(f"Levels ({len(gs.levels)}): {[(l.name, round(l.z_mm)) for l in gs.levels]}")
+print(f"Confidence: {gs.confidence:.2f}")
+
+# Check scale text
+for p in pages:
+    if p.scale_text:
+        print(f"Scale text p{p.page_index}: '{p.scale_text}'")
+
+# Check grid labels per plan page
+for p in engine.plan_pages:
+    print(f"\nPlan page {p.page_index}: {len(p.grid_labels)} grid labels: {[(l.label, l.axis) for l in p.grid_labels[:8]]}{'...' if len(p.grid_labels) > 8 else ''}")

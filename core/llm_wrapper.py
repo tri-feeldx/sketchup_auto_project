@@ -193,7 +193,13 @@ def call_llm(
     retries: int = 6,
     retry_delay: float = 30.0,
     _call_type: str = "text",
+    # Backward-compat: many agents use "images" instead of "image_parts"
+    images: list | None = None,
 ) -> str:
+    # Normalize: "images" kwarg is an alias for "image_parts"
+    if images is not None and image_parts is None:
+        image_parts = images
+
     global _last_call_at, _cache_hits, _cache_misses
 
     if LLM_CACHE_ENABLED:
