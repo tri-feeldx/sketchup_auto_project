@@ -533,6 +533,7 @@ class SynthesizerV7:
             return current_elev + DEFAULT_F2F
 
         # Columns
+        roof_elev = sorted_levels[-1][1] if sorted_levels else DEFAULT_F2F
         for col in members.get("columns", []):
             base_lid = col.get("base_level") or col.get("level_id", "")
             top_lid = col.get("top_level", "")
@@ -545,7 +546,15 @@ class SynthesizerV7:
                 except (ValueError, TypeError):
                     z_top = _next_level_elev(z_base)
             else:
-                z_top = _next_level_elev(z_base)
+                # No explicit level — check description for roof span, else use full building height
+                desc = str(col.get("height_description", "")).lower()
+                if "roof" in desc or "top" in desc:
+                    z_top = roof_elev
+                elif len(sorted_levels) > 2:
+                    # Multi-storey building: default columns to full height
+                    z_top = roof_elev
+                else:
+                    z_top = _next_level_elev(z_base)
             col["z_base_mm"] = z_base
             col["z_top_mm"] = z_top
             col["height_mm"] = z_top - z_base
@@ -646,7 +655,29 @@ class SynthesizerV7:
                 vals = sorted(best_y.values())
                 grid_system["spacing_y_mm"] = int(vals[1] - vals[0])
 
+        # Fallback: populate x_coords/y_coords from axes + spacing if still empty
+        self._populate_grid_coords_from_axes(grid_system)
         return grid_system
+
+    def _populate_grid_coords_from_axes(self, grid_system: dict) -> None:
+        """If x_coords/y_coords are empty but axes and spacing are known, compute from spacing."""
+        sx = grid_system.get("spacing_x_mm", 6000) or 6000
+        sy = grid_system.get("spacing_y_mm", 6000) or 6000
+
+        def _sort_axis_labels(labels: list) -> list:
+            """Sort grid labels: numeric first (1,2,3..), then alpha (A,B,C..)."""
+            nums = sorted([l for l in labels if str(l).isdigit()], key=int)
+            alphas = sorted([l for l in labels if not str(l).isdigit()])
+            return nums + alphas
+
+        if not grid_system.get("x_coords") and grid_system.get("x_axes"):
+            axes = _sort_axis_labels(grid_system["x_axes"])
+            grid_system["x_coords"] = {lbl: i * sx for i, lbl in enumerate(axes)}
+            grid_system["coord_source"] = "spacing_fallback"
+
+        if not grid_system.get("y_coords") and grid_system.get("y_axes"):
+            axes = _sort_axis_labels(grid_system["y_axes"])
+            grid_system["y_coords"] = {lbl: i * sy for i, lbl in enumerate(axes)}
 
     def _estimate_spacing(self, forensic: dict,
                            page_results: List[dict]) -> int:

@@ -169,10 +169,13 @@ class RubyGeneratorV5:
             lines.append("")
 
         # ── Beams ──
+        grid_ctx = {"x_coords": _x_coords, "y_coords": _y_coords,
+                    "spacing_x": spacing_x, "spacing_y": spacing_y,
+                    "gx_axes": gx_axes, "gy_axes": gy_axes}
         if beams:
             lines.append("# === Beams ===")
             for i, b in enumerate(beams):
-                lines.extend(self._beam_ruby_v5(b, col_positions, i, mat_vars))
+                lines.extend(self._beam_ruby_v5(b, col_positions, i, mat_vars, grid_ctx))
             lines.append("")
 
         # ── Slabs ──
@@ -245,8 +248,15 @@ class RubyGeneratorV5:
                     return w, d
                 except ValueError:
                     pass
-            # UB / UC / PFC: try extract number
+            # Z / C cold-formed purlin: Z10010 = Z100-1.0 (100mm deep, 1.0mm BMT)
+            # Pattern: Z or C + 3-digit height + 2-digit thickness-tenths
             import re
+            zm = re.match(r'^[ZC](\d{3})(\d{2})$', s.upper())
+            if zm:
+                depth = int(zm.group(1))   # 100, 150, 200, 250, 300
+                flange = max(int(depth * 0.55), 50)  # typical Z/C flange ratio
+                return flange, depth
+            # UB / UC / PFC: try extract number
             nums = re.findall(r'(\d+)', s)
             if nums:
                 w = int(nums[0])
@@ -422,7 +432,8 @@ class RubyGeneratorV5:
             f"f_{i}.pushpull({h}) if f_{i}",
         ]
 
-    def _beam_ruby_v5(self, beam: dict, col_map: dict, i: int, mat_vars: dict) -> List[str]:
+    def _beam_ruby_v5(self, beam: dict, col_map: dict, i: int, mat_vars: dict,
+                      grid_ctx: dict = None) -> List[str]:
         # LOD300: try exact I-beam profile first
         sec = self._lookup_section_dims(beam)
         if sec and sec.profile_type == "I":
@@ -430,10 +441,41 @@ class RubyGeneratorV5:
 
         fid = beam.get("from_col") or beam.get("from", "")
         tid = beam.get("to_col") or beam.get("to", "")
-        c1 = col_map.get(fid, {"x": 0, "y": 0, "z_top": 3500})
-        c2 = col_map.get(tid, {"x": 6000, "y": 0, "z_top": 3500})
-        x1, y1 = c1["x"], c1["y"]
-        x2, y2 = c2["x"], c2["y"]
+        c1 = col_map.get(fid)
+        c2 = col_map.get(tid)
+        if c1 is None or c2 is None:
+            # No column reference — distribute beams across grid spans systematically
+            gc = grid_ctx or {}
+            gx_c = gc.get("x_coords", {})
+            gy_c = gc.get("y_coords", {})
+            sx = gc.get("spacing_x", 6000) or 6000
+            sy = gc.get("spacing_y", 6000) or 6000
+            n_gx = len(gc.get("gx_axes", [])) or 3
+            n_gy = len(gc.get("gy_axes", [])) or 3
+            x_vals = sorted(set(int(v) for v in gx_c.values())) if gx_c else \
+                     [j * sx for j in range(n_gx)]
+            y_vals = sorted(set(int(v) for v in gy_c.values())) if gy_c else \
+                     [j * sy for j in range(n_gy)]
+            if len(x_vals) < 2:
+                x_vals = [0, sx]
+            if len(y_vals) < 2:
+                y_vals = [0, sy]
+            grid_spans = []
+            for yi in y_vals:
+                for xi in range(len(x_vals) - 1):
+                    grid_spans.append((x_vals[xi], yi, x_vals[xi+1], yi))  # X-direction beam
+            for xi in x_vals:
+                for yi in range(len(y_vals) - 1):
+                    grid_spans.append((xi, y_vals[yi], xi, y_vals[yi+1]))  # Y-direction beam
+            if grid_spans:
+                span = grid_spans[i % len(grid_spans)]
+                c1 = {"x": span[0], "y": span[1]}
+                c2 = {"x": span[2], "y": span[3]}
+            else:
+                c1 = {"x": 0, "y": 0}
+                c2 = {"x": sx, "y": 0}
+        x1, y1 = c1.get("x", 0), c1.get("y", 0)
+        x2, y2 = c2.get("x", 0), c2.get("y", 0)
         z = beam.get("z_mm") or beam.get("z") or c1.get("z_top", 3500)
         if sec:  # SHS/RHS — use exact outer dims
             w, d = int(sec.bf), int(sec.d)
