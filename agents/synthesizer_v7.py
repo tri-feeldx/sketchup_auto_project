@@ -187,6 +187,29 @@ class SynthesizerV7:
         if len(llm_cols) < len(det["members"]["columns"]):
             llm_model["members"]["columns"] = det["members"]["columns"]
 
+        # Filter out hardware/connection items misidentified as structural columns
+        def _is_structural_col(col: dict) -> bool:
+            sec = str(col.get("section") or col.get("mark") or "").strip()
+            if "*" in sec or "#" in sec:
+                return False
+            hw_prefixes = ("SH", "CH*", "P80", "PF2", "RH", "UA", "EA")
+            if any(sec.upper().startswith(p) for p in hw_prefixes):
+                return False
+            w = col.get("width_mm") or col.get("width") or 999
+            try:
+                if float(w) < 50:
+                    return False
+            except (ValueError, TypeError):
+                pass
+            return True
+
+        raw_cols = llm_model["members"].get("columns", [])
+        filtered_cols = [c for c in raw_cols if _is_structural_col(c)]
+        if len(filtered_cols) < len(raw_cols):
+            print(f"  [FILTER] Removed {len(raw_cols) - len(filtered_cols)} "
+                  f"hardware items from columns ({len(filtered_cols)} structural remain)")
+            llm_model["members"]["columns"] = filtered_cols
+
         # Beams: merge LLM + deterministic, deduplicate by id
         llm_beams = llm_model["members"].get("beams", [])
         det_beams = det["members"].get("beams", [])
@@ -223,6 +246,32 @@ class SynthesizerV7:
         # Ensure levels
         if not llm_model.get("levels"):
             llm_model["levels"] = levels
+
+        # Upgrade levels: take whichever path resolved more elevations
+        llm_lvls = llm_model.get("levels") or []
+        det_lvls = det.get("levels") or []
+        llm_elev_count = sum(
+            1 for lv in llm_lvls
+            if lv.get("elevation_mm") or lv.get("height_from_datum_mm")
+        )
+        det_elev_count = sum(
+            1 for lv in det_lvls
+            if lv.get("elevation_mm") or lv.get("height_from_datum_mm")
+        )
+        if det_elev_count > llm_elev_count:
+            llm_model["levels"] = det_lvls
+
+        # Assign Z to all members (LLM path bypasses _deterministic_merge's Z step)
+        merged_lmap = self._resolve_level_elevations(
+            llm_model.get("levels") or det_lvls, page_results,
+        )
+        if merged_lmap:
+            llm_model["levels"] = self._apply_elevations_to_levels(
+                llm_model.get("levels") or det_lvls, merged_lmap
+            )
+            llm_model["members"] = self._assign_z_to_all_members(
+                llm_model["members"], merged_lmap
+            )
 
         # Rebuild summary
         m = llm_model["members"]

@@ -323,9 +323,12 @@ class PipelineV8:
                     result.accuracy = accuracy
                     new_score = accuracy.get("overall_score", 0) or 0
                     print(f"    -> Accuracy after ARR pass {arr_pass}: {new_score}%")
-                    if new_score >= ARR_ACCURACY_THRESHOLD and not arr_result.get("3d_issues"):
+                    remaining_z = arch_reviewer._verify_3d_positions(model)
+                    if new_score >= ARR_ACCURACY_THRESHOLD and not remaining_z:
                         print(f"    ✅ ARR complete — accuracy {new_score}%, no 3D issues")
                         break
+                    elif remaining_z:
+                        print(f"    ⚠ {len(remaining_z)} 3D issue(s) remain after pass {arr_pass}")
             else:
                 print(f"[V8 STAGE 9.5] ARR: Skipped "
                       f"(accuracy={accuracy_score}% ≥ {ARR_ACCURACY_THRESHOLD}%, no 3D issues)")

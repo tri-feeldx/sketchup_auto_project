@@ -156,7 +156,11 @@ class RubyGeneratorV5:
             x = self._n(x, (i % 4) * spacing_x)
             y = self._n(y, (i // 4) * spacing_y)
             zb = self._n(c.get("z_base_mm") or c.get("z_base"), 0)
-            zh = self._n(c.get("height_mm") or c.get("height"), 3500)
+            zt = self._n(c.get("z_top_mm") or c.get("z_top"), None)
+            if zt is not None and zt > zb:
+                zh = zt - zb
+            else:
+                zh = self._n(c.get("height_mm") or c.get("height"), 3500)
             col_positions[cid] = {"x": x, "y": y, "z_base": zb, "z_top": zb + zh}
 
         # ── Columns ──
