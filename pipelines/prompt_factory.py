@@ -55,24 +55,30 @@ class PromptFactory:
 
         page_hints = {
             "plan": (
-                "FOCUS: This page is a FLOOR PLAN. Extract:\n"
-                "- Column positions with grid coordinates\n"
-                "- Beam layout between columns\n"
-                "- Slab boundaries and thickness\n"
+                "FOCUS: This page is a FLOOR PLAN. Extract ALL of the following:\n"
+                "- Column positions with grid coordinates (EVERY column — do not skip any)\n"
+                "- ALL beams: primary beams, secondary beams, transfer beams, tie beams\n"
+                "- ALL beam-to-beam connections (secondary beams framing into primary beams)\n"
+                "- Slab boundaries and thickness for each bay\n"
                 "- Wall locations (external & internal)\n"
                 "- Grid lines with labels\n"
                 "- Opening locations (doors, windows)\n"
                 "- Overall plan dimensions\n"
+                "CRITICAL: Do NOT skip secondary beams or short beams. "
+                "List EVERY beam visible on the plan.\n"
             ),
             "elevation": (
-                "FOCUS: This page is an ELEVATION VIEW. Extract:\n"
-                "- Building height and levels\n"
+                "FOCUS: This page is an ELEVATION VIEW. Extract ALL of the following:\n"
+                "- Building height and levels (RL, FFL, SSL values)\n"
                 "- Column heights and base connections\n"
-                "- Bracing configuration (X, V, chevron)\n"
+                "- ALL bracing members: X-bracing, K-bracing, flat bar braces, "
+                "knee braces, wind braces, diagonal members\n"
                 "- Roof profile and ridge height\n"
                 "- Wall cladding zones\n"
-                "- Girt and purlin positions\n"
+                "- ALL girt and purlin positions and spacings\n"
                 "- Level notations (RL, FFL, SSL)\n"
+                "CRITICAL: Extract EVERY diagonal and brace member visible. "
+                "Return bracing as a list even if only one.\n"
             ),
             "section": (
                 "FOCUS: This page is a SECTION VIEW. Extract:\n"
@@ -84,6 +90,32 @@ class PromptFactory:
                 "- Structural member sizes\n"
                 "- Level markings\n"
             ),
+            "foundation": (
+                "FOCUS: This page shows FOUNDATION / PILE LAYOUT information. "
+                "Extract ALL of the following:\n\n"
+                "REQUIRED OUTPUT FORMAT:\n"
+                '{\n'
+                '  "footings": [\n'
+                '    {"id":"P1","type":"bored_pile","grid":"A-1","x_mm":1000,"y_mm":1000,\n'
+                '     "diameter_mm":600,"depth_mm":15000,"cap_type":"PC1",\n'
+                '     "cap_width_mm":1200,"cap_length_mm":1200,"cap_depth_mm":600,\n'
+                '     "pile_capacity_kN":800,"material":"reinforced_concrete"}\n'
+                "  ],\n"
+                '  "pile_caps": [\n'
+                '    {"id":"PC1","type":"single","width_mm":1200,"length_mm":1200,"depth_mm":600}\n'
+                "  ],\n"
+                '  "pile_schedule": [\n'
+                '    {"pile_id":"P1","grid_ref":"A-1","pile_type":"BC1","dia_mm":600,"depth_m":15}\n'
+                "  ]\n"
+                "}\n\n"
+                "CRITICAL RULES:\n"
+                "- Extract EVERY pile/footing location — do not summarize\n"
+                "- Include grid reference for each pile (e.g. 'A-1', 'B-3')\n"
+                "- Include diameter (dia) and depth for every pile\n"
+                "- Types: bored_pile, driven_pile, strip_footing, pad_footing, raft\n"
+                "- AU: look for 'PBFC' (pile below footing column), 'DIA', 'NGL'\n"
+                "- VN: look for 'cọc khoan nhồi', 'cọc ép', 'móng băng', 'móng đơn'\n"
+            ),
             "schedule": (
                 "FOCUS: This page is a MEMBER SCHEDULE / TABLE. "
                 "Extract EVERY row from EVERY table.\n\n"
@@ -93,23 +125,26 @@ class PromptFactory:
                 '  "beams":   [{"id":"B1","section":"530UB92","grade":"G350","span_mm":7200,'
                 '"from_col":"C1","to_col":"C2"}],\n'
                 '  "footings":[{"id":"F1","type":"pad","width_mm":2400,"depth_mm":2400,"height_mm":600}],\n'
-                '  "bracing": [{"id":"BR1","section":"150x100x8RHS","grade":"C350"}]\n'
+                '  "bracing": [{"id":"BR1","section":"150x100x8RHS","grade":"C350"}],\n'
+                '  "schedule_counts": {"columns":32,"beams":48,"footings":32,"bracing":8}\n'
                 "}\n\n"
                 "CRITICAL RULES:\n"
                 "- section field MUST contain the full section designation (e.g. '310UC118', '530UB92', '150x100x6RHS')\n"
                 "- grade field MUST contain the steel/concrete grade (e.g. 'G350', 'C350', 'N32')\n"
                 "- Extract id/mark exactly as shown (e.g. 'C1', 'B1', 'BR3A')\n"
                 "- Do NOT summarize — include ALL rows\n"
+                "- ALWAYS include schedule_counts with total count per element type\n"
                 "- AS/NZS sections: UB, UC, PFC, RHS, SHS, CHS (e.g. '530UB92', '168.3x5.0CHS')\n"
                 "- TCVN sections: H-sections, I-sections (e.g. 'H300x300x10x15', 'I200')\n"
             ),
             "general": (
                 "Analyze this drawing and extract ALL structural elements:\n"
                 "- Columns (position, size, height, material, base connection)\n"
-                "- Beams (span, section, material, end connections)\n"
+                "- Beams (span, section, material, end connections) — include ALL secondary beams\n"
                 "- Slabs (area, thickness, material, reinforcement)\n"
                 "- Walls (position, thickness, material, openings)\n"
                 "- Foundations (type, size, depth)\n"
+                "- Bracing (ALL diagonal members, X-bracing, K-bracing)\n"
                 "- Grid system (axes labels, spacing)\n"
                 "- All dimensions and levels\n"
             ),

@@ -32,6 +32,7 @@ PAGE_TYPES = [
     "SECTION",     # Cross section, longitudinal section
     "SCHEDULE",    # Table / bill of quantities
     "DETAIL",      # Connection detail, enlarged detail
+    "FOUNDATION",  # Foundation plan, pile layout, footing details
     "UNKNOWN",     # Cannot determine
 ]
 
@@ -39,6 +40,7 @@ PAGE_TYPES = [
 TYPE_PRIORITY = {
     "SCHEDULE": 10,   # Schedule is unambiguous (tabular data)
     "TITLE": 9,       # Title page if no structural content
+    "FOUNDATION": 7,  # Foundation plans are unambiguous structural pages
     "PLAN": 6,
     "ELEVATION": 5,
     "SECTION": 5,
@@ -121,6 +123,29 @@ EN_TITLE_KEYWORDS = [
     "project notes", "specification",
 ]
 
+VN_FOUNDATION_KEYWORDS = [
+    "mat bang mong", "mong coc", "mong bang", "mong don",
+    "mong raft", "cap mong", "do sau mong", "cao do mong",
+    "coc khoan nhoi", "coc ep", "coc be tong",
+    "mat cat mong", "nen mong",
+]
+
+EN_FOUNDATION_KEYWORDS = [
+    # High-specificity terms (weight +4 in scorer)
+    "foundation plan", "pile layout", "pile schedule", "bored pile", "pbfc", "psfc",
+    # Medium-specificity terms (weight +2 in scorer)
+    "pile cap", "footing schedule", "strip footing", "pad footing", "raft foundation",
+    "pile detail", "footing detail", "pile cap detail",
+    "existing ground level", "pile depth", "founding level", "underside of footing",
+    # Pile-specific diameter patterns only (e.g. 600 dia, 1200 dia)
+    "600 dia", "900 dia", "1200 dia", "1500 dia", "2400 dia",
+]
+
+# High-specificity foundation terms that get +4 weight
+EN_FOUNDATION_HIGH = {
+    "foundation plan", "pile layout", "pile schedule", "bored pile", "pbfc", "psfc",
+}
+
 # ── Structural keywords (appear on non-title pages) ────────
 STRUCTURAL_KEYWORDS = [
     "column", "beam", "slab", "footing", "steel", "concrete",
@@ -187,6 +212,7 @@ class PageRouter:
             "SECTION": self._score_section(text_lower),
             "SCHEDULE": self._score_schedule(text_lower),
             "DETAIL": self._score_detail(text_lower),
+            "FOUNDATION": self._score_foundation(text_lower),
         }
 
         # Apply structural presence bonus
@@ -210,6 +236,12 @@ class PageRouter:
             scores["DETAIL"] += 3
         if pf.get("likely_title"):
             scores["TITLE"] += 3
+        if pf.get("likely_foundation"):
+            scores["FOUNDATION"] += 3
+
+        # Foundation supersedes PLAN only when very strong foundation signals
+        if scores["FOUNDATION"] >= 8 and scores["PLAN"] > 0:
+            scores["PLAN"] = max(0, scores["PLAN"] - 2)
 
         # Determine best type with priority tiebreaker
         best_type = "UNKNOWN"
@@ -297,6 +329,13 @@ class PageRouter:
         if re.search(r"(?:rl|ffl|ssl|cao do|elevation|height)\s*[=:]\s*\d+", text_lower):
             score += 2
 
+        # Bracing is primarily visible on elevation views
+        if any(kw in text_lower for kw in [
+            "bracing", "x-brace", "x brace", "k-brace", "k brace",
+            "wind brace", "knee brace", "flat bar brace", "giằng chéo", "giang cheo",
+        ]):
+            score += 4
+
         return score
 
     def _score_section(self, text_lower: str) -> int:
@@ -343,6 +382,37 @@ class PageRouter:
         # Detail scale indicators (large scale = detail)
         if re.search(r"1\s*[:=]\s*(?:1|2|5|10|20|25)", text_lower):
             score += 2
+
+        return score
+
+    def _score_foundation(self, text_lower: str) -> int:
+        """Score likelihood this is a foundation/pile layout page."""
+        score = 0
+
+        for kw in VN_FOUNDATION_KEYWORDS:
+            score += 4 if kw in text_lower else 0
+
+        for kw in EN_FOUNDATION_KEYWORDS:
+            # High-specificity terms get +4, medium-specificity get +2
+            score += 4 if kw in EN_FOUNDATION_HIGH and kw in text_lower else (
+                2 if kw in text_lower else 0
+            )
+
+        # Pile-specific diameter patterns — require pile/bore context, not generic "dia"
+        if re.search(r"(?:\d{3,4})\s*(?:dia|diameter)\s*(?:pile|bore|coc|mong)", text_lower):
+            score += 3
+        if re.search(r"(?:600|900|1200|1500|2400)\s*(?:dia|mm\s*dia)", text_lower):
+            score += 3
+
+        # NGL only counts when combined with pile/footing context
+        if re.search(r"ngl", text_lower) and re.search(r"(?:pile|footing|mong|coc)", text_lower):
+            score += 2
+        if re.search(r"founding level|underside of footing", text_lower):
+            score += 2
+
+        # Pile cap reference
+        if re.search(r"pc\d+|pile\s*cap|cap\s*type", text_lower):
+            score += 3
 
         return score
 

@@ -171,12 +171,41 @@ class SynthesizerV7:
                         forensic: dict) -> dict:
         """Enrich LLM model with deterministically merged data."""
         det = self._deterministic_merge(page_results, forensic)
+        llm_model.setdefault("members", {})
 
-        # If LLM model has fewer columns, supplement from deterministic
-        llm_cols = llm_model.get("members", {}).get("columns", [])
+        # Columns: take whichever is larger
+        llm_cols = llm_model["members"].get("columns", [])
         if len(llm_cols) < len(det["members"]["columns"]):
-            llm_model.setdefault("members", {})
             llm_model["members"]["columns"] = det["members"]["columns"]
+
+        # Beams: merge LLM + deterministic, deduplicate by id
+        llm_beams = llm_model["members"].get("beams", [])
+        det_beams = det["members"].get("beams", [])
+        llm_model["members"]["beams"] = self._merge_beam_lists(llm_beams, det_beams)
+
+        # Footings: take whichever is larger (often 0 from LLM)
+        llm_ftg = llm_model["members"].get("footings", [])
+        det_ftg = det["members"].get("footings", [])
+        if len(det_ftg) > len(llm_ftg):
+            llm_model["members"]["footings"] = det_ftg
+
+        # Bracing: merge, keep all
+        llm_brc = llm_model["members"].get("bracing", [])
+        det_brc = det["members"].get("bracing", [])
+        if len(det_brc) > len(llm_brc):
+            llm_model["members"]["bracing"] = det_brc
+
+        # Auto-generate slabs per level if fewer slabs than floors
+        llm_slabs = llm_model["members"].get("slabs", [])
+        levels = llm_model.get("levels") or det["levels"]
+        if len(llm_slabs) < len(levels):
+            auto_slabs = self._auto_slabs_from_levels(
+                levels,
+                llm_model["members"]["columns"],
+                existing_slabs=llm_slabs,
+            )
+            if len(auto_slabs) > len(llm_slabs):
+                llm_model["members"]["slabs"] = auto_slabs
 
         # Ensure grid
         if not llm_model.get("grid_system"):
@@ -184,13 +213,82 @@ class SynthesizerV7:
 
         # Ensure levels
         if not llm_model.get("levels"):
-            llm_model["levels"] = det["levels"]
+            llm_model["levels"] = levels
 
-        # Ensure summary
-        if not llm_model.get("summary"):
-            llm_model["summary"] = det["summary"]
+        # Rebuild summary
+        m = llm_model["members"]
+        llm_model["summary"] = {
+            "total_columns": len(m.get("columns", [])),
+            "total_beams": len(m.get("beams", [])),
+            "total_slabs": len(m.get("slabs", [])),
+            "total_walls": len(m.get("walls", [])),
+            "total_footings": len(m.get("footings", [])),
+            "total_bracing": len(m.get("bracing", [])),
+            "num_levels": len(llm_model.get("levels", [])),
+        }
 
         return llm_model
+
+    def _merge_beam_lists(self, llm_beams: List[dict],
+                           det_beams: List[dict]) -> List[dict]:
+        """Merge two beam lists, preferring LLM data but adding unique det beams."""
+        seen_ids = set()
+        merged = []
+        for b in llm_beams:
+            bid = b.get("id") or b.get("mark", "")
+            merged.append(b)
+            if bid:
+                seen_ids.add(bid)
+        for b in det_beams:
+            bid = b.get("id") or b.get("mark", "")
+            if bid and bid not in seen_ids:
+                merged.append(b)
+                seen_ids.add(bid)
+            elif not bid:
+                merged.append(b)
+        return merged
+
+    def _auto_slabs_from_levels(self, levels: List[dict],
+                                  columns: List[dict],
+                                  existing_slabs: List[dict]) -> List[dict]:
+        """Auto-generate one slab per level using building footprint from columns."""
+        # Compute footprint bounding box from column positions
+        xs = [c.get("x", c.get("x_mm", 0)) for c in columns if c.get("x") or c.get("x_mm")]
+        ys = [c.get("y", c.get("y_mm", 0)) for c in columns if c.get("y") or c.get("y_mm")]
+
+        if xs and ys:
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+        else:
+            min_x, max_x, min_y, max_y = 0, 18000, 0, 9000
+
+        boundary = [
+            [min_x, min_y], [max_x, min_y],
+            [max_x, max_y], [min_x, max_y],
+        ]
+
+        # Collect existing slab levels to avoid duplication
+        existing_level_ids = {s.get("level_id") or s.get("level") for s in existing_slabs}
+
+        slabs = list(existing_slabs)
+        for lvl in levels:
+            lvl_id = lvl.get("id") or lvl.get("name", "")
+            if lvl_id in existing_level_ids:
+                continue
+            thickness = lvl.get("slab_thickness_mm") or lvl.get("slab_depth_mm") or 200
+            elevation = lvl.get("elevation_mm") or lvl.get("elevation", 0)
+            slabs.append({
+                "id": f"S_AUTO_{lvl_id}",
+                "level_id": lvl_id,
+                "elevation_mm": elevation,
+                "thickness_mm": int(thickness),
+                "boundary": boundary,
+                "material": "reinforced_concrete",
+                "auto_generated": True,
+            })
+            existing_level_ids.add(lvl_id)
+
+        return slabs
 
     def _extract_grid(self, forensic: dict, page_results: List[dict]) -> dict:
         """Extract grid system from forensic + page data + PDF dimension analysis."""

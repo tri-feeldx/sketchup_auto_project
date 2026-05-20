@@ -51,7 +51,7 @@ with st.sidebar:
     st.markdown("<p style='color:#94a3b8;margin-bottom:4px;'>📄 Input PDF</p>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], label_visibility="collapsed")
     st.divider()
-    pipeline_version = st.selectbox("Pipeline Version", ["V7 (Next-Gen Quality Gate)", "V5 (Vision-First)", "V4 (Adaptive)", "V3 (Structural)"])
+    pipeline_version = st.selectbox("Pipeline Version", ["V8 (Accuracy-First ≥90%)", "V7 (Next-Gen Quality Gate)", "V5 (Vision-First)", "V4 (Adaptive)", "V3 (Structural)"])
     st.divider()
     st.markdown("<p style='color:#94a3b8;'>💾 LLM Cache</p>", unsafe_allow_html=True)
     stats = get_cache_stats()
@@ -129,13 +129,65 @@ if run_btn and uploaded_file:
     def _log_fn(msg):
         log_q.put(msg)
 
-    use_v7 = "V7" in pipeline_version
+    use_v8 = "V8" in pipeline_version
+    use_v7 = "V7" in pipeline_version and not use_v8
     use_v5 = "V5" in pipeline_version
     use_v4 = "V4" in pipeline_version
 
     def _run():
         try:
-            if use_v7:
+            if use_v8:
+                from pipelines.pipeline_v8 import PipelineV8
+                V8_OUTPUT_DIR = Path(_PROJ_ROOT) / "output" / "v8"
+                _log_fn("[STAGE 0] PDFForensic: Analyzing PDF structure…")
+                _log_fn("[STAGE 1] PageRouter: Classifying pages (incl. FOUNDATION)…")
+                pipeline = PipelineV8(region="auto", language="auto")
+                presult = pipeline.run(str(save_path), output_dir=str(V8_OUTPUT_DIR))
+                pdict = presult.to_dict()
+                _fsummary = pdict.get("forensic_summary", {})
+                _det_region = _fsummary.get("region", "?")
+                _det_lang = _fsummary.get("language", "?")
+                _log_fn(f"[FORENSIC] Detected: {_det_region.upper()} | {_det_lang.upper()}")
+                n_pages = len(presult.scanner_output.get("page_results", {}))
+                _log_fn(f"[STAGE 2] ScannerV6 -> {n_pages} pages scanned")
+                msum = presult.structural_model.get("members", {})
+                nc = len(msum.get("columns", [])); nb = len(msum.get("beams", []))
+                ns = len(msum.get("slabs", [])); nw = len(msum.get("walls", []))
+                nf = len(msum.get("footings", [])); nbr = len(msum.get("bracing", []))
+                _log_fn(f"[STAGE 3] SynthesizerV7 -> {nc}c {nb}b {ns}s {nw}w {nf}f {nbr}br")
+                vr = presult.verification or {}
+                recall = vr.get("overall_recall")
+                _log_fn(f"[STAGE 4] ScheduleVerifier -> recall={f'{recall:.0%}' if recall else 'N/A'}")
+                _log_fn(f"[STAGE 5] MultiPassExtractor -> {'ran' if vr.get('needs_repass') else 'skipped'}")
+                vp = pdict.get("validation_passed")
+                _log_fn(f"[STAGE 6] ValidatorV7 -> {'PASS' if vp else 'FAIL'}")
+                rvp = pdict.get("ruby_validation_passed")
+                re_ents = presult.ruby_validation.get("estimated_entities", 0) if presult.ruby_validation else 0
+                _log_fn(f"[STAGE 7-8] RubyGen+Validate -> {'PASS' if rvp else 'FAIL'} (~{re_ents} entities)")
+                acc = presult.accuracy or {}
+                acc_score = acc.get("overall_score", "N/A")
+                acc_grade = acc.get("grade", "?")
+                acc_met = acc.get("target_met", False)
+                _log_fn(f"[STAGE 9] AccuracyEval -> {acc_score}% Grade {acc_grade} {'✅' if acc_met else '❌'}")
+                _log_fn(f"[COMPLETE] Pipeline V8 in {presult.duration_sec:.1f}s")
+                total_members = nc + nb + ns + nw + nf + nbr
+                res = {
+                    "ruby_path": presult.output_rb_path,
+                    "ifc_path": presult.output_ifc_path,
+                    "detected_region": _det_region,
+                    "members_total": total_members, "placed": total_members,
+                    "unmapped": 0, "unmapped_marks": [],
+                    "audit_passed": pdict.get("validation_passed", True),
+                    "columns": nc, "beams": nb, "arch_walls": nw,
+                    "arch_doors": 0, "arch_windows": 0, "arch_slabs": ns,
+                    "arch_count": nw + ns + nf + nbr,
+                    "footings": nf, "bracing": nbr,
+                    "accuracy_score": acc_score,
+                    "accuracy_grade": acc_grade,
+                    "accuracy_target_met": acc_met,
+                    "error": None,
+                }
+            elif use_v7:
                 from pipelines.pipeline_v7 import PipelineV7
                 _log_fn("[STAGE 0] PDFForensic: Analyzing PDF structure…")
                 _log_fn("[STAGE 1] PageRouter: Classifying pages…")
@@ -243,21 +295,37 @@ if run_btn and uploaded_file:
             status_slot.markdown('<div class="sb sbs">✅ Pipeline complete!</div>', unsafe_allow_html=True)
             with metrics_slot.container():
                 st.markdown("#### 📊 Extraction Summary")
-                c1, c2, c3, c4, c5 = st.columns(5)
-                c1.metric("Total Members", result_holder.get("members_total", 0))
-                c2.metric("3D Placed", result_holder.get("placed", 0))
-                c3.metric("⚠️ Unmapped", result_holder.get("unmapped", 0))
-                c4.metric("Audit", "✅ Pass" if result_holder.get("audit_passed") else "⚠️ Warn")
-                c5.metric("Cache Hits", get_cache_stats()["hits"])
-            arch_count = result_holder.get("arch_count", 0)
-            if arch_count > 0:
-                st.markdown("#### 🏗️ Elements Breakdown")
-                w1, w2, w3, w4, w5 = st.columns(5)
-                w1.metric("Columns", result_holder.get("columns", 0))
-                w2.metric("Beams", result_holder.get("beams", 0))
-                w3.metric("Walls", result_holder.get("arch_walls", 0))
-                w4.metric("Doors+Win", result_holder.get("arch_doors", 0) + result_holder.get("arch_windows", 0))
-                w5.metric("Slabs", result_holder.get("arch_slabs", 0))
+                acc_score = result_holder.get("accuracy_score")
+                acc_grade = result_holder.get("accuracy_grade", "?")
+                acc_met = result_holder.get("accuracy_target_met", False)
+                if acc_score is not None:
+                    acc_label = f"{acc_score}% (Grade {acc_grade}) {'✅' if acc_met else '❌'}"
+                    c1, c2, c3, c4, c5 = st.columns(5)
+                    c1.metric("🎯 Accuracy", acc_label)
+                    c2.metric("Total Members", result_holder.get("members_total", 0))
+                    c3.metric("⚠️ Unmapped", result_holder.get("unmapped", 0))
+                    c4.metric("Audit", "✅ Pass" if result_holder.get("audit_passed") else "⚠️ Warn")
+                    c5.metric("Cache Hits", get_cache_stats()["hits"])
+                    if not acc_met:
+                        st.warning(f"Accuracy {acc_score}% < 90% target — multi-pass ran but more passes may help.")
+                else:
+                    c1, c2, c3, c4, c5 = st.columns(5)
+                    c1.metric("Total Members", result_holder.get("members_total", 0))
+                    c2.metric("3D Placed", result_holder.get("placed", 0))
+                    c3.metric("⚠️ Unmapped", result_holder.get("unmapped", 0))
+                    c4.metric("Audit", "✅ Pass" if result_holder.get("audit_passed") else "⚠️ Warn")
+                    c5.metric("Cache Hits", get_cache_stats()["hits"])
+                arch_count = result_holder.get("arch_count", 0)
+                if arch_count > 0:
+                    st.markdown("#### 🏗️ Elements Breakdown")
+                    w1, w2, w3, w4, w5, w6, w7 = st.columns(7)
+                    w1.metric("Columns", result_holder.get("columns", 0))
+                    w2.metric("Beams", result_holder.get("beams", 0))
+                    w3.metric("Slabs", result_holder.get("arch_slabs", 0))
+                    w4.metric("Walls", result_holder.get("arch_walls", 0))
+                    w5.metric("Footings", result_holder.get("footings", 0))
+                    w6.metric("Bracing", result_holder.get("bracing", 0))
+                    w7.metric("Doors+Win", result_holder.get("arch_doors", 0) + result_holder.get("arch_windows", 0))
             unmapped_marks = result_holder.get("unmapped_marks", [])
             if unmapped_marks:
                 st.warning(f"⚠️ {len(unmapped_marks)} member(s) could not be auto-placed: {', '.join(unmapped_marks)}")
@@ -265,17 +333,28 @@ if run_btn and uploaded_file:
             _pdf_stem = uploaded_file.name.replace(".pdf", "")
             _ts = datetime.now().strftime("%Y%m%d_%H%M")
             rb_bytes = Path(ruby_path).read_bytes()
-            rb_name = f"LOD300_{_pdf_stem}_{_ts}.rb"
+            _lod_level = "LOD350" if use_v8 else "LOD300"
+            rb_name = f"{_lod_level}_{_pdf_stem}_{_ts}.rb"
             _det_region = result_holder.get("detected_region", "").upper()
             with download_slot.container():
                 st.divider()
                 if _det_region:
                     st.markdown(f"#### 🌏 Detected Standard: **{_det_region}**")
+                if use_v8:
+                    acc_s = result_holder.get("accuracy_score", "N/A")
+                    acc_g = result_holder.get("accuracy_grade", "?")
+                    badge_color = "green" if result_holder.get("accuracy_target_met") else "orange"
+                    st.markdown(
+                        f"<span style='background:{badge_color};color:white;padding:4px 10px;"
+                        f"border-radius:8px;font-weight:600;'>LOD350 | Accuracy: {acc_s}% Grade {acc_g}</span>",
+                        unsafe_allow_html=True,
+                    )
+                    st.write("")
                 st.markdown("#### 📥 Download Output Files")
 
                 # .rb (primary)
                 st.download_button(
-                    label=f"⬇️ {rb_name} — SketchUp Ruby Script (LOD300)",
+                    label=f"⬇️ {rb_name} — SketchUp Ruby Script ({_lod_level})",
                     data=rb_bytes, file_name=rb_name, mime="text/plain",
                     use_container_width=True,
                 )

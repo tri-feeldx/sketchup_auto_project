@@ -29,19 +29,22 @@ class RubyGeneratorV5:
         if total > self.WARNING_ENTITIES:
             print(f"[GEN] {total} entities, may be slow")
 
-        # Try LLM first
+        # Deterministic first (reliable for large models with many members)
         ruby = None
         try:
-            sys_p = self.prompt_factory.build_full_system_prompt("ruby_generator", region=self.region)
-            usr_p = self.prompt_factory.user_prompt_ruby_generate(model_json=model, profile=None)
-            from core.llm_wrapper import call_llm
-            resp = call_llm(usr_p, system=sys_p)
-            ruby = self._extract_ruby(resp)
+            ruby = self._deterministic_script(model)
         except Exception as e:
-            print(f"[GEN] LLM fail: {e}")
+            print(f"[GEN] Deterministic fail: {e} — falling back to LLM")
 
         if not ruby:
-            ruby = self._deterministic_script(model)
+            try:
+                sys_p = self.prompt_factory.build_full_system_prompt("ruby_generator", region=self.region)
+                usr_p = self.prompt_factory.user_prompt_ruby_generate(model_json=model, profile=None)
+                from core.llm_wrapper import call_llm
+                resp = call_llm(usr_p, system=sys_p)
+                ruby = self._extract_ruby(resp)
+            except Exception as e:
+                print(f"[GEN] LLM fail: {e}")
         return self._wrap_script(ruby, model)
 
     # ── DETERMINISTIC ───────────────────────────────────
@@ -138,22 +141,22 @@ class RubyGeneratorV5:
         walls = members.get("walls", [])
         foots = members.get("footings", [])
 
-        # Build column lookup (id → resolved x,y,z)
+        # Build column lookup (id → resolved x,y,z) — all values forced to int
         col_positions = {}
         for i, c in enumerate(cols):
             cid = c.get("id") or c.get("mark", f"COL_{i}")
             gx = c.get("grid_x")
             gy = c.get("grid_y")
-            x = c.get("x")
-            y = c.get("y")
+            x = c.get("x") or c.get("x_mm")
+            y = c.get("y") or c.get("y_mm")
             if x is None and gx is not None:
                 x = grid_to_mm_x(gx)
             if y is None and gy is not None:
                 y = grid_to_mm_y(gy)
-            x = x or (i % 4) * spacing_x
-            y = y or (i // 4) * spacing_y
-            zb = c.get("z_base_mm") or c.get("z_base", 0)
-            zh = c.get("height_mm") or c.get("height", 3500)
+            x = self._n(x, (i % 4) * spacing_x)
+            y = self._n(y, (i // 4) * spacing_y)
+            zb = self._n(c.get("z_base_mm") or c.get("z_base"), 0)
+            zh = self._n(c.get("height_mm") or c.get("height"), 3500)
             col_positions[cid] = {"x": x, "y": y, "z_base": zb, "z_top": zb + zh}
 
         # ── Columns ──
@@ -193,8 +196,21 @@ class RubyGeneratorV5:
                 lines.extend(self._footing_ruby_v5(f, col_positions, i, mat_vars))
             lines.append("")
 
+        # ── LOD350 Connections ──
+        lines.append("# === LOD350 Connections ===")
+        lines.append("layers['conns'] = model.layers.add('Connections_LOD350')")
+        lines.append("mat_steel_plate = model.materials.add('SteelPlate')")
+        lines.append("mat_steel_plate.color = Sketchup::Color.new(140,140,160)")
+        for i, c in enumerate(cols):
+            cid = c.get("id") or c.get("mark", f"COL_{i}")
+            pos = col_positions.get(cid, {"x": 0, "y": 0, "z_base": 0, "z_top": 3500})
+            lines.extend(self._lod350_col_plates(c, pos, i))
+        for i, b in enumerate(beams):
+            lines.extend(self._lod350_beam_endplate(b, col_positions, i))
+        lines.append("")
+
         lines.append("model.commit_operation")
-        lines.append(f"UI.messagebox('Done: {len(cols)}c {len(beams)}b {len(slabs)}s {len(walls)}w {len(foots)}f')")
+        lines.append(f"UI.messagebox('Done: {len(cols)}c {len(beams)}b {len(slabs)}s {len(walls)}w {len(foots)}f [LOD350]')")
         return "\n".join(lines)
 
     def _get_mat(self, member: dict, mat_vars: dict) -> str:
@@ -371,8 +387,8 @@ class RubyGeneratorV5:
         if sec and sec.profile_type == "CHS":
             return self._chs_col_ruby(col, pos, i, mat_vars, sec)
         # Fallback: rectangular solid with resolved dimensions
-        x = pos["x"]; y = pos["y"]
-        zb = pos["z_base"]; zt = pos["z_top"]
+        x = self._n(pos["x"]); y = self._n(pos["y"])
+        zb = self._n(pos["z_base"]); zt = self._n(pos["z_top"])
         h = zt - zb
         if sec:  # SHS/RHS — use exact outer dims from library
             w, d = int(sec.bf), int(sec.d)
@@ -567,12 +583,13 @@ class RubyGeneratorV5:
 
     def _footing_ruby_v5(self, ftg: dict, col_map: dict, i: int,
                           mat_vars: dict) -> List[str]:
-        x = ftg.get("x", 0); y = ftg.get("y", 0)
+        x = self._n(ftg.get("x") or ftg.get("x_mm"), 0)
+        y = self._n(ftg.get("y") or ftg.get("y_mm"), 0)
         # Try to snap to a column position
         fid = ftg.get("column") or ftg.get("col_id") or ftg.get("id", "")
         if fid and fid in col_map:
             pos = col_map[fid]
-            x = pos["x"]; y = pos["y"]
+            x = self._n(pos["x"]); y = self._n(pos["y"])
         w = ftg.get("width_mm") or ftg.get("width", 1600)
         d = ftg.get("depth_mm") or ftg.get("depth", 1600)
         h = ftg.get("height_mm") or ftg.get("height", 600)
@@ -595,6 +612,101 @@ class RubyGeneratorV5:
             f"f_{i}.layer = layers['ftgs'] if f_{i}",
             f"f_{i}.pushpull({h}) if f_{i}",
         ]
+
+    # ── LOD350 CONNECTIONS ───────────────────────────────
+
+    def _lod350_col_plates(self, col: dict, pos: dict, i: int) -> List[str]:
+        """Generate base plate and cap plate for a column (LOD350)."""
+        x = int(pos.get("x", 0))
+        y = int(pos.get("y", 0))
+        zb = int(pos.get("z_base", 0))
+        zt = int(pos.get("z_top", 3500))
+
+        # Estimate column flange width from section (fallback 200mm)
+        sec = str(col.get("section", "") or "")
+        col_w = 200
+        try:
+            import re as _re
+            nums = _re.findall(r"\d+", sec)
+            if nums:
+                col_w = max(int(nums[0]), 100)
+        except Exception:
+            pass
+
+        pw = col_w + 100   # plate wider than column flange
+        ph = pw
+        pt = 20            # plate thickness mm
+
+        lines = [f"# LOD350 base+cap plates: col {i+1}"]
+        for plate_name, pz, push_dir in [
+            (f"bplate_{i}", zb - pt, pt),
+            (f"cplate_{i}", zt, pt),
+        ]:
+            lines += [
+                f"begin",
+                f"  {plate_name}_pts = [",
+                f"    Geom::Point3d.new(ox+{x - pw//2}, oy+{y - ph//2}, {pz}),",
+                f"    Geom::Point3d.new(ox+{x + pw//2}, oy+{y - ph//2}, {pz}),",
+                f"    Geom::Point3d.new(ox+{x + pw//2}, oy+{y + ph//2}, {pz}),",
+                f"    Geom::Point3d.new(ox+{x - pw//2}, oy+{y + ph//2}, {pz})",
+                f"  ]",
+                f"  {plate_name}_f = ents.add_face({plate_name}_pts)",
+                f"  if {plate_name}_f",
+                f"    {plate_name}_f.material = mat_steel_plate",
+                f"    {plate_name}_f.layer = layers['conns']",
+                f"    {plate_name}_f.pushpull({push_dir})",
+                f"  end",
+                f"rescue; end",
+            ]
+        return lines
+
+    def _lod350_beam_endplate(self, beam: dict, col_map: dict, i: int) -> List[str]:
+        """Generate end plates at both ends of a beam (LOD350)."""
+        from_id = beam.get("from_col") or beam.get("from", "")
+        to_id = beam.get("to_col") or beam.get("to", "")
+        c1 = col_map.get(from_id)
+        c2 = col_map.get(to_id)
+        if not (c1 and c2):
+            return []
+
+        sec = str(beam.get("section", "") or "")
+        beam_d = 300
+        beam_w = 150
+        try:
+            import re as _re
+            nums = _re.findall(r"\d+", sec)
+            if len(nums) >= 1:
+                beam_d = int(nums[0])
+            if len(nums) >= 2:
+                beam_w = int(nums[1])
+        except Exception:
+            pass
+
+        ept = 10   # end plate thickness mm
+        zb = int(c1.get("z_base", 0))
+        zt_beam = zb + beam_d  # approx beam bottom
+
+        lines = [f"# LOD350 end plates: beam {i+1}"]
+        for end_name, col_pos in [(f"ep1_{i}", c1), (f"ep2_{i}", c2)]:
+            cx = int(col_pos.get("x", 0))
+            cy = int(col_pos.get("y", 0))
+            lines += [
+                f"begin",
+                f"  {end_name}_pts = [",
+                f"    Geom::Point3d.new(ox+{cx - ept}, oy+{cy - beam_w//2}, {zt_beam}),",
+                f"    Geom::Point3d.new(ox+{cx + ept}, oy+{cy - beam_w//2}, {zt_beam}),",
+                f"    Geom::Point3d.new(ox+{cx + ept}, oy+{cy + beam_w//2}, {zt_beam}),",
+                f"    Geom::Point3d.new(ox+{cx - ept}, oy+{cy + beam_w//2}, {zt_beam})",
+                f"  ]",
+                f"  {end_name}_f = ents.add_face({end_name}_pts)",
+                f"  if {end_name}_f",
+                f"    {end_name}_f.material = mat_steel_plate",
+                f"    {end_name}_f.layer = layers['conns']",
+                f"    {end_name}_f.pushpull({beam_d})",
+                f"  end",
+                f"rescue; end",
+            ]
+        return lines
 
     # ── HELPERS ─────────────────────────────────────────
 
@@ -641,6 +753,14 @@ class RubyGeneratorV5:
             "end\n"
         )
         return ruby + footer
+
+    @staticmethod
+    def _n(v, default: int = 0) -> int:
+        """Safely coerce any model value (str/int/float/None) to int."""
+        try:
+            return int(float(v))
+        except (ValueError, TypeError):
+            return default
 
     def _error(self, msg: str) -> str:
         return f"# ERROR: {msg}\nUI.messagebox('Error: {msg}')"
