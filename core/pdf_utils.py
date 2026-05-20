@@ -394,3 +394,66 @@ def parse_rc_dimensions_from_schedule(pdf_path: str, schedule_pages: list[int]) 
                     results[mark] = {"width_mm": nums[0], "depth_mm": nums[0]}
 
     return results
+
+
+# ============================================================
+# REGION NORMALISER — translate regional notation to canonical
+# ============================================================
+
+_TCVN_TO_CANONICAL = [
+    # Level notation: "Cốt +3.500" → "RL +3500"
+    (re.compile(r'[Cc]ốt\s*\+(\d+)\.(\d{3})'),       r'RL +\1\2'),
+    (re.compile(r'[Cc]ốt\s*\+(\d+)\.(\d{1,2})'),      r'RL +\g<1>0\2'),
+    (re.compile(r'[Cc]ốt\s*±0\.000'),                  'RL +0'),
+    (re.compile(r'[Cc]ốt\s*\+(\d+)'),                  r'RL +\1'),
+    (re.compile(r'[Cc]ao\s+[Đđ]ộ\s*\+'),               'RL +'),
+    # Grid / axis labels
+    (re.compile(r'Trục\s+', re.IGNORECASE),             'GRID '),
+    (re.compile(r'TRỤC\s+'),                             'GRID '),
+    # Member type keywords
+    (re.compile(r'\bCỘT\b'),                             'COLUMN'),
+    (re.compile(r'\bDẦM\b'),                             'BEAM'),
+    (re.compile(r'\bSÀN\b'),                             'SLAB'),
+    (re.compile(r'\bMÓNG\b'),                            'FOOTING'),
+    (re.compile(r'\bTƯỜNG\b'),                           'WALL'),
+    (re.compile(r'\bGIẰNG\b'),                           'BRACING'),
+    # Material grades
+    (re.compile(r'\bCT3\b'),                             'SS400'),
+    (re.compile(r'\bCT38\b'),                            'SS400'),
+    (re.compile(r'\bCT42\b'),                            'SS490'),
+    (re.compile(r'\bM200\b'),                            'C16'),
+    (re.compile(r'\bM250\b'),                            'C20'),
+    (re.compile(r'\bM300\b'),                            'C25'),
+    (re.compile(r'\bM400\b'),                            'C32'),
+]
+
+_AU_NORMALISE = [
+    (re.compile(r'\bF\.F\.L\.?\b', re.IGNORECASE),      'FFL'),
+    (re.compile(r'\bS\.S\.L\.?\b', re.IGNORECASE),      'SSL'),
+    (re.compile(r'\bR\.L\.?\b',    re.IGNORECASE),      'RL'),
+]
+
+
+def region_normaliser(text: str, region: str) -> str:
+    """
+    Translate region-specific structural notation to canonical English
+    before passing text to the LLM scanner. Makes prompts language-agnostic.
+
+    Args:
+        text:   Raw page text from PDF
+        region: 'vn', 'au', or 'intl'
+
+    Returns:
+        Normalised text with canonical notation
+    """
+    if not text:
+        return text
+
+    if region == 'vn':
+        for pattern, replacement in _TCVN_TO_CANONICAL:
+            text = pattern.sub(replacement, text)
+    elif region == 'au':
+        for pattern, replacement in _AU_NORMALISE:
+            text = pattern.sub(replacement, text)
+
+    return text

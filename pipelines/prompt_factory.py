@@ -379,19 +379,197 @@ class PromptFactory:
             "Use null for section/grade if genuinely absent."
         )
 
+    # ── ELEVATION / STOREY HEIGHT EXTRACTION ───────────────
+    def system_prompt_elevation_extractor(self) -> str:
+        """System prompt for extracting storey heights and level elevations from any drawing."""
+        return (
+            "You are a Senior Structural Engineer. Extract ALL level elevation data from "
+            "construction drawings. Your output must be a JSON array of level objects.\n\n"
+            "HANDLE ALL NOTATION STYLES:\n"
+            "  AU/NZ:   'RL 9.150', 'FFL +9150', 'SSL +8900', 'EL.+9.15m', '3rd Floor RL12.600'\n"
+            "  VN:      'Cốt +3.500', '+3500', '±0.000', 'Cao độ 3.5m', 'Tầng 3: +7000'\n"
+            "  INTL:    '+3.50m', 'Level 3: +7000mm', 'EL +3500', 'FF +3500'\n\n"
+            "OUTPUT FORMAT (JSON array, no markdown):\n"
+            "[\n"
+            "  {\"id\": \"GROUND\",  \"label\": \"Ground Floor\", \"rl_mm\": 0,    \"ffl_mm\": 0,    \"floor_to_floor_mm\": 3500},\n"
+            "  {\"id\": \"LEVEL_1\", \"label\": \"Level 1\",      \"rl_mm\": 3500, \"ffl_mm\": 3500, \"floor_to_floor_mm\": 3200},\n"
+            "  {\"id\": \"ROOF\",    \"label\": \"Roof\",          \"rl_mm\": 6700, \"ffl_mm\": null, \"floor_to_floor_mm\": null}\n"
+            "]\n\n"
+            "RULES:\n"
+            "- Convert all values to mm (multiply metres by 1000)\n"
+            "- If only RL/elevation given (not F2F), compute floor_to_floor_mm from differences\n"
+            "- Sort levels by ascending elevation\n"
+            "- If no explicit level data found, return []\n"
+            "- Never invent values — only extract what is visible in the drawing\n"
+        )
+
+    def user_prompt_extract_elevations(self, page_text: str, page_type: str = "elevation") -> str:
+        """User prompt to extract RL/FFL/storey heights from a specific page."""
+        return (
+            f"PAGE TYPE: {page_type.upper()}\n\n"
+            "Extract ALL level elevations, storey heights, and RL/FFL values from this page.\n\n"
+            f"PAGE TEXT:\n{self._truncate(page_text)}\n\n"
+            "Return ONLY the JSON array of level objects. No explanation."
+        )
+
+    # ── GRID COORDINATE EXTRACTION ──────────────────────────
+    def user_prompt_extract_grid(self, page_text: str, page_type: str = "plan") -> str:
+        """User prompt to extract grid label → mm coordinate mappings from a plan page."""
+        return (
+            f"PAGE TYPE: {page_type.upper()}\n\n"
+            "Extract the structural grid coordinate system from this page.\n"
+            "Find the exact millimetre position of EACH grid line.\n\n"
+            "HANDLE ALL NOTATION STYLES:\n"
+            "  'GRID 1 @ 0', 'GRID 2 @ 6000', 'Grid A = 0mm, Grid B = 4500mm'\n"
+            "  Dimension chains: '4500  6000  4500' between grid labels\n"
+            "  TCVN: 'Trục 1: 0', 'Trục A: 4500'\n\n"
+            f"PAGE TEXT:\n{self._truncate(page_text)}\n\n"
+            "OUTPUT FORMAT (JSON, no markdown):\n"
+            "{\n"
+            "  \"x_labels\": {\"1\": 0, \"2\": 6000, \"3\": 12000, \"4\": 16500},\n"
+            "  \"y_labels\": {\"A\": 0, \"B\": 4500, \"C\": 9000},\n"
+            "  \"confidence\": 0.9,\n"
+            "  \"source\": \"dimension_chain\"\n"
+            "}\n\n"
+            "Set confidence: 1.0 = explicit labels with mm values, "
+            "0.7 = computed from dimension chain, 0.3 = estimated from scale.\n"
+            "Return {\"x_labels\": {}, \"y_labels\": {}, \"confidence\": 0.0} if no grid data found.\n"
+            "Return ONLY the JSON. No explanation."
+        )
+
+    # ── ARCHITECT REVIEWER PROMPTS ──────────────────────────
+    def system_prompt_architect_reviewer(self) -> str:
+        """Dual-persona system prompt: Senior Fullstack Engineer + Structural Architect."""
+        region_hint = {
+            "au": "AS/NZS standards. Sections: UB/UC/RHS/CHS/SHS. Levels: RL/FFL/SSL.",
+            "vn": "TCVN standards. Members: C=column, D=beam, S=slab, M=foundation. Levels: Cốt.",
+            "intl": "Eurocode. Sections: IPE/HEA/HEB. Levels: EL/FF.",
+        }.get(self.region, "International standards.")
+        return (
+            "You are TWO experts merged into one reviewer:\n\n"
+            "EXPERT A — Principal Structural Engineer (15+ yrs):\n"
+            f"  {region_hint}\n"
+            "  You read structural drawings fluently. You know grid systems, RL elevations,\n"
+            "  member schedules, load paths, and LOD300/350 geometry requirements.\n\n"
+            "EXPERT B — Senior Fullstack Software Engineer (15+ yrs):\n"
+            "  You understand this exact data pipeline end-to-end:\n"
+            "    PDF text → ScannerV6 → JSON model (SynthesizerV7) → RubyGeneratorV5 → SketchUp .rb\n\n"
+            "  Pipeline stage reference (use these names for root_cause attribution):\n"
+            "    'scanner_v6.py'        Stage 0-2: per-page PDF extraction\n"
+            "    'synthesizer_v7.py'    Stage 3:   merge pages + Z-coordinate assignment\n"
+            "    'ruby_generator_v5.py' Stage 7:   JSON model → SketchUp Ruby geometry\n"
+            "    'code_reviewer.py'     Stage 9.5: static script validation\n\n"
+            "TASK: For every discrepancy you find, reason through BOTH perspectives:\n"
+            "  1. What does the PDF show? (EXPERT A)\n"
+            "  2. What is wrong in the model or script? (EXPERT A)\n"
+            "  3. Which pipeline stage produced this bad data? (EXPERT B)\n"
+            "  4. What specific code or data fix resolves it? (EXPERT B)\n\n"
+            "COMMON ROOT CAUSES to look for:\n"
+            "  - Null z_base_mm/z_top_mm  → synthesizer_v7.py: level elevation not resolved\n"
+            "  - Missing column           → scanner_v6.py: grid notation not parsed\n"
+            "  - Wrong section size       → scanner_v6.py: schedule row not matched\n"
+            "  - Z=0 for all members      → synthesizer_v7.py: height_from_datum_mm all null\n"
+            "  - Crash in Ruby            → ruby_generator_v5.py: degenerate face / pushpull(0)\n"
+            "  - Wrong grid coordinates   → synthesizer_v7.py: x_coords/y_coords empty dict\n\n"
+            "OUTPUT FORMAT — respond with a single JSON object:\n"
+            "{\n"
+            "  \"page_ok\": false,\n"
+            "  \"page_summary\": \"Plan Level 1 — columns at grids A-D, 1-4\",\n"
+            "  \"discrepancies\": [\n"
+            "    {\n"
+            "      \"element_id\": \"C5\",\n"
+            "      \"visual_issue\": \"column missing from 3D model\",\n"
+            "      \"root_cause\": \"scanner_v6 page 7: grid notation 'C-3' not parsed\",\n"
+            "      \"pipeline_stage\": \"scanner_v6.py / _scan_page\",\n"
+            "      \"suggested_fix\": \"add pattern for hyphenated grid refs like 'C-3'\",\n"
+            "      \"action\": \"add_column\",\n"
+            "      \"data\": {\"grid_x\": \"3\", \"grid_y\": \"C\", \"section\": \"310UC118\"}\n"
+            "    }\n"
+            "  ],\n"
+            "  \"3d_issues\": [\n"
+            "    {\n"
+            "      \"element_id\": \"C1\",\n"
+            "      \"visual_issue\": \"column height=0, not visible in 3D\",\n"
+            "      \"root_cause\": \"synthesizer_v7: height_from_datum_mm null for all levels\",\n"
+            "      \"pipeline_stage\": \"synthesizer_v7.py / _resolve_level_elevations\",\n"
+            "      \"suggested_fix\": \"elevation page RL values not extracted — check ELEVATION page scan\",\n"
+            "      \"type\": \"wrong_z\", \"expected_z_mm\": 3500, \"got_z_mm\": 0,\n"
+            "      \"action\": \"set_z\"\n"
+            "    }\n"
+            "  ]\n"
+            "}\n\n"
+            "Use pipeline_stage: 'unknown' only if you truly cannot identify the cause.\n"
+            "Return ONLY JSON. No markdown, no explanation outside the JSON."
+        )
+
+    def user_prompt_page_review(self, page_type: str, page_text: str,
+                                 model_json_excerpt: str,
+                                 pipeline_context: Optional[str] = None,
+                                 page_image_b64: Optional[str] = None) -> str:
+        """User prompt for reviewing one PDF page against the current model + pipeline state."""
+        parts = [
+            f"PAGE TYPE: {page_type.upper()}",
+            "",
+            "=== PDF PAGE TEXT ===",
+            self._truncate(page_text),
+            "",
+            "=== CURRENT MODEL (relevant excerpt) ===",
+            model_json_excerpt[:4000] if len(model_json_excerpt) > 4000 else model_json_excerpt,
+        ]
+        if pipeline_context:
+            parts += ["", "=== PIPELINE CONTEXT (what each stage produced) ===", pipeline_context]
+        parts += [
+            "",
+            f"Review this {page_type} page. As EXPERT A: identify all structural discrepancies. "
+            "As EXPERT B: diagnose which pipeline stage caused each one and suggest a fix. "
+            "Return structured JSON as specified.",
+        ]
+        return "\n".join(parts)
+
+    def user_prompt_master_pdf_scan(self, cover_page_text: str) -> str:
+        """User prompt for initial master scan of title/cover page to understand project scope."""
+        return (
+            "Analyze this project title sheet / cover page and extract project metadata.\n\n"
+            f"PAGE TEXT:\n{self._truncate(cover_page_text)}\n\n"
+            "OUTPUT FORMAT (JSON):\n"
+            "{\n"
+            "  \"project_name\": \"University of New England Tamworth\",\n"
+            "  \"location\": \"Tamworth NSW 2340\",\n"
+            "  \"standard\": \"au\",\n"
+            "  \"building_type\": \"commercial\",\n"
+            "  \"floor_count\": 3,\n"
+            "  \"primary_material\": \"steel\",\n"
+            "  \"expected_elements\": {\"columns\": 44, \"beams\": 32, \"footings\": 6},\n"
+            "  \"drawing_list\": [\"S01 - Ground Floor Plan\", \"S02 - First Floor Plan\"]\n"
+            "}\n"
+            "Set standard: 'au' for AS/NZS, 'vn' for TCVN, 'intl' for Eurocode.\n"
+            "Use null for any field not found in the text. Return ONLY JSON."
+        )
+
     # ── REGION-AWARE SYSTEM PROMPT ──────────────────────────
     def get_region_prompt(self) -> str:
         """Get region-specific conventions."""
         prompts = {
             "vn": (
                 "\nVIETNAM (TCVN) CONVENTIONS:\n"
-                "- Steel grades: CT3, CT38, CT42, SS400, SM490\n"
-                "- Concrete grades: M200, M250, M300, M400 (TCVN)\n"
-                "- Reinforcement: Ø6, Ø8, Ø10, Ø12, Ø14, Ø16, Ø18, Ø20, Ø22, Ø25\n"
-                "- Grid notation: Trục 1, 2, 3... (numbers) and Trục A, B, C... (letters)\n"
-                "- Level notation: Cốt ±0.00, Cao độ\n"
-                "- Section labels: D1, D2... (dầm/beams), C1, C2... (cột/columns)\n"
-                "- Unit: mm for dimensions, MPa for strength\n"
+                "- Steel grades: CT3, CT38, CT42, SS400, SM490, A572\n"
+                "- Concrete grades: M200, M250, M300, M350, M400 (TCVN)\n"
+                "- Reinforcement: Ø6, Ø8, Ø10, Ø12, Ø14, Ø16, Ø18, Ø20, Ø22, Ø25, Ø28, Ø32\n"
+                "- Grid notation: 'Trục 1', 'Trục A' or just '1', 'A' in schedules\n"
+                "- Level notation: 'Cốt +X.XXX' (metres), 'Cao độ +X.XXX', '±0.000' = ground\n"
+                "- MEMBER ID prefixes:\n"
+                "    C, CP, COT = column (cột)\n"
+                "    D, DB, DAM = beam (dầm)\n"
+                "    S, SL, SAN = slab (sàn)\n"
+                "    M, MB, MONG = footing/foundation (móng)\n"
+                "    T, TT, TUONG = wall (tường)\n"
+                "    GK, GC, GIANG = bracing (giằng)\n"
+                "- Section notation: H300x300x10x15 (H-section), I200 (I-section), "
+                "  □200x200x8 (box section), Ø168x5 (circular)\n"
+                "- Pile types: cọc khoan nhồi (bored pile), cọc ép (driven pile), "
+                "  cọc vuông (square pile)\n"
+                "- Standards: TCVN 5574 (concrete), TCVN 5575 (steel), TCVN 2737 (loading)\n"
+                "- Units: mm for dimensions, kN for forces, MPa for strength\n"
             ),
             "au": (
                 "\nAUSTRALIA (AS/NZS) CONVENTIONS:\n"

@@ -29,6 +29,7 @@ from agents.validator_v7 import ValidatorV7
 from agents.schedule_verifier import ScheduleVerifier
 from agents.multi_pass_extractor import MultiPassExtractor
 from agents.structural_reviewer import StructuralReviewer
+from agents.architect_reviewer import ArchitectReviewer
 from agents.code_reviewer import CodeReviewer
 from generators.ruby_generator_v5 import RubyGeneratorV5
 from generators.ruby_validator import RubyValidator
@@ -263,43 +264,71 @@ class PipelineV8:
 
             # ── STAGE 9.5: ARR — Architect Review & Refine ───
             accuracy_score = (result.accuracy or {}).get("overall_score", 0) or 0
-            if accuracy_score < ARR_ACCURACY_THRESHOLD:
-                print(f"[V8 STAGE 9.5] ARR: Accuracy={accuracy_score}% < "
-                      f"{ARR_ACCURACY_THRESHOLD}% — running review...")
+            rv_pass = result.ruby_validation.get("passed", True) if result.ruby_validation else True
+
+            # Always run CodeReviewer to catch crash/geometry issues
+            cr = CodeReviewer(region=self.region)
+            cr_result = cr.review(ruby, model, ruby_validation_passed=rv_pass)
+            if cr_result.get("fixed_script"):
+                ruby = cr_result["fixed_script"]
+                result.ruby_script = ruby
+                print(f"[V8 STAGE 9.5] CodeReviewer: Script fixed "
+                      f"({len(cr_result['issues'])} issue(s))")
+            elif cr_result["issues"]:
+                print(f"[V8 STAGE 9.5] CodeReviewer: {len(cr_result['issues'])} issue(s) "
+                      f"(no auto-fix available)")
+
+            # Check 3D positions — run ArchitectReviewer if accuracy < threshold OR 3D issues
+            arch_reviewer = ArchitectReviewer(pdf_path=pdf_path, region=self.region, dpi=self.dpi)
+            z_issues = arch_reviewer._verify_3d_positions(model)
+            needs_arr = (accuracy_score < ARR_ACCURACY_THRESHOLD) or bool(z_issues)
+
+            if needs_arr:
+                reason = (f"accuracy={accuracy_score}% < {ARR_ACCURACY_THRESHOLD}%"
+                          if accuracy_score < ARR_ACCURACY_THRESHOLD
+                          else f"{len(z_issues)} 3D position issue(s) found")
+                print(f"[V8 STAGE 9.5] ARR: {reason} — running ArchitectReviewer...")
+
                 for arr_pass in range(1, ARR_MAX_RETRIES + 1):
                     print(f"  [ARR Pass {arr_pass}/{ARR_MAX_RETRIES}]")
 
-                    sr = StructuralReviewer(pdf_path=pdf_path, region=self.region, dpi=self.dpi)
-                    sr_result = sr.review(scanner_output, model)
-                    if sr_result["verdict"] == "ISSUES_FOUND" and sr_result.get("corrections"):
-                        model = self._apply_corrections(model, sr_result["corrections"])
-                        result.structural_model = model
-                        print(f"    ARR-1: {len(sr_result['missing_elements'])} issue(s) corrected")
+                    arr_result = arch_reviewer.review(scanner_output, model)
+
+                    if arr_result["verdict"] == "ISSUES_FOUND":
+                        corrections = arr_result.get("all_corrections", {})
+                        if corrections.get("add") or corrections.get("update"):
+                            model = self._apply_corrections(model, corrections)
+                            result.structural_model = model
+                            print(f"    ARR-1: {arr_result['total_discrepancies']} discrepancy(ies) corrected")
+
+                        # Apply 3D fixes to model levels if available
+                        if arr_result.get("project_profile", {}).get("floor_count"):
+                            # If we got a project profile with floor count, validate levels
+                            self._ensure_levels_for_floor_count(
+                                model, arr_result["project_profile"]["floor_count"]
+                            )
                     else:
                         print(f"    ARR-1: No structural issues found")
 
+                    # Re-generate Ruby with corrected model
                     ruby = self.ruby_gen.generate(model, val.to_dict())
-                    rv_pass = result.ruby_validation.get("passed", True) if result.ruby_validation else True
-                    cr = CodeReviewer(region=self.region)
-                    cr_result = cr.review(ruby, model, ruby_validation_passed=rv_pass)
-                    if cr_result.get("fixed_script"):
-                        ruby = cr_result["fixed_script"]
-                        result.ruby_script = ruby
-                        print(f"    ARR-2: Script fixed ({len(cr_result['issues'])} issue(s))")
-                    else:
-                        result.ruby_script = ruby
-                        print(f"    ARR-2: Script OK or no fix available")
+                    cr2 = CodeReviewer(region=self.region)
+                    cr2_result = cr2.review(ruby, model, ruby_validation_passed=rv_pass)
+                    if cr2_result.get("fixed_script"):
+                        ruby = cr2_result["fixed_script"]
+                        print(f"    ARR-2: Script fixed ({len(cr2_result['issues'])} issue(s))")
+                    result.ruby_script = ruby
 
                     accuracy = self.accuracy_eval.evaluate(model, schedule_counts or None)
                     result.accuracy = accuracy
                     new_score = accuracy.get("overall_score", 0) or 0
                     print(f"    -> Accuracy after ARR pass {arr_pass}: {new_score}%")
-                    if new_score >= ARR_ACCURACY_THRESHOLD:
-                        print(f"    ✅ ARR target met ({new_score}%)")
+                    if new_score >= ARR_ACCURACY_THRESHOLD and not arr_result.get("3d_issues"):
+                        print(f"    ✅ ARR complete — accuracy {new_score}%, no 3D issues")
                         break
             else:
                 print(f"[V8 STAGE 9.5] ARR: Skipped "
-                      f"(accuracy={accuracy_score}% ≥ {ARR_ACCURACY_THRESHOLD}%)")
+                      f"(accuracy={accuracy_score}% ≥ {ARR_ACCURACY_THRESHOLD}%, no 3D issues)")
 
             # ── STAGE 10: Save outputs ────────────────────────
             print("[V8 STAGE 10] Saving outputs...")
@@ -351,6 +380,28 @@ class PipelineV8:
         print(f"{'='*60}")
         return result
 
+
+    def _ensure_levels_for_floor_count(self, model: dict, floor_count: int) -> None:
+        """Fill in missing levels if project profile says there are more floors than in model."""
+        levels = model.get("levels", [])
+        if len(levels) >= floor_count:
+            return
+        DEFAULT_F2F = 3500
+        max_elev = max(
+            (l.get("height_from_datum_mm") or l.get("elevation_mm") or 0)
+            for l in levels
+        ) if levels else 0
+        for i in range(len(levels), floor_count):
+            elev = max_elev + DEFAULT_F2F * (i - len(levels) + 1)
+            levels.append({
+                "id": f"LEVEL_{i+1}",
+                "name": f"Level {i+1}",
+                "height_from_datum_mm": elev,
+                "elevation_mm": elev,
+                "floor_to_floor_mm": DEFAULT_F2F,
+                "auto_generated": True,
+            })
+        model["levels"] = levels
 
     def _apply_corrections(self, model: dict, corrections: dict) -> dict:
         """Apply ARR-1 structural corrections (add/remove elements) to the model."""

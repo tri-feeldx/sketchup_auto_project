@@ -23,7 +23,7 @@ from typing import Optional, Dict, List
 
 from core.llm_wrapper import call_llm
 from core.vision_renderer import VisionRenderer
-from core.pdf_utils import get_page_count
+from core.pdf_utils import get_page_count, region_normaliser
 
 # V7 imports
 from agents.pdf_forensic import PDFForensicAnalyzer
@@ -160,12 +160,15 @@ class ScannerV6:
             elif isinstance(page_texts, list) and page_idx < len(page_texts):
                 page_text = page_texts[page_idx]
 
+        # Normalise regional notation before LLM sees the text
+        page_text_norm = region_normaliser(page_text, self.region)
+
         # Build prompts
         system_prompt = self.prompt_factory.build_full_system_prompt(
             "scanner", page_type=ptype.lower(), region=self.region
         )
         user_prompt = self.prompt_factory.user_prompt_scan(
-            page_text=page_text,
+            page_text=page_text_norm,
             page_idx=page_idx,
             page_type=ptype.lower(),
             profile=self.forensic_result,
@@ -181,6 +184,7 @@ class ScannerV6:
                 print(f"    [WARN] Render page {page_idx} failed: {e}")
 
         # Call LLM
+        result_data = None
         try:
             response = call_llm(
                 user_prompt,
@@ -193,11 +197,10 @@ class ScannerV6:
                     data["page_idx"] = page_idx
                     data["page_type"] = ptype
                     data["route_confidence"] = rp.confidence
-                    return data
+                    result_data = data
                 elif isinstance(data, list):
-                    # LLM returned a JSON array – wrap it
                     print(f"    [INFO] LLM returned array, wrapping as dict")
-                    return {
+                    result_data = {
                         "page_idx": page_idx,
                         "page_type": ptype,
                         "route_confidence": rp.confidence,
@@ -208,14 +211,56 @@ class ScannerV6:
         except Exception as e:
             print(f"    [WARN] LLM scan page {page_idx} failed: {e}")
 
-        # Fallback: return text-only metadata
-        return {
-            "page_idx": page_idx,
-            "page_type": ptype,
-            "route_confidence": rp.confidence,
-            "error": "LLM analysis failed",
-            "raw_text": page_text[:500] if page_text else "",
-        }
+        if result_data is None:
+            result_data = {
+                "page_idx": page_idx,
+                "page_type": ptype,
+                "route_confidence": rp.confidence,
+                "error": "LLM analysis failed",
+                "raw_text": page_text[:500] if page_text else "",
+            }
+
+        # ── Post-scan: specialised extractors ───────────────
+        if ptype == "ELEVATION" and page_text:
+            result_data["level_elevations"] = self._extract_elevations(page_idx, page_text)
+
+        if ptype in ("PLAN", "SECTION") and page_text:
+            grid = self._extract_grid_coords(page_idx, page_text, ptype)
+            if grid and grid.get("confidence", 0) > 0.4:
+                result_data["grid_coords"] = grid
+
+        return result_data
+
+    def _extract_elevations(self, page_idx: int, page_text: str) -> list:
+        """Call elevation extractor LLM to get RL/FFL/storey heights from a page."""
+        try:
+            sys_p = self.prompt_factory.system_prompt_elevation_extractor()
+            usr_p = self.prompt_factory.user_prompt_extract_elevations(page_text, "elevation")
+            resp = call_llm(usr_p, system=sys_p)
+            data = self._parse_json(resp)
+            if isinstance(data, list) and data:
+                print(f"    [ELEV] Page {page_idx}: extracted {len(data)} level elevations")
+                return data
+        except Exception as e:
+            print(f"    [WARN] Elevation extract page {page_idx}: {e}")
+        return []
+
+    def _extract_grid_coords(self, page_idx: int, page_text: str, ptype: str) -> dict:
+        """Call grid extractor LLM to get label→mm coordinate mapping from a plan page."""
+        try:
+            sys_p = self.prompt_factory.system_prompt_scanner("plan")
+            usr_p = self.prompt_factory.user_prompt_extract_grid(page_text, ptype.lower())
+            resp = call_llm(usr_p, system=sys_p)
+            data = self._parse_json(resp)
+            if isinstance(data, dict) and (data.get("x_labels") or data.get("y_labels")):
+                conf = data.get("confidence", 0)
+                print(f"    [GRID] Page {page_idx}: extracted grid coords "
+                      f"(confidence={conf:.2f}, "
+                      f"x={len(data.get('x_labels',{}))}, y={len(data.get('y_labels',{}))})")
+                return data
+        except Exception as e:
+            print(f"    [WARN] Grid extract page {page_idx}: {e}")
+        return {}
 
     # ── TARGETED SECTION RETRY ──────────────────────────────
     def _targeted_section_retry(self, page_results: dict, batches: dict) -> dict:

@@ -165,6 +165,15 @@ class SynthesizerV7:
             model["members"]["columns"],
         )
 
+        # Resolve storey heights then assign Z to all members
+        levels_map = self._resolve_level_elevations(model["levels"], page_results)
+        if levels_map:
+            model["levels"] = self._apply_elevations_to_levels(model["levels"], levels_map)
+            model["members"] = self._assign_z_to_all_members(model["members"], levels_map)
+
+        # Upgrade grid coords from scanner-extracted grid_coords if better than PDFExtractor
+        model["grid_system"] = self._upgrade_grid_from_pages(model["grid_system"], page_results)
+
         return model
 
     def _merge_members(self, llm_model: dict, page_results: List[dict],
@@ -414,21 +423,230 @@ class SynthesizerV7:
 
     def _extract_levels(self, forensic: dict,
                          page_results: List[dict]) -> List[dict]:
-        """Extract floor levels from elevation + section data."""
+        """Extract floor levels from elevation + section data, including scanner level_elevations."""
         levels = []
+        seen_ids = set()
+
+        # First priority: level_elevations from scanner ELEVATION page extraction
+        for pr in page_results:
+            for le in pr.get("level_elevations", []):
+                lvl_id = le.get("id") or le.get("label", "")
+                if lvl_id and lvl_id not in seen_ids:
+                    rl = le.get("rl_mm") or le.get("ffl_mm") or 0
+                    levels.append({
+                        "id": lvl_id,
+                        "name": le.get("label", lvl_id),
+                        "height_from_datum_mm": int(rl),
+                        "elevation_mm": int(rl),
+                        "floor_to_floor_mm": le.get("floor_to_floor_mm"),
+                        "confidence": 0.9,
+                    })
+                    seen_ids.add(lvl_id)
+
+        # Second: levels from page result "levels" key
         for pr in page_results:
             for lvl in pr.get("levels", []):
-                if lvl not in levels:
+                lvl_id = lvl.get("id") or lvl.get("name", "")
+                if lvl_id and lvl_id not in seen_ids:
                     levels.append(lvl)
+                    seen_ids.add(lvl_id)
 
         if not levels:
             levels = [
-                {"name": "Foundation", "elevation_mm": 0},
-                {"name": "Ground Floor", "elevation_mm": 0, "height_mm": 3500},
-                {"name": "Level 1", "elevation_mm": 3500, "height_mm": 3500},
+                {"id": "GROUND", "name": "Ground Floor", "height_from_datum_mm": 0, "elevation_mm": 0, "floor_to_floor_mm": 3500},
+                {"id": "LEVEL_1", "name": "Level 1", "height_from_datum_mm": 3500, "elevation_mm": 3500, "floor_to_floor_mm": 3200},
+                {"id": "LEVEL_2", "name": "Level 2", "height_from_datum_mm": 6700, "elevation_mm": 6700, "floor_to_floor_mm": 3200},
+                {"id": "ROOF", "name": "Roof", "height_from_datum_mm": 9900, "elevation_mm": 9900, "floor_to_floor_mm": None},
             ]
 
+        # Sort by elevation
+        levels.sort(key=lambda l: l.get("height_from_datum_mm") or l.get("elevation_mm") or 0)
         return levels
+
+    def _resolve_level_elevations(self, levels: List[dict],
+                                    page_results: List[dict]) -> dict:
+        """Build a map of level_id → elevation_mm, filling nulls intelligently."""
+        lmap: dict = {}
+
+        # Collect from levels list
+        for lvl in levels:
+            lid = lvl.get("id") or lvl.get("name", "")
+            elev = lvl.get("height_from_datum_mm") or lvl.get("elevation_mm")
+            if lid and elev is not None:
+                try:
+                    lmap[lid] = int(float(elev))
+                except (ValueError, TypeError):
+                    pass
+
+        # Fill nulls using floor_to_floor_mm from neighbours
+        if levels and len(lmap) < len(levels):
+            sorted_lvls = sorted(levels, key=lambda l: lmap.get(l.get("id") or l.get("name", ""), 0))
+            cursor = 0
+            DEFAULT_F2F = 3500
+            for lvl in sorted_lvls:
+                lid = lvl.get("id") or lvl.get("name", "")
+                if lid not in lmap:
+                    f2f = lvl.get("floor_to_floor_mm") or DEFAULT_F2F
+                    try:
+                        lmap[lid] = cursor + int(float(f2f))
+                        cursor = lmap[lid]
+                    except (ValueError, TypeError):
+                        lmap[lid] = cursor + DEFAULT_F2F
+                        cursor = lmap[lid]
+                else:
+                    cursor = lmap[lid]
+
+        if lmap:
+            print(f"  [Z] Level map resolved: {len(lmap)} levels "
+                  f"({min(lmap.values())}mm–{max(lmap.values())}mm)")
+        return lmap
+
+    def _apply_elevations_to_levels(self, levels: List[dict], lmap: dict) -> List[dict]:
+        """Write computed elevations back to the levels list."""
+        for lvl in levels:
+            lid = lvl.get("id") or lvl.get("name", "")
+            if lid in lmap:
+                lvl["height_from_datum_mm"] = lmap[lid]
+                lvl["elevation_mm"] = lmap[lid]
+        return levels
+
+    def _assign_z_to_all_members(self, members: dict, lmap: dict) -> dict:
+        """Assign z_base_mm, z_top_mm, height_mm to every member using level map."""
+        DEFAULT_F2F = 3500
+
+        # Build a sorted list of (level_id, elevation) for sequential lookup
+        sorted_levels = sorted(lmap.items(), key=lambda kv: kv[1])
+
+        def _get_elev(level_id: str, default: int = 0) -> int:
+            if not level_id:
+                return default
+            for lid, elev in lmap.items():
+                if (str(lid).upper() in str(level_id).upper() or
+                        str(level_id).upper() in str(lid).upper()):
+                    return elev
+            return default
+
+        def _next_level_elev(current_elev: int) -> int:
+            for lid, elev in sorted_levels:
+                if elev > current_elev:
+                    return elev
+            return current_elev + DEFAULT_F2F
+
+        # Columns
+        for col in members.get("columns", []):
+            base_lid = col.get("base_level") or col.get("level_id", "")
+            top_lid = col.get("top_level", "")
+            z_base = _get_elev(base_lid, 0)
+            if top_lid:
+                z_top = _get_elev(top_lid, z_base + DEFAULT_F2F)
+            elif col.get("height_mm"):
+                try:
+                    z_top = z_base + int(float(col["height_mm"]))
+                except (ValueError, TypeError):
+                    z_top = _next_level_elev(z_base)
+            else:
+                z_top = _next_level_elev(z_base)
+            col["z_base_mm"] = z_base
+            col["z_top_mm"] = z_top
+            col["height_mm"] = z_top - z_base
+
+        # Beams — sit at z_top of base-level columns
+        col_base_map: dict = {}
+        for col in members.get("columns", []):
+            cid = col.get("id") or col.get("mark", "")
+            if cid:
+                col_base_map[cid] = col.get("z_base_mm", 0)
+
+        for beam in members.get("beams", []):
+            if beam.get("z_mm") or beam.get("z"):
+                continue
+            # Infer from connected column's base level
+            from_id = beam.get("from_col") or beam.get("from", "")
+            to_id = beam.get("to_col") or beam.get("to", "")
+            col_z = col_base_map.get(from_id) or col_base_map.get(to_id)
+            if col_z is not None:
+                beam_z = _next_level_elev(int(col_z))
+            else:
+                beam_lid = beam.get("level_id") or beam.get("base_level", "")
+                beam_z = _get_elev(beam_lid, DEFAULT_F2F)
+            beam["z_mm"] = beam_z
+
+        # Footings — snap to column XY, place at negative Z
+        col_xy_map: dict = {}
+        for col in members.get("columns", []):
+            cid = col.get("id") or col.get("mark", "")
+            if cid:
+                coords = col.get("local_coordinates_mm") or {}
+                x = col.get("x") or col.get("x_mm") or coords.get("x") or 0
+                y = col.get("y") or col.get("y_mm") or coords.get("y") or 0
+                col_xy_map[cid] = (x, y)
+
+        for ftg in members.get("footings", []):
+            if not (ftg.get("x") or ftg.get("x_mm")):
+                col_ref = ftg.get("column") or ftg.get("col_id") or ftg.get("id", "")
+                xy = col_xy_map.get(col_ref)
+                if xy:
+                    ftg["x"] = xy[0]; ftg["y"] = xy[1]
+
+        # Slabs — ensure elevation_mm set from level
+        for slab in members.get("slabs", []):
+            if not (slab.get("elevation_mm") or slab.get("z_mm")):
+                lid = slab.get("level_id") or slab.get("level", "")
+                slab["elevation_mm"] = _get_elev(lid, 0)
+
+        # Bracing — use from/to column levels
+        for brc in members.get("bracing", []):
+            if brc.get("z_base_mm"):
+                continue
+            from_id = brc.get("from_col") or brc.get("from", "")
+            to_id = brc.get("to_col") or brc.get("to", "")
+            z_base = col_base_map.get(from_id, 0)
+            z_top_col = None
+            for col in members.get("columns", []):
+                cid = col.get("id") or col.get("mark", "")
+                if cid == from_id:
+                    z_top_col = col.get("z_top_mm")
+                    break
+            brc["z_base_mm"] = z_base
+            brc["z_top_mm"] = z_top_col or _next_level_elev(z_base)
+
+        return members
+
+    def _upgrade_grid_from_pages(self, grid_system: dict,
+                                   page_results: List[dict]) -> dict:
+        """Merge scanner-extracted grid_coords into the model grid system if confidence > existing."""
+        best_conf = grid_system.get("coord_confidence", 0.0)
+        best_x: dict = grid_system.get("x_coords", {})
+        best_y: dict = grid_system.get("y_coords", {})
+
+        for pr in page_results:
+            gc = pr.get("grid_coords", {})
+            if not gc:
+                continue
+            conf = gc.get("confidence", 0.0)
+            if conf > best_conf:
+                xl = gc.get("x_labels", {})
+                yl = gc.get("y_labels", {})
+                if xl or yl:
+                    best_conf = conf
+                    best_x = xl
+                    best_y = yl
+                    print(f"  [GRID] Upgraded from page {pr.get('page_idx','?')}: "
+                          f"conf={conf:.2f}, x={len(xl)}, y={len(yl)}")
+
+        if best_x or best_y:
+            grid_system["x_coords"] = best_x
+            grid_system["y_coords"] = best_y
+            grid_system["coord_confidence"] = best_conf
+            # Recompute spacing from coords
+            if best_x and len(best_x) >= 2:
+                vals = sorted(best_x.values())
+                grid_system["spacing_x_mm"] = int(vals[1] - vals[0])
+            if best_y and len(best_y) >= 2:
+                vals = sorted(best_y.values())
+                grid_system["spacing_y_mm"] = int(vals[1] - vals[0])
+
+        return grid_system
 
     def _estimate_spacing(self, forensic: dict,
                            page_results: List[dict]) -> int:

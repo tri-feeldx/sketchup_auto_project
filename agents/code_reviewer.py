@@ -140,6 +140,44 @@ class CodeReviewer:
                     })
                     break  # Report once
 
+        # 6. pushpull(0) — extrudes nothing, may cause empty geometry
+        for i, line in enumerate(lines, 1):
+            m = re.search(r'\.pushpull\(\s*(-?0\.?0*)\s*\)', line)
+            if m:
+                issues.append({
+                    "line": i,
+                    "type": "zero_pushpull",
+                    "description": f"pushpull(0) creates no geometry — element will be invisible",
+                })
+
+        # 7. Duplicate points in add_face — detect when w or d suffix = 0
+        # Pattern: pts array where ox+N appears twice with the same Y value
+        for i, line in enumerate(lines, 1):
+            if "add_face(pts_" in line:
+                # Look back up to 8 lines for the pts array
+                block = "\n".join(lines[max(0, i - 9):i])
+                y_vals = re.findall(r'oy\+(\d+)', block)
+                if y_vals:
+                    # If all Y values are identical → collinear → degenerate face
+                    if len(set(y_vals)) == 1 and len(y_vals) >= 3:
+                        issues.append({
+                            "line": i,
+                            "type": "degenerate_face",
+                            "description": f"add_face near line {i}: all Y coords identical — collinear points will crash",
+                        })
+
+        # 8. Negative pushpull with potential overflow
+        for i, line in enumerate(lines, 1):
+            m = re.search(r'\.pushpull\(\s*-(\d+)\s*\)', line)
+            if m:
+                val = int(m.group(1))
+                if val > 100000:
+                    issues.append({
+                        "line": i,
+                        "type": "extreme_pushpull",
+                        "description": f"pushpull(-{val}) is extremely large (>{100000}mm) — may be unit error",
+                    })
+
         # Deduplicate by (line, type)
         seen = set()
         unique = []

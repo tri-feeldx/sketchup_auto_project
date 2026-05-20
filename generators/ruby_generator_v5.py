@@ -282,7 +282,10 @@ class RubyGeneratorV5:
         """Column with exact I-profile (UB/UC). Extrudes vertically along Z."""
         x = int(pos["x"]); y = int(pos["y"])
         zb = int(pos["z_base"]); h = int(pos["z_top"] - pos["z_base"])
-        d = int(sec.d); bf = int(sec.bf); tf = int(sec.tf); tw = int(sec.tw)
+        d = max(int(sec.d), 100); bf = max(int(sec.bf), 60)
+        tf = max(int(sec.tf), 5); tw = max(int(sec.tw), 5)
+        tw = min(tw, bf - 2); tf = min(tf, d // 2 - 1)
+        h = max(h, 100)
         mat = self._get_mat(col, mat_vars)
         # Centre profile on (x, y); profile spans x±bf/2, y…y+d
         cx = x - bf // 2;  cy = y
@@ -316,7 +319,8 @@ class RubyGeneratorV5:
         """Column with CHS circular profile. Uses SketchUp add_circle + pushpull."""
         x = int(pos["x"]); y = int(pos["y"])
         zb = int(pos["z_base"]); h = int(pos["z_top"] - pos["z_base"])
-        od = int(sec.od or sec.d)
+        od = max(int(sec.od or sec.d), 50)
+        h = max(h, 100)
         mat = self._get_mat(col, mat_vars)
         return [
             f"# Column {i+1} [{col.get('id','')}] {sec.name} CHS LOD300",
@@ -394,6 +398,15 @@ class RubyGeneratorV5:
             w, d = int(sec.bf), int(sec.d)
         else:
             w, d = self._resolve_section(col, 400, 400)
+        # Guard: degenerate face → fallback to minimum dimensions
+        MIN_COL = 100
+        if w < MIN_COL:
+            print(f"[GEN] WARN: col {col.get('id','')} width={w} < {MIN_COL}mm, using {MIN_COL}")
+            w = MIN_COL
+        if d < MIN_COL:
+            print(f"[GEN] WARN: col {col.get('id','')} depth={d} < {MIN_COL}mm, using {MIN_COL}")
+            d = MIN_COL
+        h = max(h, 100)
         mat = self._get_mat(col, mat_vars)
         return [
             f"# Column {i+1}: {col.get('id','')}",
@@ -598,6 +611,7 @@ class RubyGeneratorV5:
             w = int(w); d = int(d); h = int(h)
         except (ValueError, TypeError):
             w = 1600; d = 1600; h = 600
+        w = max(w, 200); d = max(d, 200); h = max(h, 100)
         hw = w // 2; hd = d // 2
         return [
             f"# Footing {i+1}: {ftg.get('id','')}",
