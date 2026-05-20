@@ -27,6 +27,7 @@ from agents.synthesizer_v7 import SynthesizerV7
 from agents.validator_v7 import ValidatorV7, ValidationResult
 from generators.ruby_generator_v5 import RubyGeneratorV5
 from generators.ruby_validator import RubyValidator, RubyValidationResult
+from generators.ifc_generator import IFCGenerator, _ifc_available
 
 
 @dataclass
@@ -45,6 +46,7 @@ class PipelineResult:
     # File outputs
     output_rb_path: str = ""
     output_json_path: str = ""
+    output_ifc_path: str = ""
 
     errors: List[str] = field(default_factory=list)
 
@@ -81,6 +83,7 @@ class PipelineResult:
             ),
             "output_rb_path": self.output_rb_path,
             "output_json_path": self.output_json_path,
+            "output_ifc_path": self.output_ifc_path,
             "errors": self.errors,
         }
 
@@ -99,23 +102,26 @@ class PipelineV7:
 
     def __init__(
         self,
-        region: str = "vn",
-        language: str = "vn",
+        region: str = "auto",
+        language: str = "auto",
         building_type: str = "general",
         max_pages: Optional[int] = None,
         dpi: int = 200,
     ):
-        self.region = region
-        self.language = language
+        self.region = region        # "auto" → detected from forensic in run()
+        self.language = language    # "auto" → detected from forensic in run()
         self.building_type = building_type
         self.max_pages = max_pages
         self.dpi = dpi
 
-        # Downstream components (ScannerV6 is created per-run with pdf_path)
-        self.synthesizer = SynthesizerV7(region=region)
+        # Downstream components initialised with placeholder; re-created in run()
+        # when region="auto" so they use the forensic-detected standard (VN/AU/INTL).
+        _init_region = "vn" if region == "auto" else region
+        _init_lang = "vn" if language == "auto" else language
+        self.synthesizer = SynthesizerV7(region=_init_region)
         self.validator = ValidatorV7()
-        self.ruby_gen = RubyGeneratorV5(region=region, language=language)
-        self.ruby_val = RubyValidator(region=region)
+        self.ruby_gen = RubyGeneratorV5(region=_init_region, language=_init_lang)
+        self.ruby_val = RubyValidator(region=_init_region)
 
     def run(
         self, pdf_path: str, output_dir: str = "./output"
@@ -131,7 +137,7 @@ class PipelineV7:
             print("[STAGE 0-2] ScannerV6 running A0+A1+A2...")
             scanner = ScannerV6(
                 pdf_path, dpi=self.dpi, region=self.region,
-                language=self.language,
+                language=self.language, max_pages=self.max_pages,
             )
             scanner_output = scanner.run(skip_vision=False)
             scanner.close()
@@ -143,12 +149,37 @@ class PipelineV7:
             page_results = scanner_output.get("page_results", {})
             elapsed_scan = scanner_output.get("elapsed_s", 0)
 
-            print(f"  → {num_pages} pages, "
+            # ── Auto-detect region from forensic analysis ──────────────
+            if self.region == "auto" or self.language == "auto":
+                _REGION_MAP = {
+                    "au": "au", "australia": "au", "as/nzs": "au", "nzs": "au",
+                    "vn": "vn", "vietnam": "vn", "tcvn": "vn",
+                    "intl": "intl", "international": "intl", "eu": "intl",
+                }
+                raw_region = forensic.get("region", "vn").lower()
+                effective_region = _REGION_MAP.get(raw_region, "vn")
+                # AS/NZS drawings are almost always in English
+                effective_lang = "en" if effective_region == "au" else (
+                    "vn" if effective_region == "vn" else "en"
+                )
+                if self.region == "auto":
+                    self.region = effective_region
+                if self.language == "auto":
+                    self.language = effective_lang
+                # Re-create downstream components with the correct region
+                self.synthesizer = SynthesizerV7(region=self.region)
+                self.ruby_gen = RubyGeneratorV5(
+                    region=self.region, language=self.language
+                )
+                self.ruby_val = RubyValidator(region=self.region)
+                print(f"  -> Auto-detected: region={self.region}, lang={self.language}")
+
+            print(f"  -> {num_pages} pages, "
                   f"region={forensic.get('region','?')}, "
                   f"lang={forensic.get('detected_language','?')}")
-            print(f"  → Routing: {routing.get('total_pages',0)} pages "
-                  f"→ {len(page_results)} scanned")
-            print(f"  → Scanner completed in {elapsed_scan:.1f}s")
+            print(f"  -> Routing: {routing.get('total_pages',0)} pages "
+                  f"-> {len(page_results)} scanned")
+            print(f"  -> Scanner completed in {elapsed_scan:.1f}s")
 
             if num_pages == 0:
                 result.errors.append("No pages found in PDF")
@@ -162,11 +193,11 @@ class PipelineV7:
 
             if model.get("error"):
                 result.errors.append(f"Synthesizer error: {model['error']}")
-                print(f"  → ERROR: {model['error']}")
+                print(f"  -> ERROR: {model['error']}")
             else:
                 m = model.get("members", {})
                 print(
-                    f"  → Model: {len(m.get('columns',[]))}c "
+                    f"  -> Model: {len(m.get('columns',[]))}c "
                     f"{len(m.get('beams',[]))}b "
                     f"{len(m.get('slabs',[]))}s "
                     f"{len(m.get('walls',[]))}w "
@@ -178,7 +209,7 @@ class PipelineV7:
             val = self.validator.validate(model)
             result.validation = val.to_dict()
             print(
-                f"  → {'PASSED' if val.passed else 'FAILED'} "
+                f"  -> {'PASSED' if val.passed else 'FAILED'} "
                 f"(score={val.score:.2f})"
             )
 
@@ -186,7 +217,7 @@ class PipelineV7:
             print("[STAGE 5] RubyGeneratorV5 building .rb script...")
             ruby = self.ruby_gen.generate(model, val.to_dict())
             result.ruby_script = ruby
-            print(f"  → Ruby script: {len(ruby)} chars, "
+            print(f"  -> Ruby script: {len(ruby)} chars, "
                   f"{len(ruby.splitlines())} lines")
 
             # ── STAGE 6: Validate Ruby ─────────────────────────────
@@ -194,7 +225,7 @@ class PipelineV7:
             rv = self.ruby_val.validate(ruby)
             result.ruby_validation = rv.to_dict()
             print(
-                f"  → {'PASSED' if rv.passed else 'FAILED'} "
+                f"  -> {'PASSED' if rv.passed else 'FAILED'} "
                 f"(lines={rv.line_count}, entities~{rv.estimated_entities})"
             )
 
@@ -208,7 +239,7 @@ class PipelineV7:
             with open(rb_path, "w", encoding="utf-8") as f:
                 f.write(ruby)
             result.output_rb_path = rb_path
-            print(f"  → Ruby: {rb_path}")
+            print(f"  -> Ruby: {rb_path}")
 
             # Save JSON model
             json_path = os.path.join(
@@ -220,7 +251,7 @@ class PipelineV7:
                     default=str,
                 )
             result.output_json_path = json_path
-            print(f"  → JSON: {json_path}")
+            print(f"  -> JSON: {json_path}")
 
             # Save scanner output (intermediate debug)
             scanner_json_path = os.path.join(
@@ -231,7 +262,21 @@ class PipelineV7:
                     scanner_output, f, indent=2,
                     ensure_ascii=False, default=str,
                 )
-            print(f"  → Scanner Output: {scanner_json_path}")
+            print(f"  -> Scanner Output: {scanner_json_path}")
+
+            # ── STAGE 8: Generate IFC ──────────────────────────
+            if _ifc_available():
+                print("[STAGE 8] IFCGenerator building .ifc file...")
+                try:
+                    ifc_path = os.path.join(output_dir, f"{base_name}_structural.ifc")
+                    IFCGenerator(region=self.region).generate(model, ifc_path)
+                    result.output_ifc_path = ifc_path
+                    print(f"  -> IFC: {ifc_path}")
+                except Exception as ifc_err:
+                    result.errors.append(f"IFC generation warning: {ifc_err}")
+                    print(f"  -> IFC skipped: {ifc_err}")
+            else:
+                print("[STAGE 8] ifcopenshell not installed — skipping IFC export")
 
             result.success = True
 

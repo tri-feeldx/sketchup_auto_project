@@ -8,7 +8,7 @@ _PROJ_ROOT = Path(__file__).resolve().parent
 if str(_PROJ_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJ_ROOT))
 
-from config import INPUT_PDF_DIR, OUTPUT_JSON_DIR, RUBY_OUTPUT_DIR, CODER_OUTPUT_FILE, SKP_OUTPUT_FILE
+from config import INPUT_PDF_DIR, OUTPUT_JSON_DIR, RUBY_OUTPUT_DIR
 from core.llm_wrapper import any_key_available, clear_cache, get_cache_stats
 
 st.set_page_config(page_title="FeelDX — PDF to SketchUp LOD 300", page_icon="🏗️", layout="wide", initial_sidebar_state="expanded")
@@ -139,9 +139,13 @@ if run_btn and uploaded_file:
                 from pipelines.pipeline_v7 import PipelineV7
                 _log_fn("[STAGE 0] PDFForensic: Analyzing PDF structure…")
                 _log_fn("[STAGE 1] PageRouter: Classifying pages…")
-                pipeline = PipelineV7(region="vn", language="vn")
+                pipeline = PipelineV7(region="auto", language="auto")
                 presult = pipeline.run(str(save_path), output_dir=str(V7_OUTPUT_DIR))
                 pdict = presult.to_dict()
+                _fsummary = pdict.get("forensic_summary", {})
+                _det_region = _fsummary.get("region", "?")
+                _det_lang = _fsummary.get("language", "?")
+                _log_fn(f"[FORENSIC] Detected standard: {_det_region.upper()} | language: {_det_lang.upper()}")
                 n_pages = len(presult.scanner_output.get("page_results", {}))
                 _log_fn(f"[STAGE 2] ScannerV6 -> {n_pages} pages scanned")
                 msum = presult.structural_model.get("members", {})
@@ -156,10 +160,11 @@ if run_btn and uploaded_file:
                 _log_fn(f"[STAGE 5] RubyGeneratorV5 -> .rb generated")
                 _log_fn(f"[STAGE 6] RubyValidator -> {'PASS' if rvp else 'FAIL'} (entities~{re})")
                 _log_fn(f"[COMPLETE] Pipeline V7 finished in {presult.duration_sec:.1f}s")
-                m = msum
                 total_members = nc + nb + ns + nw + nf
                 res = {
                     "ruby_path": presult.output_rb_path,
+                    "ifc_path": presult.output_ifc_path,
+                    "detected_region": _det_region,
                     "members_total": total_members, "placed": total_members,
                     "unmapped": 0, "unmapped_marks": [],
                     "audit_passed": pdict.get("validation_passed", True),
@@ -261,27 +266,42 @@ if run_btn and uploaded_file:
             _ts = datetime.now().strftime("%Y%m%d_%H%M")
             rb_bytes = Path(ruby_path).read_bytes()
             rb_name = f"LOD300_{_pdf_stem}_{_ts}.rb"
-            skp_path = Path(SKP_OUTPUT_FILE)
+            _det_region = result_holder.get("detected_region", "").upper()
             with download_slot.container():
                 st.divider()
+                if _det_region:
+                    st.markdown(f"#### 🌏 Detected Standard: **{_det_region}**")
                 st.markdown("#### 📥 Download Output Files")
-                st.download_button(label=f"⬇️ Download {rb_name} (SketchUp Ruby)", data=rb_bytes, file_name=rb_name, mime="text/plain", use_container_width=True)
-                combined_path = Path(CODER_OUTPUT_FILE).parent / "lod300_combined.rb"
-                if combined_path.exists():
-                    combined_bytes = combined_path.read_bytes()
-                    combined_name = f"LOD300_{_pdf_stem}_combined_{_ts}.rb"
-                    st.download_button(label=f"⬇️ Download {combined_name} (Steel + Architecture)", data=combined_bytes, file_name=combined_name, mime="text/plain", use_container_width=True)
-                st.caption(f"SketchUp: Extensions -> Ruby Console -> load 'path/to/{combined_name if combined_path.exists() else rb_name}'")
-                # .skp is SketchUp's proprietary binary format — only SketchUp itself can generate it.
-                # The pipeline produces .rb (Ruby script) which you load into SketchUp to create the .skp.
-                skp_path = Path(SKP_OUTPUT_FILE)
-                if skp_path.exists():
-                    skp_bytes = skp_path.read_bytes()
-                    skp_mb = len(skp_bytes) / (1024 * 1024)
-                    skp_name = f"LOD300_{_pdf_stem}_{_ts}.skp"
-                    st.download_button(label=f"⬇️ Download {skp_name} ({skp_mb:.1f} MB)", data=skp_bytes, file_name=skp_name, mime="application/octet-stream", use_container_width=True)
+
+                # .rb (primary)
+                st.download_button(
+                    label=f"⬇️ {rb_name} — SketchUp Ruby Script (LOD300)",
+                    data=rb_bytes, file_name=rb_name, mime="text/plain",
+                    use_container_width=True,
+                )
+
+                # .ifc (if generated)
+                _ifc_path = result_holder.get("ifc_path", "")
+                if _ifc_path and Path(_ifc_path).exists():
+                    _ifc_bytes = Path(_ifc_path).read_bytes()
+                    _ifc_mb = len(_ifc_bytes) / (1024 * 1024)
+                    _ifc_name = f"LOD300_{_pdf_stem}_{_ts}.ifc"
+                    st.download_button(
+                        label=f"⬇️ {_ifc_name} ({_ifc_mb:.1f} MB) — IFC 2x3 (Revit / Navisworks / SketchUp)",
+                        data=_ifc_bytes, file_name=_ifc_name,
+                        mime="application/x-step", use_container_width=True,
+                    )
                 else:
-                    st.info(f"💡 **Cách tạo file .skp:** Mở SketchUp → Extensions → Ruby Console → gõ lệnh:\n\n`load '{ruby_path}'`\n\nSketchUp sẽ chạy Ruby script và tạo model 3D LOD 300. Sau đó Save As → `.skp`.")
+                    st.caption("💡 IFC export skipped (install `ifcopenshell` to enable)")
+
+                # .skp instructions
+                st.info(
+                    "**Tạo file .skp:**  \n"
+                    f"1. Mở SketchUp → Extensions → Ruby Console  \n"
+                    f"2. Gõ: `load '{ruby_path}'`  \n"
+                    "3. Script tự chạy và **auto-save** vào thư mục Downloads  \n"
+                    "4. File `.skp` LOD300 sẵn sàng để dùng ✅"
+                )
 
     full_log = "\n".join(log_lines)
     with tab_term:

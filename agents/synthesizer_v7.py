@@ -193,26 +193,126 @@ class SynthesizerV7:
         return llm_model
 
     def _extract_grid(self, forensic: dict, page_results: List[dict]) -> dict:
-        """Extract grid system from forensic + page data."""
-        grid_x = forensic.get("detected_grid_x", [])
-        grid_y = forensic.get("detected_grid_y", [])
+        """Extract grid system from forensic + page data + PDF dimension analysis."""
+        grid_x_set = set()
+        grid_y_set = set()
+
+        # From forensic
+        for v in forensic.get("detected_grid_x", []):
+            grid_x_set.add(str(v))
+        for v in forensic.get("detected_grid_y", []):
+            grid_y_set.add(str(v).upper())
 
         # Supplement from page results
         for pr in page_results:
             for col in pr.get("columns", []):
-                gx = col.get("grid_x", "")
-                gy = col.get("grid_y", "")
-                if gx and str(gx) not in grid_x:
-                    grid_x.append(str(gx))
-                if gy and str(gy).upper() not in grid_y:
-                    grid_y.append(str(gy).upper())
+                gx = col.get("grid_x")
+                gy = col.get("grid_y")
+                for v in self._flatten_grid_value(gx):
+                    grid_x_set.add(v)
+                for v in self._flatten_grid_value(gy, upper=True):
+                    grid_y_set.add(v)
+
+        # Clean garbage (remove list literals, non-grid strings)
+        grid_x = sorted(
+            [v for v in grid_x_set if self._is_valid_grid(v)],
+            key=lambda v: int(v) if v.isdigit() else 999,
+        )
+        grid_y = sorted(
+            [v for v in grid_y_set if self._is_valid_grid(v)],
+        )
+
+        # ── Try PDFDimensionExtractor for real mm coordinates ──
+        x_coords: dict = {}
+        y_coords: dict = {}
+        coord_confidence = 0.0
+        coord_source = "default"
+        pdf_path = forensic.get("pdf_path") or forensic.get("file_path", "")
+        if pdf_path:
+            try:
+                from core.analyze_pdf import PDFDimensionExtractor
+                ext = PDFDimensionExtractor(pdf_path, region=self.region)
+                page_texts = forensic.get("page_texts", {})
+                # Try up to 3 pages for best confidence
+                best_conf = 0.0
+                for idx in range(min(5, len(page_texts))):
+                    pt = page_texts.get(str(idx)) or page_texts.get(idx) or ""
+                    gc = ext.extract_grid_coordinates(
+                        page_idx=idx,
+                        page_text=pt,
+                        x_labels=grid_x or None,
+                        y_labels=grid_y or None,
+                    )
+                    if gc.confidence > best_conf:
+                        best_conf = gc.confidence
+                        x_coords = gc.x_coords
+                        y_coords = gc.y_coords
+                        coord_confidence = gc.confidence
+                        coord_source = gc.source
+                    if gc.confidence >= 0.7:
+                        break
+                if coord_confidence > 0:
+                    print(f"  [GRID] PDFDimensionExtractor: "
+                          f"confidence={coord_confidence:.2f}, source={coord_source}")
+            except Exception as e:
+                print(f"  [GRID] PDFDimensionExtractor failed: {e}")
+
+        # Spacing: derive from x_coords if available, else estimate
+        if x_coords and len(x_coords) >= 2:
+            vals = sorted(x_coords.values())
+            spacing_x = int(vals[1] - vals[0]) if len(vals) >= 2 else self._estimate_spacing(forensic, page_results)
+        else:
+            spacing_x = self._estimate_spacing(forensic, page_results)
+
+        if y_coords and len(y_coords) >= 2:
+            vals = sorted(y_coords.values())
+            spacing_y = int(vals[1] - vals[0]) if len(vals) >= 2 else spacing_x
+        else:
+            spacing_y = spacing_x
 
         return {
-            "x_axes": sorted(grid_x, key=lambda v: int(v) if v.isdigit() else 999),
-            "y_axes": sorted(grid_y),
-            "spacing_x_mm": self._estimate_spacing(forensic, page_results),
-            "spacing_y_mm": self._estimate_spacing(forensic, page_results),
+            "x_axes": grid_x,
+            "y_axes": grid_y,
+            "spacing_x_mm": spacing_x,
+            "spacing_y_mm": spacing_y,
+            "x_coords": x_coords,    # label→mm, from PDFDimensionExtractor
+            "y_coords": y_coords,
+            "coord_confidence": coord_confidence,
+            "coord_source": coord_source,
         }
+
+    @staticmethod
+    def _flatten_grid_value(val, upper=False):
+        """Flatten grid value that could be str, list, or None."""
+        if val is None:
+            return []
+        if isinstance(val, list):
+            result = []
+            for v in val:
+                result.extend(SynthesizerV7._flatten_grid_value(v, upper))
+            return result
+        s = str(val).strip()
+        if not s or len(s) > 4:  # skip long garbage
+            return []
+        if upper:
+            s = s.upper()
+        return [s]
+
+    @staticmethod
+    def _is_valid_grid(v: str) -> bool:
+        """Filter out obvious garbage from grid values."""
+        if not v:
+            return False
+        # Reject Python list literals, JSON, brackets
+        if any(c in v for c in '[]{}"\''):
+            return False
+        # Reject numbers with dots (decimals), commas
+        if '.' in v or ',' in v:
+            return False
+        # Accept single digits, letters, or digit+letter combos (like 2A)
+        if len(v) > 3:
+            return False
+        return bool(v.strip())
 
     def _extract_levels(self, forensic: dict,
                          page_results: List[dict]) -> List[dict]:
@@ -269,28 +369,56 @@ class SynthesizerV7:
         return beams
 
     # ── JSON PARSING ────────────────────────────────────────
-    def _parse_json(self, response: str) -> Optional[dict]:
-        """Parse LLM response with recovery strategies."""
+    def _parse_json(self, response: str):
+        """Parse LLM response with recovery strategies. Returns dict, list, or None."""
         if not response:
             return None
+        # Strategy 1: Direct parse
         try:
             return json.loads(response)
         except json.JSONDecodeError:
             pass
+
         import re
+        # Strategy 2: Extract from code blocks
         m = re.search(r'```(?:json)?\s*([\s\S]*?)```', response)
         if m:
             try:
                 return json.loads(m.group(1))
             except json.JSONDecodeError:
                 pass
-        brace_start = response.find('{')
-        brace_end = response.rfind('}')
-        if brace_start >= 0 and brace_end > brace_start:
-            try:
-                return json.loads(response[brace_start:brace_end+1])
-            except json.JSONDecodeError:
-                pass
+
+        # Strategy 3: Find outer braces or brackets
+        for open_c, close_c in [('{', '}'), ('[', ']')]:
+            start = response.find(open_c)
+            end = response.rfind(close_c)
+            if start >= 0 and end > start:
+                try:
+                    return json.loads(response[start:end+1])
+                except json.JSONDecodeError:
+                    pass
+
+        # Strategy 4: Repair truncated JSON
+        try:
+            stripped = response.strip().rstrip(",. \t\n\r")
+            depth_curly = stripped.count("{") - stripped.count("}")
+            depth_square = stripped.count("[") - stripped.count("]")
+            repair = stripped
+            repair += "]" * depth_square
+            repair += "}" * depth_curly
+            result = json.loads(repair)
+            print(f"    [SYNTH] JSON repaired (added {depth_square}] {depth_curly}}})")
+            return result
+        except (json.JSONDecodeError, Exception):
+            pass
+
+        # Strategy 5: Try json_repair
+        try:
+            from json_repair import repair_json
+            return json.loads(repair_json(response))
+        except Exception:
+            pass
+
         return None
 
     def _empty_model(self, forensic: dict) -> dict:

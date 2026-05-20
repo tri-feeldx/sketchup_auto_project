@@ -43,11 +43,13 @@ class ScannerV6:
     """
 
     def __init__(self, pdf_path: str | Path, dpi: int = 200,
-                 region: str = "vn", language: str = "vn"):
+                 region: str = "vn", language: str = "vn",
+                 max_pages: Optional[int] = None):
         self.pdf_path = Path(pdf_path)
         self.dpi = dpi
         self.region = region
         self.language = language
+        self.max_pages = max_pages
 
         self.renderer: Optional[VisionRenderer] = None
         self.forensic_result: Optional[Dict] = None
@@ -82,8 +84,8 @@ class ScannerV6:
         forensic_result = forensic.analyze()
         self.forensic_result = forensic_result.to_dict()
         num_pages = forensic_result.num_pages
-        print(f"  -> {num_pages} pages, region={self.forensic_result['region']}, "
-              f"lang={self.forensic_result['detected_language']}")
+        print(f"  -> {num_pages} pages, region={self.forensic_result.get('region','?')}, "
+              f"lang={self.forensic_result.get('detected_language','?')}")
 
         if num_pages == 0:
             return self._empty_result()
@@ -103,6 +105,10 @@ class ScannerV6:
 
         page_results = {}
         for rp in routed:
+            # Respect max_pages limit
+            if self.max_pages and len(page_results) >= self.max_pages:
+                print(f"  -> max_pages={self.max_pages} reached, stopping scan")
+                break
             ptype = rp.page_type
             if ptype in ("TITLE", "UNKNOWN"):
                 # Skip title/unknown pages — just store metadata
@@ -121,6 +127,10 @@ class ScannerV6:
 
         if self.renderer:
             self.close()
+
+        # ── STAGE 2b: TARGETED SECTION RETRY ────────────────
+        # If any members came back with null sections, re-query schedule pages.
+        page_results = self._targeted_section_retry(page_results, batches)
 
         # ── COLLECT ─────────────────────────────────────────
         elapsed = time.time() - t0
@@ -141,11 +151,13 @@ class ScannerV6:
         page_idx = rp.page_idx
         ptype = rp.page_type
 
-        # Get text from forensic
+        # Get text from forensic (page_texts can be dict<str, str> or list)
         page_text = ""
         if self.forensic_result:
-            page_texts = self.forensic_result.get("page_texts", [])
-            if page_idx < len(page_texts):
+            page_texts = self.forensic_result.get("page_texts", {})
+            if isinstance(page_texts, dict):
+                page_text = page_texts.get(str(page_idx), "")
+            elif isinstance(page_texts, list) and page_idx < len(page_texts):
                 page_text = page_texts[page_idx]
 
         # Build prompts
@@ -176,11 +188,23 @@ class ScannerV6:
                 images=images if images else None,
             )
             data = self._parse_json(response)
-            if data:
-                data["page_idx"] = page_idx
-                data["page_type"] = ptype
-                data["route_confidence"] = rp.confidence
-                return data
+            if data is not None:
+                if isinstance(data, dict):
+                    data["page_idx"] = page_idx
+                    data["page_type"] = ptype
+                    data["route_confidence"] = rp.confidence
+                    return data
+                elif isinstance(data, list):
+                    # LLM returned a JSON array – wrap it
+                    print(f"    [INFO] LLM returned array, wrapping as dict")
+                    return {
+                        "page_idx": page_idx,
+                        "page_type": ptype,
+                        "route_confidence": rp.confidence,
+                        "items": data,
+                    }
+                else:
+                    print(f"    [WARN] Unexpected JSON type: {type(data).__name__}")
         except Exception as e:
             print(f"    [WARN] LLM scan page {page_idx} failed: {e}")
 
@@ -193,11 +217,98 @@ class ScannerV6:
             "raw_text": page_text[:500] if page_text else "",
         }
 
+    # ── TARGETED SECTION RETRY ──────────────────────────────
+    def _targeted_section_retry(self, page_results: dict, batches: dict) -> dict:
+        """
+        After the main scan pass, collect all members whose section is null.
+        Re-query up to 3 schedule pages with a targeted prompt to fill them.
+        """
+        # Collect member IDs with null sections
+        null_ids: List[str] = []
+        for pdata in page_results.values():
+            for mtype in ("columns", "beams", "bracing", "footings"):
+                for m in pdata.get(mtype, []):
+                    if not (m.get("section") or m.get("section_size") or m.get("size")):
+                        mid = m.get("id") or m.get("mark") or m.get("label")
+                        if mid and str(mid) not in null_ids:
+                            null_ids.append(str(mid))
+
+        if not null_ids:
+            return page_results
+
+        schedule_idxs = batches.get("SCHEDULE", [])
+        if not schedule_idxs:
+            print(f"  [RETRY] {len(null_ids)} null sections but no schedule pages found")
+            return page_results
+
+        print(f"  [RETRY] {len(null_ids)} null sections → re-scanning "
+              f"{min(3, len(schedule_idxs))} schedule page(s)")
+
+        page_texts = (self.forensic_result or {}).get("page_texts", {})
+        sys_p = self.prompt_factory.system_prompt_section_extractor()
+
+        for page_idx in schedule_idxs[:3]:
+            pt = (page_texts.get(str(page_idx)) or page_texts.get(page_idx) or "")
+            if not pt:
+                continue
+            usr_p = self.prompt_factory.user_prompt_targeted_section_extract(
+                pt, null_ids[:25]
+            )
+            try:
+                resp = call_llm(usr_p, system=sys_p)
+                data = self._parse_json(resp)
+                if not data or not isinstance(data, dict):
+                    continue
+                section_map: dict = data.get("section_map", data)
+                # Apply to all page results
+                filled = 0
+                for pdata in page_results.values():
+                    for mtype in ("columns", "beams", "bracing", "footings"):
+                        for m in pdata.get(mtype, []):
+                            mid = m.get("id") or m.get("mark") or m.get("label")
+                            if not mid or str(mid) not in section_map:
+                                continue
+                            info = section_map[str(mid)]
+                            if not isinstance(info, dict):
+                                continue
+                            if not (m.get("section") or m.get("section_size")):
+                                sec = info.get("section")
+                                if sec and sec != "null":
+                                    m["section"] = sec
+                                    filled += 1
+                            if not m.get("material"):
+                                grade = info.get("grade") or info.get("material")
+                                if grade and grade != "null":
+                                    m["material"] = grade
+                print(f"    [OK] Retry page {page_idx}: filled {filled} sections")
+                # Remove from null_ids those now filled
+                null_ids = [
+                    mid for mid in null_ids
+                    if not any(
+                        (pdata.get("id") or pdata.get("mark")) == mid
+                        and (pdata.get("section") or pdata.get("section_size"))
+                        for pdata in [
+                            m for pr in page_results.values()
+                            for mt in ("columns", "beams", "bracing")
+                            for m in pr.get(mt, [])
+                        ]
+                    )
+                ]
+                if not null_ids:
+                    break
+            except Exception as e:
+                print(f"    [WARN] Section retry page {page_idx}: {e}")
+
+        return page_results
+
     # ── JSON PARSING WITH RECOVERY ──────────────────────────
-    def _parse_json(self, response: str) -> Optional[dict]:
-        """Parse LLM JSON response with multiple recovery strategies."""
+    def _parse_json(self, response: str):
+        """Parse LLM JSON response with multiple recovery strategies.
+        Returns dict, list, or None."""
         if not response or not response.strip():
             return None
+
+        import re
 
         # Strategy 1: Direct parse
         try:
@@ -206,7 +317,6 @@ class ScannerV6:
             pass
 
         # Strategy 2: Extract from code blocks
-        import re
         m = re.search(r'```(?:json)?\s*([\s\S]*?)```', response)
         if m:
             try:
@@ -214,14 +324,58 @@ class ScannerV6:
             except json.JSONDecodeError:
                 pass
 
-        # Strategy 3: Find outer braces
-        brace_start = response.find('{')
-        brace_end = response.rfind('}')
-        if brace_start >= 0 and brace_end > brace_start:
-            try:
-                return json.loads(response[brace_start:brace_end+1])
-            except json.JSONDecodeError:
-                pass
+        # Strategy 3: Find outer braces or brackets
+        for open_c, close_c in [('{', '}'), ('[', ']')]:
+            start = response.find(open_c)
+            end = response.rfind(close_c)
+            if start >= 0 and end > start:
+                try:
+                    return json.loads(response[start:end+1])
+                except json.JSONDecodeError:
+                    pass
+
+        # Strategy 4: Repair truncated JSON (add missing closing brackets/braces)
+        try:
+            stripped = response.strip().rstrip(",. \t\n\r")
+            depth_curly = stripped.count("{") - stripped.count("}")
+            depth_square = stripped.count("[") - stripped.count("]")
+            repair = stripped
+            repair += "]" * depth_square
+            repair += "}" * depth_curly
+            result = json.loads(repair)
+            print(f"    [OK] JSON repaired (added {depth_square}] {depth_curly}}})")
+            return result
+        except (json.JSONDecodeError, Exception):
+            pass
+
+        # Strategy 5: Try json_repair library
+        try:
+            from json_repair import repair_json
+            repaired = repair_json(response)
+            return json.loads(repaired)
+        except Exception:
+            pass
+
+        # Strategy 6: Last-resort — find the LAST complete JSON object/array
+        try:
+            # Find the last '}' and work backwards to find matching '{'
+            last_brace = response.rfind('}')
+            if last_brace >= 0:
+                # Find matching opening brace
+                depth = 0
+                first_brace = -1
+                for i in range(last_brace, -1, -1):
+                    if response[i] == '}':
+                        depth += 1
+                    elif response[i] == '{':
+                        depth -= 1
+                        if depth == 0:
+                            first_brace = i
+                            break
+                if first_brace >= 0:
+                    return json.loads(response[first_brace:last_brace+1])
+        except json.JSONDecodeError:
+            pass
 
         print(f"    [WARN] Could not parse JSON from response: {response[:200]}...")
         return None

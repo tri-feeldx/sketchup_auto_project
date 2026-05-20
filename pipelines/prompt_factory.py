@@ -85,14 +85,23 @@ class PromptFactory:
                 "- Level markings\n"
             ),
             "schedule": (
-                "FOCUS: This page is a SCHEDULE/TABLE. Extract:\n"
-                "- Member schedule data (columns, beams, footings)\n"
-                "- Section sizes with labels\n"
-                "- Reinforcement details\n"
-                "- Bolt/weld specifications\n"
-                "- Material grades\n"
-                "- Quantities and weights\n"
-                "Format as structured table data.\n"
+                "FOCUS: This page is a MEMBER SCHEDULE / TABLE. "
+                "Extract EVERY row from EVERY table.\n\n"
+                "REQUIRED OUTPUT FORMAT:\n"
+                '{\n'
+                '  "columns": [{"id":"C1","section":"310UC118","grade":"G350","height_mm":4500}],\n'
+                '  "beams":   [{"id":"B1","section":"530UB92","grade":"G350","span_mm":7200,'
+                '"from_col":"C1","to_col":"C2"}],\n'
+                '  "footings":[{"id":"F1","type":"pad","width_mm":2400,"depth_mm":2400,"height_mm":600}],\n'
+                '  "bracing": [{"id":"BR1","section":"150x100x8RHS","grade":"C350"}]\n'
+                "}\n\n"
+                "CRITICAL RULES:\n"
+                "- section field MUST contain the full section designation (e.g. '310UC118', '530UB92', '150x100x6RHS')\n"
+                "- grade field MUST contain the steel/concrete grade (e.g. 'G350', 'C350', 'N32')\n"
+                "- Extract id/mark exactly as shown (e.g. 'C1', 'B1', 'BR3A')\n"
+                "- Do NOT summarize — include ALL rows\n"
+                "- AS/NZS sections: UB, UC, PFC, RHS, SHS, CHS (e.g. '530UB92', '168.3x5.0CHS')\n"
+                "- TCVN sections: H-sections, I-sections (e.g. 'H300x300x10x15', 'I200')\n"
             ),
             "general": (
                 "Analyze this drawing and extract ALL structural elements:\n"
@@ -297,6 +306,43 @@ class PromptFactory:
 
         parts.append("\n\nValidate this Ruby script and report ALL issues found.")
         return "\n".join(parts)
+
+    # ── TARGETED SECTION EXTRACTION (retry for null sections) ──
+    def system_prompt_section_extractor(self) -> str:
+        """Targeted system prompt for re-scanning schedule pages to fill null sections."""
+        return (
+            "You are a structural steel detailer expert at reading member schedules. "
+            "Your ONLY job is to extract section designations, steel grades, and member IDs. "
+            "Return ONLY valid JSON. No explanations, no markdown.\n\n"
+            "AS/NZS section examples:\n"
+            "  '310UC118 G350' → section='310UC118', grade='G350'\n"
+            "  '530UB92.4 G350' → section='530UB92', grade='G350'\n"
+            "  '150x100x6RHS C350' → section='150x100x6RHS', grade='C350'\n"
+            "  'CHS168.3x5.0 C350' → section='168.3x5.0CHS', grade='C350'\n"
+            "  '100x100x5SHS C350' → section='100x100x5SHS', grade='C350'\n"
+            "TCVN section examples:\n"
+            "  'H300x300x10x15 CT3' → section='H300x300x10x15', grade='CT3'\n"
+            "  'I200 SS400' → section='I200', grade='SS400'\n"
+        )
+
+    def user_prompt_targeted_section_extract(
+        self, page_text: str, member_ids: List[str]
+    ) -> str:
+        """User prompt for targeted re-scan of a schedule page to fill null sections."""
+        ids_str = ", ".join(member_ids[:30])
+        return (
+            f"These member IDs are MISSING their section data: {ids_str}\n\n"
+            "From the schedule text below, extract the section designation and grade "
+            "for EACH member ID listed.\n\n"
+            f"SCHEDULE TEXT:\n{self._truncate(page_text)}\n\n"
+            "OUTPUT — JSON only:\n"
+            '{"section_map": {\n'
+            '  "C1": {"section": "310UC118", "grade": "G350"},\n'
+            '  "B1": {"section": "530UB92",  "grade": "G350"}\n'
+            "}}\n"
+            "Include only member IDs you can confirm from the text. "
+            "Use null for section/grade if genuinely absent."
+        )
 
     # ── REGION-AWARE SYSTEM PROMPT ──────────────────────────
     def get_region_prompt(self) -> str:

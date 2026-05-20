@@ -1,973 +1,462 @@
 {
-  "project": {},
+  "project_info": {
+    "name": "THE UNIVERSITY OF NEW ENGLAND TAMWORTH CENTRAL CAMPUS",
+    "location": "24 Fitzroy Street, Tamworth New South Wales 2340",
+    "region": "AU",
+    "units": {
+      "length": "mm",
+      "strength": "MPa"
+    },
+    "notes": [
+      "These drawings are preliminary drawings issued for tendering purposes only as an indication of the extent of works only. They are not a complete set of construction drawings and are not to be used for construction.",
+      "To determine the full extent of work, these drawings shall be read in conjunction with the architectural drawings and other contract documents. Allow for all items shown on architectural and other drawings as not all items are shown on the structural drawings.",
+      "Should any ambiguity, error, omission, discrepancy, inconsistency or other fault exist or seem to exist in the documents, immediately notify, in writing, to the superintendent.",
+      "Rates shown on these drawings are for the final structure in place and do not allow for any wastage, rolling margins, over supply or fabrication requirements etc."
+    ]
+  },
   "grid_system": {
-    "x_axes": [
-      "1",
-      "2",
-      "3",
-      "4",
-      "2.5",
-      "D",
-      "C",
-      "B",
-      "A"
+    "origin_mm": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "x_grids": [
+      {
+        "label": "1",
+        "coordinate_mm": 1000,
+        "confidence": 0.9
+      },
+      {
+        "label": "2",
+        "coordinate_mm": 7000,
+        "confidence": 0.9
+      },
+      {
+        "label": "3",
+        "coordinate_mm": 13000,
+        "confidence": 0.9
+      },
+      {
+        "label": "4",
+        "coordinate_mm": 19000,
+        "confidence": 0.9
+      }
     ],
-    "y_axes": [
-      "A",
-      "B",
-      "C",
-      "D",
-      "T"
-    ],
-    "spacing_x_mm": 6000,
-    "spacing_y_mm": 6000
+    "y_grids": [
+      {
+        "label": "D",
+        "coordinate_mm": 1000,
+        "confidence": 0.9
+      },
+      {
+        "label": "C",
+        "coordinate_mm": 7000,
+        "confidence": 0.9
+      },
+      {
+        "label": "B",
+        "coordinate_mm": 13000,
+        "confidence": 0.9
+      },
+      {
+        "label": "A",
+        "coordinate_mm": 19000,
+        "confidence": 0.9
+      }
+    ]
   },
   "levels": [
     {
-      "name": "LEVEL 03"
+      "id": "L01",
+      "name": "LEVEL 01",
+      "elevation_mm": 0,
+      "slab_thickness_mm": 240,
+      "confidence": 0.9
+    },
+    {
+      "id": "L02",
+      "name": "LEVEL 02",
+      "elevation_mm": 3000,
+      "slab_thickness_mm": 200,
+      "confidence": 0.85
+    },
+    {
+      "id": "L03",
+      "name": "LEVEL 03",
+      "elevation_mm": 6000,
+      "slab_thickness_mm": 200,
+      "confidence": 0.85
+    },
+    {
+      "id": "L04",
+      "name": "LEVEL 04",
+      "elevation_mm": 9000,
+      "slab_thickness_mm": 200,
+      "confidence": 0.85
+    },
+    {
+      "id": "L05",
+      "name": "LEVEL 05",
+      "elevation_mm": 12000,
+      "slab_thickness_mm": 200,
+      "confidence": 0.8
+    },
+    {
+      "id": "LRF",
+      "name": "LOWER ROOF",
+      "elevation_mm": 15000,
+      "slab_thickness_mm": null,
+      "confidence": 0.7
+    },
+    {
+      "id": "URF",
+      "name": "UPPER ROOF",
+      "elevation_mm": 18000,
+      "slab_thickness_mm": null,
+      "confidence": 0.7
     }
   ],
+  "foundations": {
+    "piles": [
+      {
+        "id": "P1",
+        "type": "pile",
+        "diameter_mm": 750,
+        "socket_length_mm": 600,
+        "max_working_compression_kN": 850,
+        "max_working_tension_kN": null,
+        "max_ultimate_compression_kN": 1200,
+        "max_ultimate_tension_kN": null,
+        "max_ultimate_lateral_kN": 450,
+        "notes": "Self-weight of piles excluded. Ultimate lateral force (shear) to be applied in any direction. Bedrock level approx 10m below surface (RL 368.5). *Denotes estimated pile socket into low-strength argilite bedrock. Single pile design to consider eccentric loading AS 2159.",
+        "confidence": 0.95
+      },
+      {
+        "id": "P2",
+        "type": "pile",
+        "diameter_mm": 750,
+        "socket_length_mm": 3000,
+        "max_working_compression_kN": 1500,
+        "max_working_tension_kN": null,
+        "max_ultimate_compression_kN": 2100,
+        "max_ultimate_tension_kN": null,
+        "max_ultimate_lateral_kN": 5
+      }
+    ]
+  },
   "members": {
     "columns": [
       {
-        "type": "column",
-        "id": "C-1A",
+        "id": "Col_A1",
         "grid_x": "1",
         "grid_y": "A",
-        "coordinate_x_mm": 0,
-        "coordinate_y_mm": 21600
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-2A",
+        "id": "Col_A2",
         "grid_x": "2",
         "grid_y": "A",
-        "coordinate_x_mm": 7200,
-        "coordinate_y_mm": 21600
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-3A",
+        "id": "Col_A3",
         "grid_x": "3",
         "grid_y": "A",
-        "coordinate_x_mm": 14400,
-        "coordinate_y_mm": 21600
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-4A",
+        "id": "Col_A4",
         "grid_x": "4",
         "grid_y": "A",
-        "coordinate_x_mm": 21600,
-        "coordinate_y_mm": 21600
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-1B",
+        "id": "Col_B1",
         "grid_x": "1",
         "grid_y": "B",
-        "coordinate_x_mm": 0,
-        "coordinate_y_mm": 14400
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-2B",
+        "id": "Col_B2",
         "grid_x": "2",
         "grid_y": "B",
-        "coordinate_x_mm": 7200,
-        "coordinate_y_mm": 14400
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-3B",
+        "id": "Col_B3",
         "grid_x": "3",
         "grid_y": "B",
-        "coordinate_x_mm": 14400,
-        "coordinate_y_mm": 14400
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-4B",
+        "id": "Col_B4",
         "grid_x": "4",
         "grid_y": "B",
-        "coordinate_x_mm": 21600,
-        "coordinate_y_mm": 14400
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-1C",
+        "id": "Col_C1",
         "grid_x": "1",
         "grid_y": "C",
-        "coordinate_x_mm": 0,
-        "coordinate_y_mm": 7200
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-2C",
+        "id": "Col_C2",
         "grid_x": "2",
         "grid_y": "C",
-        "coordinate_x_mm": 7200,
-        "coordinate_y_mm": 7200
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-3C",
+        "id": "Col_C3",
         "grid_x": "3",
         "grid_y": "C",
-        "coordinate_x_mm": 14400,
-        "coordinate_y_mm": 7200
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-4C",
+        "id": "Col_C4",
         "grid_x": "4",
         "grid_y": "C",
-        "coordinate_x_mm": 21600,
-        "coordinate_y_mm": 7200
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-1D",
+        "id": "Col_D1",
         "grid_x": "1",
         "grid_y": "D",
-        "coordinate_x_mm": 0,
-        "coordinate_y_mm": 0
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-2D",
+        "id": "Col_D2",
         "grid_x": "2",
         "grid_y": "D",
-        "coordinate_x_mm": 7200,
-        "coordinate_y_mm": 0
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-3D",
+        "id": "Col_D3",
         "grid_x": "3",
         "grid_y": "D",
-        "coordinate_x_mm": 14400,
-        "coordinate_y_mm": 0
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-4D",
+        "id": "Col_D4",
         "grid_x": "4",
         "grid_y": "D",
-        "coordinate_x_mm": 21600,
-        "coordinate_y_mm": 0
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-2.5C",
-        "grid_x": "2.5",
+        "id": "Col_C_1_5",
+        "grid_x": "between 1 and 2",
         "grid_y": "C",
-        "coordinate_x_mm": 10800,
-        "coordinate_y_mm": 7200
+        "location_description": "Centerline between Grid 1 and 2",
+        "section": null,
+        "material": null
       },
       {
-        "type": "column",
-        "id": "C-2.5D",
-        "grid_x": "2.5",
+        "id": "Col_C_2_5_Left",
+        "grid_x": "between 2 and 3",
+        "grid_y": "C",
+        "location_description": "Left of centerline between Grid 2 and 3",
+        "section": null,
+        "material": null
+      },
+      {
+        "id": "Col_C_2_5_Right",
+        "grid_x": "between 2 and 3",
+        "grid_y": "C",
+        "location_description": "Right of centerline between Grid 2 and 3",
+        "section": null,
+        "material": null
+      },
+      {
+        "id": "Col_C_3_5",
+        "grid_x": "between 3 and 4",
+        "grid_y": "C",
+        "location_description": "Centerline between Grid 3 and 4",
+        "section": null,
+        "material": null
+      },
+      {
+        "id": "Col_D_1_5",
+        "grid_x": "between 1 and 2",
         "grid_y": "D",
-        "coordinate_x_mm": 10800,
-        "coordinate_y_mm": 0
+        "location_description": "Centerline between Grid 1 and 2",
+        "section": null,
+        "material": null
+      },
+      {
+        "id": "Col_D_2_5_Left",
+        "grid_x": "between 2 and 3",
+        "grid_y": "D",
+        "location_description": "Left of centerline between Grid 2 and 3",
+        "section": null,
+        "material": null
+      },
+      {
+        "id": "Col_D_2_5_Right",
+        "grid_x": "between 2 and 3",
+        "grid_y": "D",
+        "location_description": "Right of centerline between Grid 2 and 3",
+        "section": null,
+        "material": null
+      },
+      {
+        "id": "Col_D_3_5",
+        "grid_x": "between 3 and 4",
+        "grid_y": "D",
+        "location_description": "Centerline between Grid 3 and 4",
+        "section": null,
+        "material": null
       },
       {
         "type": "column",
-        "id": "CH40b",
-        "section": "CHS400",
-        "material": "steel",
+        "id": "C_CH40b",
+        "section": "CH40b",
+        "material": "Structural Steel",
         "grid_x": "2",
-        "grid_y": "T",
-        "notes": "Main vertical column, shown in details 1, 1A, 1B. Connected to CH32a."
+        "grid_y": null,
+        "description": "Vertical column element shown in Detail 1/1A/1B"
       },
       {
         "type": "column",
+        "id": "C_CH35a",
+        "section": "CH35a",
+        "material": "Structural Steel",
+        "grid_x": null,
+        "grid_y": null,
+        "description": "Vertical column element shown in Detail 2/Section 2A"
+      },
+      {
+        "type": "column",
+        "id": "C_CH13c",
+        "section": "CH13c",
+        "material": "Structural Steel",
+        "grid_x": null,
+        "grid_y": null,
+        "description": "Vertical column stub element shown in Detail 2/Section 2A"
+      },
+      {
+        "id": "UB_Column_Cap_200UB",
+        "type": "column",
+        "section": "200 UB",
+        "height_mm": null,
+        "material": null,
+        "base_connection": null,
+        "cap_connection": {
+          "type": "cap_plate_connection",
+          "notes": [
+            "10 stiffener plates each side"
+          ],
+          "cap_plate_thickness_mm": 10,
+          "bolts": "4M20",
+          "bolt_grade": "8.8/S"
+        },
+        "grid_x": null,
+        "grid_y": null
+      },
+      {
+        "id": "UB_Column_Cap_310UB",
+        "type": "column",
+        "section": "310 UB",
+        "height_mm": null,
+        "material": null,
+        "base_connection": null,
+        "cap_connection": {
+          "type": "cap_plate_connection",
+          "notes": [
+            "10 stiffener plates each side"
+          ],
+          "cap_plate_thickness_mm": 12,
+          "bolts": "4M20",
+          "bolt_grade": "8.8/S"
+        },
+        "grid_x": null,
+        "grid_y": null
+      },
+      {
+        "id": "UB_Column_Cap_360UB",
+        "type": "column",
+        "section": "360 UB",
+        "height_mm": null,
+        "material": null,
+        "base_connection": null,
+        "cap_connection": {
+          "type": "cap_plate_connection",
+          "notes": [
+            "10 stiffener plates each side"
+          ],
+          "cap_plate_thickness_mm": 12,
+          "bolts": "4M20",
+          "bolt_grade": "8.8/S"
+        },
+        "grid_x": null,
+        "grid_y": null
+      },
+      {
+        "id": "CHS_Column_End_140DIA",
+        "type": "column",
+        "section": "140 DIA CHS",
+        "height_mm": null,
+        "material": null,
+        "base_connection": {
+          "type": "compression_end_connection",
+          "notes": [
+            "6 seal plate",
+            "10 stiffener plate",
+            "Bolt centres 70mm for M20 bolts",
+            "Bolt centres 80mm for M24 bolts",
+            "Connection plate same thickness as slotted plate"
+          ],
+          "plate_thickness_mm": 10,
+          "slot_length_mm": 140,
+          "bolts": "3M20",
+          "bolt_grade": "8.8/S"
+        },
+        "cap_connection": null,
+        "grid_x": null,
+        "grid_y": null
+      },
+      {
         "id": "CH35a",
-        "section": "CHS350",
-        "material": "steel",
-        "grid_x": null,
-        "grid_y": null,
-        "notes": "Vertical column, shown in Detail 2 and Section 2A. Connected to UB36c and SH15b."
-      },
-      {
-        "type": "column",
-        "id": "CH13c",
-        "section": "CHS130",
-        "material": "steel",
-        "grid_x": null,
-        "grid_y": null,
-        "notes": "Vertical column, shown in Detail 2 and Section 2A. Connected to UB36c and SH15b."
-      },
-      {
-        "id": "CH35a_D",
         "type": "steel_column",
-        "grid_x": "D",
-        "height_mm": 9500,
-        "base_level_mm": -500,
-        "top_level_mm": 9000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_curved_roof_structure",
-        "material": "steel",
-        "section": null
-      },
-      {
-        "id": "CH35a_C",
-        "type": "steel_column",
-        "grid_x": "C",
-        "height_mm": 9500,
-        "base_level_mm": -500,
-        "top_level_mm": 9000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_curved_roof_structure",
-        "material": "steel",
-        "section": null
-      },
-      {
-        "id": "CH35a_B",
-        "type": "steel_column",
-        "grid_x": "B",
-        "height_mm": 9500,
-        "base_level_mm": -500,
-        "top_level_mm": 9000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_curved_roof_structure",
-        "material": "steel",
-        "section": null
-      },
-      {
-        "id": "CH35a_A",
-        "type": "steel_column",
+        "section": "CH35a",
         "grid_x": "A",
-        "height_mm": 9500,
-        "base_level_mm": -500,
-        "top_level_mm": 9000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_curved_roof_structure",
-        "material": "steel",
-        "section": null
-      },
-      {
-        "id": "CH35a_4",
-        "type": "steel_column",
-        "grid_x": "4",
-        "height_mm": 8500,
-        "base_level_mm": -500,
-        "top_level_mm": 8000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_flat_roof_structure",
-        "material": "steel",
-        "section": null
-      },
-      {
-        "id": "CH35a_3",
-        "type": "steel_column",
-        "grid_x": "3",
-        "height_mm": 8500,
-        "base_level_mm": -500,
-        "top_level_mm": 8000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_flat_roof_structure",
-        "material": "steel",
-        "section": null
-      },
-      {
-        "id": "CH35a_2",
-        "type": "steel_column",
-        "grid_x": "2",
-        "height_mm": 8500,
-        "base_level_mm": -500,
-        "top_level_mm": 8000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_flat_roof_structure",
-        "material": "steel",
-        "section": null
-      },
-      {
-        "id": "CH35a_1",
-        "type": "steel_column",
-        "grid_x": "1",
-        "height_mm": 8500,
-        "base_level_mm": -500,
-        "top_level_mm": 8000,
-        "base_connection": "embedded_in_concrete_column",
-        "top_connection": "integrated_with_flat_roof_structure",
-        "material": "steel",
-        "section": null
+        "grid_y": "T",
+        "height_description": "Extends from below Level 01 to above Level 03",
+        "connections": [
+          {
+            "level": "LEVEL 03",
+            "detail": "16 END PLATE WITH 4-M24 DRILL AND EPOXY ANCHORS"
+          }
+        ]
       }
-    ],
-    "beams": [
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-1A-2A",
-        "start_coordinate_mm": [
-          0,
-          21600
-        ],
-        "end_coordinate_mm": [
-          7200,
-          21600
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-2A-3A",
-        "start_coordinate_mm": [
-          7200,
-          21600
-        ],
-        "end_coordinate_mm": [
-          14400,
-          21600
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-3A-4A",
-        "start_coordinate_mm": [
-          14400,
-          21600
-        ],
-        "end_coordinate_mm": [
-          21600,
-          21600
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-1B-2B",
-        "start_coordinate_mm": [
-          0,
-          14400
-        ],
-        "end_coordinate_mm": [
-          7200,
-          14400
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-2B-3B",
-        "start_coordinate_mm": [
-          7200,
-          14400
-        ],
-        "end_coordinate_mm": [
-          14400,
-          14400
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-3B-4B",
-        "start_coordinate_mm": [
-          14400,
-          14400
-        ],
-        "end_coordinate_mm": [
-          21600,
-          14400
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-1C-2C",
-        "start_coordinate_mm": [
-          0,
-          7200
-        ],
-        "end_coordinate_mm": [
-          7200,
-          7200
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-2C-3C",
-        "start_coordinate_mm": [
-          7200,
-          7200
-        ],
-        "end_coordinate_mm": [
-          14400,
-          7200
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-3C-4C",
-        "start_coordinate_mm": [
-          14400,
-          7200
-        ],
-        "end_coordinate_mm": [
-          21600,
-          7200
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-1D-2D",
-        "start_coordinate_mm": [
-          0,
-          0
-        ],
-        "end_coordinate_mm": [
-          7200,
-          0
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-2D-3D",
-        "start_coordinate_mm": [
-          7200,
-          0
-        ],
-        "end_coordinate_mm": [
-          14400,
-          0
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-3D-4D",
-        "start_coordinate_mm": [
-          14400,
-          0
-        ],
-        "end_coordinate_mm": [
-          21600,
-          0
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-1A-1B",
-        "start_coordinate_mm": [
-          0,
-          21600
-        ],
-        "end_coordinate_mm": [
-          0,
-          14400
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-1B-1C",
-        "start_coordinate_mm": [
-          0,
-          14400
-        ],
-        "end_coordinate_mm": [
-          0,
-          7200
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-1C-1D",
-        "start_coordinate_mm": [
-          0,
-          7200
-        ],
-        "end_coordinate_mm": [
-          0,
-          0
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-2A-2B",
-        "start_coordinate_mm": [
-          7200,
-          21600
-        ],
-        "end_coordinate_mm": [
-          7200,
-          14400
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-2B-2C",
-        "start_coordinate_mm": [
-          7200,
-          14400
-        ],
-        "end_coordinate_mm": [
-          7200,
-          7200
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-2C-2D",
-        "start_coordinate_mm": [
-          7200,
-          7200
-        ],
-        "end_coordinate_mm": [
-          7200,
-          0
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-3A-3B",
-        "start_coordinate_mm": [
-          14400,
-          21600
-        ],
-        "end_coordinate_mm": [
-          14400,
-          14400
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-3B-3C",
-        "start_coordinate_mm": [
-          14400,
-          14400
-        ],
-        "end_coordinate_mm": [
-          14400,
-          7200
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-3C-3D",
-        "start_coordinate_mm": [
-          14400,
-          7200
-        ],
-        "end_coordinate_mm": [
-          14400,
-          0
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-4A-4B",
-        "start_coordinate_mm": [
-          21600,
-          21600
-        ],
-        "end_coordinate_mm": [
-          21600,
-          14400
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-4B-4C",
-        "start_coordinate_mm": [
-          21600,
-          14400
-        ],
-        "end_coordinate_mm": [
-          21600,
-          7200
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "diaphragm_edge",
-        "id": "DE-4C-4D",
-        "start_coordinate_mm": [
-          21600,
-          7200
-        ],
-        "end_coordinate_mm": [
-          21600,
-          0
-        ],
-        "span_mm": 7200
-      },
-      {
-        "type": "beam",
-        "id": "CH32a",
-        "section": "CHS320",
-        "material": "steel",
-        "end_connection": "FPBW (Full Penetration Butt Weld) to CH40b column with shop welded stiffeners to create T-post. Non-structural sleeve also shown.",
-        "notes": "Horizontal member, shown in details 1, 1A, 1B."
-      },
-      {
-        "type": "beam",
-        "id": "UB36c",
-        "section": "UB360",
-        "material": "steel",
-        "end_connection": "Shop welded stub to CH35a/CH13c column, with annular plate and provide counter sunk bolts.",
-        "notes": "Horizontal member, shown in Detail 2 and Section 2A."
-      },
-      {
-        "type": "beam",
-        "id": "SH15b",
-        "section": "SHS150",
-        "material": "steel",
-        "end_connection": "Shop welded stub to CH35a/CH13c column, with annular plate and provide counter sunk bolts.",
-        "notes": "Horizontal member, shown in Detail 2 and Section 2A."
-      },
-      {
-        "type": "beam",
-        "id": "PF15a",
-        "section": "Purlin150",
-        "material": "steel",
-        "end_connection": "Connection to UB36c/SH15b not fully detailed, but shown in Detail 2.",
-        "notes": "Horizontal member, likely a purlin or girt, shown in Detail 2."
-      },
-      {
-        "type": "beam",
-        "id": "PF25a",
-        "section": "Purlin250",
-        "material": "steel",
-        "end_connection": "Connection to UB36c/SH15b not fully detailed, but shown in Detail 2 and Section 2A. Provide counter sunk bolts.",
-        "notes": "Horizontal member, likely a purlin or girt, shown in Detail 2 and Section 2A."
-      }
-    ],
-    "slabs": [
-      {
-        "id": "Slab_L4",
-        "type": "concrete_slab",
-        "thickness_mm": "unknown",
-        "material": "concrete",
-        "boundary_polygon_mm": [
-          [
-            -1500,
-            -1500
-          ],
-          [
-            19500,
-            -1500
-          ],
-          [
-            19500,
-            19500
-          ],
-          [
-            -1500,
-            19500
-          ],
-          [
-            -1500,
-            -1500
-          ]
-        ]
-      },
-      {
-        "type": "slab",
-        "id": "Slab-01",
-        "boundary_points_mm": [
-          [
-            0,
-            0
-          ],
-          [
-            21600,
-            0
-          ],
-          [
-            21600,
-            21600
-          ],
-          [
-            0,
-            21600
-          ],
-          [
-            0,
-            0
-          ]
-        ],
-        "thickness_mm": null
-      },
-      {
-        "id": "Slab_01",
-        "type": "concrete_slab",
-        "thickness_mm": null,
-        "boundary_description": "Main floor slab forming seismic diaphragm, bounded by Grid 1, 4, A, D.",
-        "notes": "Slab thickness not specified on this plan."
-      }
-    ],
-    "walls": [
-      {
-        "id": "Core_Wall_System",
-        "type": "shear_wall_system",
-        "material": "concrete",
-        "description": "Central core wall system with internal walls and openings for lifts and stairs.",
-        "bounding_box_mm": {
-          "x_min": 6000,
-          "y_min": 6000,
-          "x_max": 12000,
-          "y_max": 12000
-        }
-      },
-      {
-        "type": "concrete_wall",
-        "id": "Wall-Core",
-        "boundary_points_mm": [
-          [
-            8000,
-            800
-          ],
-          [
-            13600,
-            800
-          ],
-          [
-            13600,
-            6400
-          ],
-          [
-            8000,
-            6400
-          ],
-          [
-            8000,
-            800
-          ]
-        ]
-      },
-      {
-        "id": "Wall_G4_AD",
-        "type": "concrete_shear_wall",
-        "location_description": "Along Grid 4, from Grid A to Grid D",
-        "reinforcement_notes": [
-          "2N28+ END TERMINATORS",
-          "2N28",
-          "2N32"
-        ]
-      },
-      {
-        "id": "Wall_GA_24",
-        "type": "concrete_shear_wall",
-        "location_description": "Along Grid A, from Grid 2 to Grid 4",
-        "reinforcement_notes": [
-          "4N40",
-          "5N28",
-          "5N40"
-        ]
-      },
-      {
-        "id": "Wall_GD_24",
-        "type": "concrete_shear_wall",
-        "location_description": "Along Grid D, from Grid 2 to Grid 4",
-        "reinforcement_notes": [
-          "5N40"
-        ]
-      },
-      {
-        "id": "Wall_G2_AD",
-        "type": "concrete_shear_wall",
-        "location_description": "Along Grid 2, from Grid A to Grid D",
-        "reinforcement_notes": [
-          "4N40",
-          "8N40"
-        ]
-      },
-      {
-        "id": "Wall_G3_AD",
-        "type": "concrete_shear_wall",
-        "location_description": "Along Grid 3, from Grid A to Grid D",
-        "reinforcement_notes": [
-          "4N40",
-          "8N40",
-          "3N28"
-        ]
-      },
-      {
-        "id": "Wall_Internal_2_3_A_B_partial",
-        "type": "concrete_wall",
-        "location_description": "Between Grid 2 and 3, from Grid A to approximately mid-way to Grid B",
-        "reinforcement_notes": [
-          "4N28"
-        ]
-      },
-      {
-        "id": "Wall_Internal_2_3_C_D_partial",
-        "type": "concrete_wall",
-        "location_description": "Between Grid 2 and 3, from approximately mid-way to Grid C to Grid D",
-        "reinforcement_notes": [
-          "N12-200"
-        ]
-      },
-      {
-        "id": "Wall_Internal_3_4_A_B_partial",
-        "type": "concrete_wall",
-        "location_description": "Between Grid 3 and 4, from Grid A to approximately mid-way to Grid B",
-        "reinforcement_notes": [
-          "N12-300 U-BARS"
-        ]
-      },
-      {
-        "id": "Wall_Internal_3_4_C_D_partial",
-        "type": "concrete_wall",
-        "location_description": "Between Grid 3 and 4, from approximately mid-way to Grid C to Grid D",
-        "reinforcement_notes": []
-      },
-      {
-        "id": "Wall_Internal_G2_B_segment",
-        "type": "concrete_wall",
-        "location_description": "Along Grid B, between Grid 2 and 3 (segment)",
-        "reinforcement_notes": []
-      },
-      {
-        "id": "Wall_Internal_G2_C_segment",
-        "type": "concrete_wall",
-        "location_description": "Along Grid C, between Grid 2 and 3 (segment)",
-        "reinforcement_notes": []
-      },
-      {
-        "id": "W1",
-        "type": "wall",
-        "thickness_mm": 250,
-        "material": "concrete",
-        "start_grid_x": "2",
-        "end_grid_x": "4",
-        "start_grid_y": "A",
-        "end_grid_y": "A",
-        "start_coord_x_mm": null,
-        "start_coord_y_mm": null,
-        "end_coord_x_mm": null,
-        "end_coord_y_mm": null,
-        "orientation": "horizontal"
-      },
-      {
-        "id": "W2",
-        "type": "wall",
-        "thickness_mm": 250,
-        "material": "concrete",
-        "start_grid_x": "4",
-        "end_grid_x": "4",
-        "start_grid_y": "D",
-        "end_grid_y": "B",
-        "start_coord_x_mm": null,
-        "start_coord_y_mm": null,
-        "end_coord_x_mm": null,
-        "end_coord_y_mm": null,
-        "orientation": "vertical"
-      },
-      {
-        "id": "W3",
-        "type": "wall",
-        "thickness_mm": 250,
-        "material": "concrete",
-        "start_grid_x": "2",
-        "end_grid_x": "4",
-        "start_grid_y": "D",
-        "end_grid_y": "D",
-        "start_coord_x_mm": null,
-        "start_coord_y_mm": null,
-        "end_coord_x_mm": null,
-        "end_coord_y_mm": null,
-        "orientation": "horizontal"
-      },
-      {
-        "id": "Core_Wall_C_2-3",
-        "type": "wall",
-        "thickness_mm": 250,
-        "material": "concrete",
-        "start_grid_x": "2",
-        "end_grid_x": "3",
-        "start_grid_y": "C",
-        "end_grid_y": "C",
-        "start_coord_x_mm": null,
-        "start_coord_y_mm": null,
-        "end_coord_x_mm": null,
-        "end_coord_y_mm": null,
-        "orientation": "horizontal"
-      },
-      {
-        "id": "Core_Wall_D_2-3",
-        "type": "wall",
-        "thickness_mm": 250,
-        "material": "concrete",
-        "start_grid_x": "2",
-        "end_grid_x": "3",
-        "start_grid_y": "D",
-        "end_grid_y": "D",
-        "start_coord_x_mm": null,
-        "start_coord_y_mm": null,
-        "end_coord_x_mm": null,
-        "end_coord_y_mm": null,
-        "orientation": "horizontal"
-      },
-      {
-        "id": "Core_Wall_2_C-D",
-        "type": "wall",
-        "thickness_mm": 250,
-        "material": "concrete",
-        "start_grid_x": "2",
-        "end_grid_x": "2",
-        "start_grid_y": "D",
-        "end_grid_y": "C",
-        "start_coord_x_mm": null,
-        "start_coord_y_mm": null,
-        "end_coord_x_mm": null,
-        "end_coord_y_mm": null,
-        "orientation": "vertical"
-      },
-      {
-        "id": "Core_Wall_3_C-D",
-        "type": "wall",
-        "thickness_mm": 250,
-        "material": "concrete",
-        "start_grid_x": "3",
-        "end_grid_x": "3",
-        "start_grid_y": "D",
-        "end_grid_y": "C",
-        "start_coord_x_mm": null,
-        "start_coord_y_mm": null,
-        "end_coord_x_mm": null,
-        "end_coord_y_mm": null,
-        "orientation": "vertical"
-      }
-    ],
-    "footings": [],
-    "bracing": []
-  },
-  "materials": {
-    "primary": "steel",
-    "region": "au",
-    "building_type": "general"
+    ]
   },
   "summary": {
-    "total_columns": 29,
-    "total_beams": 29,
+    "total_columns": 32,
+    "total_beams": 16,
     "total_slabs": 3,
-    "total_walls": 20,
+    "total_walls": 5,
     "total_footings": 0,
     "total_bracing": 0,
     "num_levels": 1,
-    "grid_x_axes": 9,
+    "grid_x_axes": 8,
     "grid_y_axes": 5
   },
-  "synthesis_method": "deterministic",
-  "elapsed_s": 78.5
+  "synthesis_method": "llm",
+  "elapsed_s": 74.6
 }
