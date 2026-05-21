@@ -110,6 +110,9 @@ class ScannerV6:
         # If any members came back with null sections, re-query schedule pages.
         page_results = self._targeted_section_retry(page_results, batches)
 
+        # ── STAGE 2c: CROSS-PAGE REFERENCE RESOLUTION ───────
+        page_results = self._cross_reference_pass(page_results)
+
         # ── COLLECT ─────────────────────────────────────────
         elapsed = time.time() - t0
         output = {
@@ -165,6 +168,7 @@ class ScannerV6:
                 print(f"    [WARN] Render page {page_idx} failed: {e}")
 
         # Call LLM
+        parse_strategy = 99
         result_data = None
         try:
             response = call_llm(
@@ -172,7 +176,7 @@ class ScannerV6:
                 system=system_prompt,
                 images=images if images else None,
             )
-            data = self._parse_json(response)
+            data, parse_strategy = self._parse_json(response)
             if data is not None:
                 if isinstance(data, dict):
                     data["page_idx"] = page_idx
@@ -210,6 +214,14 @@ class ScannerV6:
             if grid and grid.get("confidence", 0) > 0.4:
                 result_data["grid_coords"] = grid
 
+        # ── Scan confidence fields ───────────────────────────
+        route_conf = getattr(rp, 'confidence', 1.0)
+        scan_conf, issues = self._compute_scan_confidence(result_data, parse_strategy, route_conf)
+        result_data["_scan_confidence"] = scan_conf
+        result_data["_issues"] = issues
+        result_data["_retry_recommended"] = scan_conf < 0.6
+        result_data["_raw_text"] = page_text[:2000] if page_text else ""
+
         return result_data
 
     def _extract_elevations(self, page_idx: int, page_text: str) -> list:
@@ -218,7 +230,7 @@ class ScannerV6:
             sys_p = self.prompt_factory.system_prompt_elevation_extractor()
             usr_p = self.prompt_factory.user_prompt_extract_elevations(page_text, "elevation")
             resp = call_llm(usr_p, system=sys_p)
-            data = self._parse_json(resp)
+            data, _ = self._parse_json(resp)
             if isinstance(data, list) and data:
                 print(f"    [ELEV] Page {page_idx}: extracted {len(data)} level elevations")
                 return data
@@ -254,6 +266,26 @@ class ScannerV6:
                         renderer.close()
                     except Exception:
                         pass
+
+            # Auto-retry at higher DPI if low confidence
+            if result and result.get("_retry_recommended") and not skip_vision:
+                print(f"  [SCANNER] Page {rp.page_idx+1}: conf={result.get('_scan_confidence',0):.2f} — retrying +50 DPI")
+                retry_renderer = None
+                try:
+                    retry_renderer = VisionRenderer(str(self.pdf_path), dpi=self.dpi + 50)
+                    r2 = self._scan_page(rp, skip_vision=False, _renderer=retry_renderer)
+                    if r2 and r2.get("_scan_confidence", 0) > result.get("_scan_confidence", 0):
+                        result = r2
+                        print(f"  [SCANNER] Page {rp.page_idx+1}: retry improved → {result['_scan_confidence']:.2f}")
+                except Exception as re_e:
+                    print(f"  [SCANNER] Page {rp.page_idx+1}: retry failed: {re_e}")
+                finally:
+                    if retry_renderer:
+                        try:
+                            retry_renderer.close()
+                        except Exception:
+                            pass
+
             return str(rp.page_idx), result
 
         n_workers = min(PARALLEL_SCAN_WORKERS, len(routed)) if routed else 1
@@ -277,7 +309,7 @@ class ScannerV6:
             sys_p = self.prompt_factory.system_prompt_scanner("plan")
             usr_p = self.prompt_factory.user_prompt_extract_grid(page_text, ptype.lower())
             resp = call_llm(usr_p, system=sys_p)
-            data = self._parse_json(resp)
+            data, _ = self._parse_json(resp)
             if isinstance(data, dict) and (data.get("x_labels") or data.get("y_labels")):
                 conf = data.get("confidence", 0)
                 print(f"    [GRID] Page {page_idx}: extracted grid coords "
@@ -329,7 +361,7 @@ class ScannerV6:
             )
             try:
                 resp = call_llm(usr_p, system=sys_p)
-                data = self._parse_json(resp)
+                data, _ = self._parse_json(resp)
                 if not data or not isinstance(data, dict):
                     continue
                 section_map: dict = data.get("section_map", data)
@@ -376,40 +408,142 @@ class ScannerV6:
 
         return page_results
 
+    # ── SCAN CONFIDENCE ─────────────────────────────────────
+    def _compute_scan_confidence(self, result: dict, parse_strategy: int,
+                                  route_conf: float) -> tuple:
+        """Returns (confidence 0.0-1.0, issues list)."""
+        issues = []
+        if result.get("error"):
+            return 0.2, [f"LLM error: {str(result['error'])[:80]}"]
+        conf = 1.0
+        if parse_strategy == 0:
+            pass
+        elif parse_strategy <= 2:
+            conf = min(conf, 0.8)
+            issues.append(f"JSON strategy {parse_strategy}")
+        elif parse_strategy <= 4:
+            conf = min(conf, 0.6)
+            issues.append(f"JSON strategy {parse_strategy} (repair needed)")
+        elif parse_strategy == 99:
+            conf = min(conf, 0.2)
+            issues.append("JSON parse failed entirely")
+        else:
+            conf = min(conf, 0.3)
+            issues.append(f"JSON strategy {parse_strategy} (last resort)")
+        ptype = result.get("page_type", "")
+        if ptype not in ("TITLE", "UNKNOWN", "COVERSHEET"):
+            total = sum(
+                len(result.get(k, []) or [])
+                for k in ("columns", "beams", "footings", "bracing")
+            )
+            if total == 0:
+                conf = min(conf, 0.5)
+                issues.append(f"0 members on {ptype}")
+        if route_conf < 0.5:
+            conf = round(conf * 0.8, 2)
+            issues.append(f"low route_confidence ({route_conf:.2f})")
+        return round(conf, 2), issues
+
+    # ── CROSS-PAGE REFERENCE RESOLUTION ─────────────────────
+    def _cross_reference_pass(self, page_results: dict) -> dict:
+        """
+        After all pages are scanned, find 'see detail X/YY' references in SCHEDULE/PLAN
+        pages and enrich null-section members from already-scanned DETAIL pages.
+        No extra LLM calls — uses data already in page_results.
+        """
+        import re
+        REF_PATTERNS = [
+            r'\b(\d+)/([A-Z]\d+)\b',
+            r'\bdetails?\s+(\d+)\b',
+            r'\bsee\s+(\d+)/([A-Z]\d+)\b',
+        ]
+        detail_pages = {
+            k: v for k, v in page_results.items()
+            if isinstance(v, dict)
+            and v.get("page_type") in ("DETAIL", "SECTION")
+            and not v.get("skipped")
+        }
+        if not detail_pages:
+            print("  [CROSS-REF] No DETAIL/SECTION pages — skipping cross-reference pass")
+            return page_results
+        refs_found = 0
+        refs_resolved = 0
+        for page_data in page_results.values():
+            if not isinstance(page_data, dict):
+                continue
+            if page_data.get("page_type") not in ("SCHEDULE", "PLAN"):
+                continue
+            raw = page_data.get("_raw_text", "")
+            if not raw:
+                continue
+            for pat in REF_PATTERNS:
+                for match in re.finditer(pat, raw, re.IGNORECASE):
+                    nums = re.findall(r'\d+', match.group(0))
+                    refs_found += 1
+                    for dk, dv in detail_pages.items():
+                        if any(n in dk for n in nums):
+                            refs_resolved += self._enrich_from_detail(page_data, dv, dk)
+        print(f"  [CROSS-REF] {refs_found} references found, {refs_resolved} members enriched")
+        return page_results
+
+    def _enrich_from_detail(self, page_data: dict, detail_data: dict, dkey: str) -> int:
+        """Copy section/material from detail_data into null-section members of page_data."""
+        enriched = 0
+        for k in ("columns", "beams", "bracing", "footings"):
+            for m in page_data.get(k, []) or []:
+                if not isinstance(m, dict) or m.get("section"):
+                    continue
+                mid = m.get("id") or m.get("mark") or m.get("label", "")
+                if not mid:
+                    continue
+                for dm in detail_data.get(k, []) or []:
+                    if not isinstance(dm, dict):
+                        continue
+                    did = dm.get("id") or dm.get("mark") or dm.get("label", "")
+                    if mid == did and dm.get("section"):
+                        m["section"] = dm["section"]
+                        if dm.get("material") and not m.get("material"):
+                            m["material"] = dm["material"]
+                        m["_source_detail"] = f"page_{dkey}"
+                        enriched += 1
+                        break
+        return enriched
+
     # ── JSON PARSING WITH RECOVERY ──────────────────────────
-    def _parse_json(self, response: str):
+    def _parse_json(self, response: str) -> tuple:
         """Parse LLM JSON response with multiple recovery strategies.
-        Returns dict, list, or None."""
+        Returns (result, strategy_idx) where result is dict/list/None and
+        strategy_idx is 0-5 (success) or 99 (total failure)."""
         if not response or not response.strip():
-            return None
+            return None, 99
 
         import re
 
-        # Strategy 1: Direct parse
+        # Strategy 0: Direct parse
         try:
-            return json.loads(response)
+            return json.loads(response), 0
         except json.JSONDecodeError:
             pass
 
-        # Strategy 2: Extract from code blocks
+        # Strategy 1: Extract from code blocks
         m = re.search(r'```(?:json)?\s*([\s\S]*?)```', response)
         if m:
             try:
-                return json.loads(m.group(1))
+                return json.loads(m.group(1)), 1
             except json.JSONDecodeError:
                 pass
 
-        # Strategy 3: Find outer braces or brackets
+        # Strategy 2: Find outer braces or brackets
         for open_c, close_c in [('{', '}'), ('[', ']')]:
             start = response.find(open_c)
             end = response.rfind(close_c)
             if start >= 0 and end > start:
                 try:
-                    return json.loads(response[start:end+1])
+                    return json.loads(response[start:end+1]), 2
                 except json.JSONDecodeError:
                     pass
 
-        # Strategy 4: Repair truncated JSON (add missing closing brackets/braces)
+        # Strategy 3: Repair truncated JSON (add missing closing brackets/braces)
         try:
             stripped = response.strip().rstrip(",. \t\n\r")
             depth_curly = stripped.count("{") - stripped.count("}")
@@ -419,24 +553,22 @@ class ScannerV6:
             repair += "}" * depth_curly
             result = json.loads(repair)
             print(f"    [OK] JSON repaired (added {depth_square}] {depth_curly}}})")
-            return result
+            return result, 3
         except (json.JSONDecodeError, Exception):
             pass
 
-        # Strategy 5: Try json_repair library
+        # Strategy 4: Try json_repair library
         try:
             from json_repair import repair_json
             repaired = repair_json(response)
-            return json.loads(repaired)
+            return json.loads(repaired), 4
         except Exception:
             pass
 
-        # Strategy 6: Last-resort — find the LAST complete JSON object/array
+        # Strategy 5: Last-resort — find the LAST complete JSON object/array
         try:
-            # Find the last '}' and work backwards to find matching '{'
             last_brace = response.rfind('}')
             if last_brace >= 0:
-                # Find matching opening brace
                 depth = 0
                 first_brace = -1
                 for i in range(last_brace, -1, -1):
@@ -448,12 +580,12 @@ class ScannerV6:
                             first_brace = i
                             break
                 if first_brace >= 0:
-                    return json.loads(response[first_brace:last_brace+1])
+                    return json.loads(response[first_brace:last_brace+1]), 5
         except json.JSONDecodeError:
             pass
 
         print(f"    [WARN] Could not parse JSON from response: {response[:200]}...")
-        return None
+        return None, 99
 
     def _empty_result(self) -> dict:
         return {
