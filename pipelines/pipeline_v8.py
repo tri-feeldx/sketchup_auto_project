@@ -201,6 +201,17 @@ class PipelineV8:
             print(f"  -> {num_pages} pages, {len(page_results)} scanned, "
                   f"types: {list(routing.get('types', {}).keys())}")
 
+            # ── STAGE 0.5: Coversheet Parser ─────────────────
+            print("[V8 STAGE 0.5] CoversheetParser: Reading project title block...")
+            try:
+                from agents.coversheet_parser import CoversheetParser
+                _csp = CoversheetParser(str(pdf_path), region=self.region)
+                project_meta = _csp.parse(scanner_output)
+            except Exception as _csp_err:
+                print(f"  [COVERSHEET] WARN: {_csp_err} — using defaults")
+                project_meta = {"project_name": "Structural Model", "revision": "A",
+                                "standard": "AS/NZS"}
+
             # ── STAGE 2.5: Plan Page Column Extractor ────────
             print("[V8 STAGE 2.5] PlanPageExtractor: Reading plan pages for column XY...")
             try:
@@ -215,6 +226,16 @@ class PipelineV8:
                 print(f"  [PLAN-EXTRACT] WARN: extractor failed ({_pex_err}) — skipping")
                 plan_positions = {}
             result.plan_positions = plan_positions
+
+            # ── STAGE 2.6: Detail Page Extractor ─────────────
+            print("[V8 STAGE 2.6] DetailPageExtractor: Reading connection details...")
+            try:
+                from agents.detail_page_extractor import DetailPageExtractor
+                _dex = DetailPageExtractor(str(pdf_path), region=self.region)
+                detail_specs = _dex.run(scanner_output)
+            except Exception as _dex_err:
+                print(f"  [DETAIL-EXT] WARN: {_dex_err} — skipping")
+                detail_specs = {}
 
             # ── STAGE 3: Synthesize ───────────────────────────
             print("[V8 STAGE 3] SynthesizerV7: Building structural model...")
@@ -281,6 +302,9 @@ class PipelineV8:
 
             # ── STAGE 7: Generate Ruby ────────────────────────
             print("[V8 STAGE 7] RubyGeneratorV5: Building .rb script...")
+            # Inject metadata and detail specs into model for LOD350 generator
+            model.setdefault("project", {}).update(project_meta)
+            model["detail_specs"] = detail_specs
             ruby = self.ruby_gen.generate(model, val.to_dict())
             result.ruby_script = ruby
             print(f"  -> {len(ruby.splitlines())} lines")

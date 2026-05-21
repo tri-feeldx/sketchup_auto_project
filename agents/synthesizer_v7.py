@@ -128,6 +128,8 @@ class SynthesizerV7:
                 "walls": [],
                 "footings": [],
                 "bracing": [],
+                "stairs": [],
+                "shafts": [],
             },
             "materials": {},
             "summary": {},
@@ -140,6 +142,8 @@ class SynthesizerV7:
         all_walls = []
         all_footings = []
         all_bracing = []
+        all_stairs = []
+        all_shafts = []
 
         for pr in page_results:
             # Columns — deduplicate by ID
@@ -153,6 +157,8 @@ class SynthesizerV7:
             all_walls.extend(pr.get("walls", []))
             all_footings.extend(pr.get("footings", []))
             all_bracing.extend(pr.get("bracing", []))
+            all_stairs.extend(pr.get("stairs", []))
+            all_shafts.extend(pr.get("shafts", []))
 
         model["members"]["columns"] = list(all_columns.values())
         model["members"]["beams"] = all_beams
@@ -160,6 +166,8 @@ class SynthesizerV7:
         model["members"]["walls"] = all_walls
         model["members"]["footings"] = all_footings
         model["members"]["bracing"] = all_bracing
+        model["members"]["stairs"] = all_stairs
+        model["members"]["shafts"] = all_shafts
 
         # Material summary
         model["materials"] = {
@@ -176,6 +184,8 @@ class SynthesizerV7:
             "total_walls": len(all_walls),
             "total_footings": len(all_footings),
             "total_bracing": len(all_bracing),
+            "total_stairs": len(all_stairs),
+            "total_shafts": len(all_shafts),
             "num_levels": len(model["levels"]),
             "grid_x_axes": len(model["grid_system"].get("x_axes", [])),
             "grid_y_axes": len(model["grid_system"].get("y_axes", [])),

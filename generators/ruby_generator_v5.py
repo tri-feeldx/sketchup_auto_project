@@ -4,6 +4,7 @@ Converts structural model into executable .rb scripts.
 LOD300/350: uses exact cross-section profiles (I-beam, CHS, SHS/RHS, solid rect).
 """
 
+import json
 import re
 from typing import List, Optional
 from pipelines.prompt_factory import PromptFactory
@@ -80,20 +81,34 @@ class RubyGeneratorV5:
                 return gy_axes.index(s) * spacing_y
             return len(gy_axes) * spacing_y
 
+        detail_specs = model.get("detail_specs", {}) or {}
+        project_meta = model.get("project", {}) or {}
+        levels = model.get("levels", []) or []
+
         lines = [self._header(model), ""]
+
+        # Project metadata as model attributes
+        proj_name = str(project_meta.get("project_name", "Structural Model"))
+        proj_rev  = str(project_meta.get("revision", "A"))
+        proj_std  = str(project_meta.get("standard", "AS/NZS"))
         lines += [
             "model = Sketchup.active_model",
+            f"model.set_attribute('project','name',{json.dumps(proj_name)})",
+            f"model.set_attribute('project','revision',{json.dumps(proj_rev)})",
+            f"model.set_attribute('project','standard',{json.dumps(proj_std)})",
             "ents = model.active_entities",
             "model.start_operation('Structural_Import', true)",
             "defn = model.definitions",
             "",
             "# ── Layers ──",
             "layers = {",
-            "  'cols' => model.layers.add('Columns'),",
-            "  'beams'=> model.layers.add('Beams'),",
-            "  'slabs'=> model.layers.add('Slabs'),",
-            "  'walls'=> model.layers.add('Walls'),",
-            "  'ftgs' => model.layers.add('Footings'),",
+            "  'cols'  => model.layers.add('S_COLUMN'),",
+            "  'beams' => model.layers.add('S_BEAM'),",
+            "  'slabs' => model.layers.add('S_SLAB'),",
+            "  'walls' => model.layers.add('S_WALL'),",
+            "  'ftgs'  => model.layers.add('S_FOOTING'),",
+            "  'stairs'=> model.layers.add('S_STAIR'),",
+            "  'shafts'=> model.layers.add('S_SHAFT'),",
             "}",
             "",
             "# ── Materials ──",
@@ -142,6 +157,8 @@ class RubyGeneratorV5:
         slabs = members.get("slabs", [])
         walls = members.get("walls", [])
         foots = members.get("footings", [])
+        stairs = members.get("stairs", [])
+        shafts = members.get("shafts", [])
 
         # Build column lookup (id → resolved x,y,z) — all values forced to int
         col_positions = {}
@@ -219,21 +236,46 @@ class RubyGeneratorV5:
                 lines.extend(self._footing_ruby_v5(f, col_positions, i, mat_vars))
             lines.append("")
 
+        # ── Stairs ──
+        if stairs:
+            lines.append("# === Stairs ===")
+            for i, s in enumerate(stairs):
+                lines.extend(self._stair_ruby_v5(s, i, mat_vars, spacing_x, spacing_y))
+            lines.append("")
+
+        # ── Shafts ──
+        if shafts:
+            lines.append("# === Shafts (Lift/Stair) ===")
+            for i, s in enumerate(shafts):
+                lines.extend(self._shaft_ruby_v5(s, i, mat_vars, spacing_x, spacing_y, levels))
+            lines.append("")
+
         # ── LOD350 Connections ──
-        lines.append("# === LOD350 Connections ===")
-        lines.append("layers['conns'] = model.layers.add('Connections_LOD350')")
+        lines.append("# === LOD350 Connections (Base Plates + End Plates) ===")
+        lines.append("layers['conns'] = model.layers.add('S_BASEPLATE')")
         lines.append("mat_steel_plate = model.materials.add('SteelPlate')")
         lines.append("mat_steel_plate.color = Sketchup::Color.new(140,140,160)")
         for i, c in enumerate(cols):
             cid = c.get("id") or c.get("mark", f"COL_{i}")
             pos = col_positions.get(cid, {"x": 0, "y": 0, "z_base": 0, "z_top": 3500})
-            lines.extend(self._lod350_col_plates(c, pos, i))
+            lines.extend(self._lod350_col_plates(c, pos, i, detail_specs))
         for i, b in enumerate(beams):
             lines.extend(self._lod350_beam_endplate(b, col_positions, i))
         lines.append("")
 
+        lod350_count = sum([
+            len(cols), len(beams), len(slabs), len(walls),
+            len(foots), len(stairs), len(shafts)
+        ])
+        print(f"  [GEN] LOD350: {len(cols)}c {len(beams)}b {len(slabs)}s "
+              f"{len(walls)}w {len(foots)}f {len(stairs)}st {len(shafts)}sh "
+              f"— {lod350_count} total elements")
         lines.append("model.commit_operation")
-        lines.append(f"UI.messagebox('Done: {len(cols)}c {len(beams)}b {len(slabs)}s {len(walls)}w {len(foots)}f [LOD350]')")
+        lines.append(
+            f"UI.messagebox('LOD350 Done: {len(cols)}c {len(beams)}b "
+            f"{len(slabs)}s {len(walls)}w {len(foots)}f "
+            f"{len(stairs)}st {len(shafts)}sh')"
+        )
         return "\n".join(lines)
 
     def _get_mat(self, member: dict, mat_vars: dict) -> str:
@@ -721,8 +763,74 @@ class RubyGeneratorV5:
 
     # ── LOD350 CONNECTIONS ───────────────────────────────
 
-    def _lod350_col_plates(self, col: dict, pos: dict, i: int) -> List[str]:
-        """Generate base plate and cap plate for a column (LOD350)."""
+    def _stair_ruby_v5(self, stair: dict, i: int, mat_vars: dict,
+                        spacing_x: int, spacing_y: int) -> List[str]:
+        """Simplified stair flight as a ramp box (LOD350 representation)."""
+        w = self._n(stair.get("width_mm") or stair.get("width"), 1200)
+        z_bot = self._n(stair.get("z_base_mm") or stair.get("z_base"), 0)
+        z_top = self._n(stair.get("z_top_mm") or stair.get("z_top"), 3500)
+        x = self._n(stair.get("x") or stair.get("x_mm"), spacing_x)
+        y = self._n(stair.get("y") or stair.get("y_mm"), spacing_y)
+        run = self._n(stair.get("run_mm"), max(abs(z_top - z_bot) * 2, 3000))
+        mat = self._get_mat(stair, mat_vars)
+        sid = stair.get("id", f"ST{i+1}")
+        return [
+            f"# Stair {i+1}: {sid}",
+            f"begin",
+            f"  st_pts_{i} = [",
+            f"    Geom::Point3d.new(ox+{x}, oy+{y}, {z_bot}),",
+            f"    Geom::Point3d.new(ox+{x+w}, oy+{y}, {z_bot}),",
+            f"    Geom::Point3d.new(ox+{x+w}, oy+{y+run}, {z_top}),",
+            f"    Geom::Point3d.new(ox+{x}, oy+{y+run}, {z_top})",
+            f"  ]",
+            f"  st_f_{i} = ents.add_face(st_pts_{i})",
+            f"  if st_f_{i}",
+            f"    st_f_{i}.material = {mat}",
+            f"    st_f_{i}.layer = layers['stairs']",
+            f"    st_f_{i}.pushpull(-150)",
+            f"  end",
+            f"rescue; end",
+        ]
+
+    def _shaft_ruby_v5(self, shaft: dict, i: int, mat_vars: dict,
+                        spacing_x: int, spacing_y: int,
+                        levels: list) -> List[str]:
+        """Lift/stair shaft as a vertical void box (LOD350)."""
+        sw = self._n(shaft.get("width_mm") or shaft.get("width"), 2100)
+        sd = self._n(shaft.get("depth_mm") or shaft.get("depth"), 2100)
+        x = self._n(shaft.get("x") or shaft.get("x_mm"), spacing_x * 2)
+        y = self._n(shaft.get("y") or shaft.get("y_mm"), spacing_y)
+        z_bot = self._n(shaft.get("z_base_mm") or shaft.get("z_base"), 0)
+        z_top = (max(lv.get("elevation_mm", 0) for lv in levels)
+                 if levels else self._n(shaft.get("z_top_mm"), 12000))
+        shaft_h = max(abs(z_top - z_bot), 3500)
+        mat = self._get_mat(shaft, mat_vars)
+        wt = 200  # shaft wall thickness
+        sfid = shaft.get("id", f"SH{i+1}")
+        stype = shaft.get("type", "shaft")
+        return [
+            f"# Shaft {i+1}: {sfid} ({stype})",
+            f"begin",
+            f"  sh_pts_{i} = [",
+            f"    Geom::Point3d.new(ox+{x}, oy+{y}, {z_bot}),",
+            f"    Geom::Point3d.new(ox+{x+sw}, oy+{y}, {z_bot}),",
+            f"    Geom::Point3d.new(ox+{x+sw}, oy+{y+sd}, {z_bot}),",
+            f"    Geom::Point3d.new(ox+{x}, oy+{y+sd}, {z_bot})",
+            f"  ]",
+            f"  sh_f_{i} = ents.add_face(sh_pts_{i})",
+            f"  if sh_f_{i}",
+            f"    sh_f_{i}.material = {mat}",
+            f"    sh_f_{i}.layer = layers['shafts']",
+            f"    sh_f_{i}.pushpull({shaft_h})",
+            f"  end",
+            f"rescue; end",
+        ]
+
+    def _lod350_col_plates(self, col: dict, pos: dict, i: int,
+                            detail_specs: dict = None) -> List[str]:
+        """Generate base plate and cap plate for a column (LOD350).
+        Uses actual dimensions from detail_specs if available, else estimates.
+        """
         x = int(pos.get("x", 0))
         y = int(pos.get("y", 0))
         zb = int(pos.get("z_base", 0))
@@ -739,9 +847,25 @@ class RubyGeneratorV5:
         except Exception:
             pass
 
-        pw = col_w + 100   # plate wider than column flange
+        pw = col_w + 100   # default plate wider than column flange
         ph = pw
-        pt = 20            # plate thickness mm
+        pt = 20            # default plate thickness mm
+
+        # Override with real detail spec if available
+        if detail_specs:
+            mark = str(col.get("id") or col.get("mark", "")).upper()
+            bp = {}
+            for spec in detail_specs.values():
+                if not isinstance(spec, dict):
+                    continue
+                ref = str(spec.get("member_ref", "")).strip().upper()
+                if (ref == mark or not ref) and spec.get("connection_type") == "column_base":
+                    bp = spec.get("base_plate", {})
+                    break
+            if bp:
+                pw = self._n(bp.get("width_mm"), pw)
+                ph = self._n(bp.get("depth_mm"), pw)
+                pt = self._n(bp.get("thickness_mm"), pt)
 
         lines = [f"# LOD350 base+cap plates: col {i+1}"]
         for plate_name, pz, push_dir in [

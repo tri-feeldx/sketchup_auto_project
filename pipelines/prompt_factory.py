@@ -650,6 +650,60 @@ class PromptFactory:
             "Output valid JSON only — no text before or after the JSON object."
         )
 
+    def system_prompt_detail_extractor(self) -> str:
+        return (
+            "You are a senior structural connection designer with 20 years experience "
+            "reading Australian structural detail drawings (AS/NZS 4100, AS 4600).\n"
+            "Your task: read each connection detail shown and extract its specifications precisely.\n\n"
+            "For each detail visible, output JSON:\n"
+            "{\n"
+            '  "DET_ID": {\n'
+            '    "connection_type": "column_base" | "beam_to_column" | "beam_splice" | "brace_end",\n'
+            '    "member_ref": "C1",\n'
+            '    "base_plate": {"width_mm": 400, "depth_mm": 400, "thickness_mm": 20,\n'
+            '                   "bolt_count": 4, "bolt_grade": "8.8", "bolt_dia_mm": 24},\n'
+            '    "end_plate": {"width_mm": 200, "depth_mm": 300, "thickness_mm": 12},\n'
+            '    "stiffeners": true,\n'
+            '    "weld_size_mm": 8,\n'
+            '    "confidence": 0.85\n'
+            "  }\n"
+            "}\n\n"
+            "Rules:\n"
+            "- DET_ID format: 'N/XX' matching the detail reference on drawing (e.g. '7/A3')\n"
+            "- Only include fields you can clearly read — omit uncertain values\n"
+            "- All dimensions in mm\n"
+            "- Output JSON only, no markdown, no explanation"
+        )
+
+    def user_prompt_detail_extract(self, page_idx: int) -> str:
+        return (
+            f"Structural detail page {page_idx}. "
+            "Extract all connection details shown: base plates, end plates, bolt layouts, welds. "
+            "Output valid JSON only — no text before or after the JSON object."
+        )
+
+    def system_prompt_coversheet_parser(self) -> str:
+        return (
+            "You are reading a structural engineering drawing title block / coversheet.\n"
+            "Extract the project metadata from the title block and drawing list.\n\n"
+            "Output JSON:\n"
+            "{\n"
+            '  "project_name": "...",\n'
+            '  "project_number": "...",\n'
+            '  "revision": "A",\n'
+            '  "standard": "AS/NZS",\n'
+            '  "engineer": "...",\n'
+            '  "date": "2026-05",\n'
+            '  "building_type": "commercial",\n'
+            '  "floor_count": 4,\n'
+            '  "material": "steel"\n'
+            "}\n\n"
+            "Rules:\n"
+            "- Use null for any field not found\n"
+            "- floor_count: read from notes (e.g. '4-storey', 'G+3') — integer only\n"
+            "- Output JSON only, no markdown"
+        )
+
     def build_full_system_prompt(self, agent_type: str, **kwargs) -> str:
         """Build complete system prompt for any agent."""
         agent_prompts = {
