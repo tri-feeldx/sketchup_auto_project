@@ -18,8 +18,11 @@ Key V6 improvements over V5:
 
 import json
 import time
+import concurrent.futures
 from pathlib import Path
 from typing import Optional, Dict, List
+
+PARALLEL_SCAN_WORKERS = 6
 
 from core.llm_wrapper import call_llm
 from core.vision_renderer import VisionRenderer
@@ -100,33 +103,8 @@ class ScannerV6:
 
         # ── STAGE 2: SCAN ───────────────────────────────────
         print("[SCAN V6] Stage 2: Page scanning (A2)...")
-        if not skip_vision:
-            self._open()
-
-        page_results = {}
-        for rp in routed:
-            # Respect max_pages limit
-            if self.max_pages and len(page_results) >= self.max_pages:
-                print(f"  -> max_pages={self.max_pages} reached, stopping scan")
-                break
-            ptype = rp.page_type
-            if ptype in ("TITLE", "UNKNOWN"):
-                # Skip title/unknown pages — just store metadata
-                page_results[str(rp.page_idx)] = {
-                    "page_idx": rp.page_idx,
-                    "page_type": ptype,
-                    "confidence": rp.confidence,
-                    "skipped": True,
-                }
-                continue
-
-            print(f"  Scanning page {rp.page_idx+1}/{num_pages} ({ptype})...")
-            result = self._scan_page(rp, skip_vision=skip_vision)
-            if result:
-                page_results[str(rp.page_idx)] = result
-
-        if self.renderer:
-            self.close()
+        pages_to_scan = routed[:self.max_pages] if self.max_pages else routed
+        page_results = self._scan_pages_parallel(pages_to_scan, skip_vision, num_pages)
 
         # ── STAGE 2b: TARGETED SECTION RETRY ────────────────
         # If any members came back with null sections, re-query schedule pages.
@@ -146,8 +124,10 @@ class ScannerV6:
         print(f"  [OK] V6 Complete: {len(page_results)} pages scanned in {elapsed:.1f}s")
         return output
 
-    def _scan_page(self, rp, skip_vision: bool = False) -> Optional[dict]:
-        """Scan a single page — text-only or vision-assisted."""
+    def _scan_page(self, rp, skip_vision: bool = False, _renderer=None) -> Optional[dict]:
+        """Scan a single page — text-only or vision-assisted.
+        _renderer: per-thread VisionRenderer for parallel mode (overrides self.renderer).
+        """
         page_idx = rp.page_idx
         ptype = rp.page_type
 
@@ -174,11 +154,12 @@ class ScannerV6:
             profile=self.forensic_result,
         )
 
-        # Get image if vision enabled
+        # Get image if vision enabled — use _renderer (parallel) or self.renderer (sequential)
         images = []
-        if not skip_vision and self.renderer:
+        active_renderer = _renderer if _renderer is not None else self.renderer
+        if not skip_vision and active_renderer:
             try:
-                img_bytes = self.renderer.render_page_as_bytes(page_idx, format="PNG")
+                img_bytes = active_renderer.render_page_as_bytes(page_idx, format="PNG")
                 images = [img_bytes]
             except Exception as e:
                 print(f"    [WARN] Render page {page_idx} failed: {e}")
@@ -245,6 +226,51 @@ class ScannerV6:
             print(f"    [WARN] Elevation extract page {page_idx}: {e}")
         return []
 
+    def _scan_pages_parallel(self, routed: list, skip_vision: bool, num_pages: int) -> dict:
+        """Scan pages in parallel. Each worker opens its own VisionRenderer instance."""
+        page_results = {}
+
+        def _worker(rp):
+            ptype = rp.page_type
+            if ptype in ("TITLE", "UNKNOWN"):
+                return str(rp.page_idx), {
+                    "page_idx": rp.page_idx,
+                    "page_type": ptype,
+                    "confidence": rp.confidence,
+                    "skipped": True,
+                }
+            print(f"  Scanning page {rp.page_idx+1}/{num_pages} ({ptype})...")
+            renderer = None
+            if not skip_vision:
+                try:
+                    renderer = VisionRenderer(str(self.pdf_path), dpi=self.dpi)
+                except Exception as e:
+                    print(f"    [WARN] Renderer open failed page {rp.page_idx}: {e}")
+            try:
+                result = self._scan_page(rp, skip_vision=skip_vision, _renderer=renderer)
+            finally:
+                if renderer:
+                    try:
+                        renderer.close()
+                    except Exception:
+                        pass
+            return str(rp.page_idx), result
+
+        n_workers = min(PARALLEL_SCAN_WORKERS, len(routed)) if routed else 1
+        print(f"  [PARALLEL] Scanning {len(routed)} pages with {n_workers} workers...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = {executor.submit(_worker, rp): rp for rp in routed}
+            for future in concurrent.futures.as_completed(futures):
+                rp = futures[future]
+                try:
+                    key, result = future.result()
+                    if result:
+                        page_results[key] = result
+                except Exception as e:
+                    print(f"    [WARN] Worker failed page {rp.page_idx}: {e}")
+
+        return page_results
+
     def _extract_grid_coords(self, page_idx: int, page_text: str, ptype: str) -> dict:
         """Call grid extractor LLM to get label→mm coordinate mapping from a plan page."""
         try:
@@ -273,6 +299,8 @@ class ScannerV6:
         for pdata in page_results.values():
             for mtype in ("columns", "beams", "bracing", "footings"):
                 for m in pdata.get(mtype, []):
+                    if not isinstance(m, dict):
+                        continue
                     if not (m.get("section") or m.get("section_size") or m.get("size")):
                         mid = m.get("id") or m.get("mark") or m.get("label")
                         if mid and str(mid) not in null_ids:
@@ -310,6 +338,8 @@ class ScannerV6:
                 for pdata in page_results.values():
                     for mtype in ("columns", "beams", "bracing", "footings"):
                         for m in pdata.get(mtype, []):
+                            if not isinstance(m, dict):
+                                continue
                             mid = m.get("id") or m.get("mark") or m.get("label")
                             if not mid or str(mid) not in section_map:
                                 continue

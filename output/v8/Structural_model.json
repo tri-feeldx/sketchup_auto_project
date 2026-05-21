@@ -1,1720 +1,1538 @@
 {
-  "project_info": {
-    "name": "UNE Tamworth Central Campus",
-    "location": "24 Fitzroy Street, Tamworth New South Wales 2340",
-    "engineer": "TTW",
-    "region": "AU",
-    "standards": [
-      "AS4100",
-      "AS3600",
-      "AS4600",
-      "AS1170",
-      "AS2319",
-      "AS2699",
-      "AS3700",
-      "AS2159"
-    ],
-    "notes": "Preliminary drawings for tendering purposes only. Not for construction. To be read in conjunction with architectural drawings and other contract documents. Ambiguities to be reported. Rates do not include wastage/margins. Fire protection to fire engineer's details. All steel posts supporting Level 3 floor and roof to be fire rated. Steel member sizes to refer to S70001 (not provided in analysis). Masonry and suspended slab details to be finalised at design finalisation stage."
-  },
   "grid_system": {
-    "origin_mm": {
-      "x": 0,
-      "y": 0,
-      "z": 0
-    },
-    "x_grids": [
+    "x_axes": [
       {
         "label": "1",
         "coordinate_mm": 0,
-        "confidence": 0.8
+        "confidence": 0.9
       },
       {
         "label": "2",
-        "coordinate_mm": 6000,
-        "confidence": 0.8
+        "coordinate_mm": 8000,
+        "confidence": 0.9
       },
       {
         "label": "3",
-        "coordinate_mm": 12000,
-        "confidence": 0.8
+        "coordinate_mm": 16000,
+        "confidence": 0.9
       },
       {
         "label": "4",
-        "coordinate_mm": 18000,
-        "confidence": 0.8
+        "coordinate_mm": 24000,
+        "confidence": 0.9
       }
     ],
-    "y_grids": [
+    "y_axes": [
       {
         "label": "D",
         "coordinate_mm": 0,
-        "confidence": 0.8
+        "confidence": 0.9
       },
       {
         "label": "C",
-        "coordinate_mm": 6000,
-        "confidence": 0.8
+        "coordinate_mm": 8000,
+        "confidence": 0.9
       },
       {
         "label": "B",
-        "coordinate_mm": 12000,
-        "confidence": 0.8
+        "coordinate_mm": 16000,
+        "confidence": 0.9
       },
       {
         "label": "A",
-        "coordinate_mm": 18000,
-        "confidence": 0.8
+        "coordinate_mm": 24000,
+        "confidence": 0.9
       }
     ],
-    "notes": "Global grid system based on 6m spacing from Page 4 (Level 4 Outline Plan) and Page 28 (Footing Plan). Local grids on other pages (e.g., 3m spacing on Page 6, 8) are assumed to align their (1,D) origin with the global"
+    "origin_description": "Bottom-left corner at Grid 1-D",
+    "confidence": 0.9
   },
+  "levels": [
+    {
+      "name": "LEVEL 03",
+      "height_mm": null,
+      "height_from_datum_mm": 3500,
+      "elevation_mm": 3500
+    }
+  ],
+  "columns": [
+    {
+      "id": "C1",
+      "type": "concrete_column",
+      "grid_x": "1",
+      "grid_y": "C",
+      "x_mm": 0,
+      "y_mm": 8000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C2",
+      "type": "concrete_column",
+      "grid_x": "2",
+      "grid_y": "C",
+      "x_mm": 8000,
+      "y_mm": 8000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C3",
+      "type": "concrete_column",
+      "grid_x": "3",
+      "grid_y": "C",
+      "x_mm": 16000,
+      "y_mm": 8000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C4",
+      "type": "concrete_column",
+      "grid_x": "4",
+      "grid_y": "C",
+      "x_mm": 24000,
+      "y_mm": 8000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C5",
+      "type": "concrete_column",
+      "grid_x": "1",
+      "grid_y": "D",
+      "x_mm": 0,
+      "y_mm": 0,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C6",
+      "type": "concrete_column",
+      "grid_x": "2",
+      "grid_y": "D",
+      "x_mm": 8000,
+      "y_mm": 0,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C7",
+      "type": "concrete_column",
+      "grid_x": "3",
+      "grid_y": "D",
+      "x_mm": 16000,
+      "y_mm": 0,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C8",
+      "type": "concrete_column",
+      "grid_x": "4",
+      "grid_y": "D",
+      "x_mm": 24000,
+      "y_mm": 0,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "confidence": 0.9
+    },
+    {
+      "id": "C9",
+      "type": "concrete_column",
+      "grid_x": "1",
+      "grid_y": "B",
+      "x_mm": 0,
+      "y_mm": 16000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 05",
+      "confidence": 0.9
+    },
+    {
+      "id": "C10",
+      "type": "concrete_column",
+      "grid_x": "2",
+      "grid_y": "B",
+      "x_mm": 8000,
+      "y_mm": 16000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N24",
+        "ties": "N12-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 05",
+      "confidence": 0.9
+    },
+    {
+      "id": "C11",
+      "type": "concrete_column",
+      "grid_x": "3",
+      "grid_y": "B",
+      "x_mm": 16000,
+      "y_mm": 16000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N24",
+        "ties": "N12-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 05",
+      "confidence": 0.9
+    },
+    {
+      "id": "C12",
+      "type": "concrete_column",
+      "grid_x": "4",
+      "grid_y": "B",
+      "x_mm": 24000,
+      "y_mm": 16000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 05",
+      "confidence": 0.9
+    },
+    {
+      "id": "C13",
+      "type": "concrete_column",
+      "grid_x": "1",
+      "grid_y": "A",
+      "x_mm": 0,
+      "y_mm": 24000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 04",
+      "confidence": 0.9
+    },
+    {
+      "id": "C14",
+      "type": "concrete_column",
+      "grid_x": "2",
+      "grid_y": "A",
+      "x_mm": 8000,
+      "y_mm": 24000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 04",
+      "confidence": 0.9
+    },
+    {
+      "id": "C15",
+      "type": "concrete_column",
+      "grid_x": "3",
+      "grid_y": "A",
+      "x_mm": 16000,
+      "y_mm": 24000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 04",
+      "confidence": 0.9
+    },
+    {
+      "id": "C16",
+      "type": "concrete_column",
+      "grid_x": "4",
+      "grid_y": "A",
+      "x_mm": 24000,
+      "y_mm": 24000,
+      "section": "600x600",
+      "material": "Concrete",
+      "concrete_grade": "50MPa",
+      "reinforcement": {
+        "vertical": "12N20",
+        "ties": "N10-300"
+      },
+      "start_level": "Level 01",
+      "end_level": "Level 04",
+      "confidence": 0.9
+    },
+    {
+      "id": "CH35a_Elev_A",
+      "type": "steel_column",
+      "grid_x": "A",
+      "grid_y": "T",
+      "x_mm": null,
+      "y_mm": null,
+      "section": "CH35a",
+      "material": "G350",
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "notes": "Location relative to grid A-T is schematic on elevation. Height inferred from levels.",
+      "confidence": 0.6
+    },
+    {
+      "id": "CH35a_Elev_D",
+      "type": "steel_column",
+      "grid_x": "D",
+      "grid_y": "T",
+      "x_mm": null,
+      "y_mm": null,
+      "section": "CH35a",
+      "material": "G350",
+      "start_level": "Level 01",
+      "end_level": "Level 03",
+      "notes": "Location relative to grid D-T is schematic on elevation. Height inferred from levels.",
+      "confidence": 0.6
+    }
+  ],
+  "beams": [
+    {
+      "id": "UB36c_LR_1C-2C",
+      "type": "steel_beam",
+      "start_point_mm": {
+        "x": 0,
+        "y": 8000,
+        "level": "Lower Roof"
+      },
+      "end_point_mm": {
+        "x": 8000,
+        "y": 8000,
+        "level": "Lower Roof"
+      },
+      "section": "UB360",
+      "material": "G350",
+      "span_mm": 8000,
+      "notes": "Inferred from Page 2 (Lower Roof Steelwork Marking Plan) at Grid 1-C to 2-C",
+      "confidence": 0.7
+    },
+    {
+      "id": "UB36c_LR_2C-3C",
+      "type": "steel_beam",
+      "start_point_mm": {
+        "x": 8000,
+        "y": 8000,
+        "level": "Lower Roof"
+      },
+      "end_point_mm": {
+        "x": 16000,
+        "y": 8000,
+        "level": "Lower Roof"
+      },
+      "section": "UB360",
+      "material": "G350",
+      "span_mm": 8000,
+      "notes": "Inferred from Page 2 (Lower Roof Steelwork Marking Plan) at Grid 2-C to 3-C",
+      "confidence": 0.7
+    },
+    {
+      "id": "UB36c_LR_3C-4C",
+      "type": "steel_beam",
+      "start_point_mm": {
+        "x": 16000,
+        "y": 8000,
+        "level": "Lower Roof"
+      },
+      "end_point_mm": {
+        "x": 24000,
+        "y": 8000,
+        "level": "Lower Roof"
+      },
+      "section": "UB360",
+      "material": "G350",
+      "span_mm": 8000,
+      "notes": "Inferred from Page 2 (Lower Roof Steelwork Marking Plan) at Grid 3-C to 4-C",
+      "confidence": 0.7
+    },
+    {
+      "id": "UB"
+    }
+  ],
   "members": {
     "columns": [
       {
-        "type": "column",
+        "id": "UB36c",
+        "section": "UB360",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500
+      },
+      {
+        "id": "UB36d",
+        "section": "UB360",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500
+      },
+      {
         "id": "C1",
         "grid_x": "1",
         "grid_y": "C",
-        "location_mm": {
+        "center_point_mm": {
           "x": 0,
-          "y": 6000
+          "y": 8000
         },
-        "section": "concrete column",
         "material": "concrete",
+        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "type": "column",
         "id": "C2",
         "grid_x": "2",
         "grid_y": "C",
-        "location_mm": {
-          "x": 6000,
-          "y": 6000
+        "center_point_mm": {
+          "x": 8000,
+          "y": 8000
         },
-        "section": "concrete column",
         "material": "concrete",
+        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "type": "column",
         "id": "C3",
         "grid_x": "3",
         "grid_y": "C",
-        "location_mm": {
-          "x": 12000,
-          "y": 6000
+        "center_point_mm": {
+          "x": 16000,
+          "y": 8000
         },
-        "section": "concrete column",
         "material": "concrete",
+        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "type": "column",
         "id": "C4",
         "grid_x": "4",
         "grid_y": "C",
-        "location_mm": {
-          "x": 18000,
-          "y": 6000
+        "center_point_mm": {
+          "x": 24000,
+          "y": 8000
         },
-        "section": "concrete column",
         "material": "concrete",
+        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "type": "column",
         "id": "C5",
         "grid_x": "1",
         "grid_y": "D",
-        "location_mm": {
+        "center_point_mm": {
           "x": 0,
           "y": 0
         },
-        "section": "concrete column",
         "material": "concrete",
+        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "type": "column",
         "id": "C6",
         "grid_x": "2",
         "grid_y": "D",
-        "location_mm": {
-          "x": 6000,
+        "center_point_mm": {
+          "x": 8000,
           "y": 0
         },
-        "section": "concrete column",
         "material": "concrete",
+        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "type": "column",
         "id": "C7",
         "grid_x": "3",
         "grid_y": "D",
-        "location_mm": {
-          "x": 12000,
+        "center_point_mm": {
+          "x": 16000,
           "y": 0
         },
-        "section": "concrete column",
         "material": "concrete",
+        "section": "unknown",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500
+      },
+      {
+        "id": "C8",
+        "grid_x": "4",
+        "grid_y": "D",
+        "center_point_mm": {
+          "x": 24000,
+          "y": 0
+        },
+        "material": "concrete",
+        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
         "type": "column",
-        "id": "C8",
-        "grid_x": "4",
-        "grid_y": "D",
-        "location_mm": {
-          "x": 18000,
-          "y": 0
-        },
-        "section": "concrete column",
-        "material": "concrete",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
         "id": "C9",
         "grid_x": "1",
         "grid_y": "C",
-        "x_mm": 0,
-        "y_mm": 3000,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 4000,
+        "y_mm": 11000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
+        "type": "column",
         "id": "C10",
         "grid_x": "2",
         "grid_y": "C",
-        "x_mm": 3000,
-        "y_mm": 3000,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 10000,
+        "y_mm": 11000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
+        "type": "column",
         "id": "C11",
         "grid_x": "3",
         "grid_y": "C",
-        "x_mm": 6000,
-        "y_mm": 3000,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 16000,
+        "y_mm": 11000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
+        "type": "column",
         "id": "C12",
         "grid_x": "4",
         "grid_y": "C",
-        "x_mm": 9000,
-        "y_mm": 3000,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 22000,
+        "y_mm": 11000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
+        "type": "column",
         "id": "C13",
         "grid_x": "1",
         "grid_y": "D",
-        "x_mm": 0,
-        "y_mm": 0,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 4000,
+        "y_mm": 5000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
+        "type": "column",
         "id": "C14",
         "grid_x": "2",
         "grid_y": "D",
-        "x_mm": 3000,
-        "y_mm": 0,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 10000,
+        "y_mm": 5000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
+        "type": "column",
         "id": "C15",
         "grid_x": "3",
         "grid_y": "D",
-        "x_mm": 6000,
-        "y_mm": 0,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 16000,
+        "y_mm": 5000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
+        "type": "column",
         "id": "C16",
         "grid_x": "4",
         "grid_y": "D",
-        "x_mm": 9000,
-        "y_mm": 0,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
+        "x_mm": 22000,
+        "y_mm": 5000,
+        "section": "Rectangular Concrete Column (assumed)",
+        "material": "C40/50 (assumed)",
+        "notes": "Part of concrete diaphragm structure",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
         "id": "C17",
-        "grid_x": "1.5",
-        "grid_y": "C",
-        "x_mm": 1500,
-        "y_mm": 3000,
-        "section": "unknown",
+        "type": "column",
+        "grid_x": "3-4",
+        "grid_y": "A",
+        "x_mm": 12500,
+        "y_mm": 15000,
         "material": "concrete",
-        "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
         "id": "C18",
-        "grid_x": "2.5",
-        "grid_y": "C",
-        "x_mm": 4500,
-        "y_mm": 3000,
-        "section": "unknown",
+        "type": "column",
+        "grid_x": "3-4",
+        "grid_y": "B",
+        "x_mm": 12500,
+        "y_mm": 10000,
         "material": "concrete",
-        "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
         "id": "C19",
-        "grid_x": "3.5",
+        "type": "column",
+        "grid_x": "3-4",
         "grid_y": "C",
-        "x_mm": 7500,
-        "y_mm": 3000,
-        "section": "unknown",
+        "x_mm": 12500,
+        "y_mm": 5000,
         "material": "concrete",
-        "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
         "id": "C20",
-        "grid_x": "1.5",
+        "type": "column",
+        "grid_x": "3-4",
         "grid_y": "D",
-        "x_mm": 1500,
+        "x_mm": 12500,
         "y_mm": 0,
-        "section": "unknown",
         "material": "concrete",
-        "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
         "id": "C21",
-        "grid_x": "2.5",
-        "grid_y": "D",
-        "x_mm": 4500,
-        "y_mm": 0,
-        "section": "unknown",
+        "type": "column",
+        "grid_x": "4",
+        "grid_y": "A-B",
+        "x_mm": 15000,
+        "y_mm": 12500,
         "material": "concrete",
-        "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
         "id": "C22",
-        "grid_x": "3.5",
-        "grid_y": "D",
-        "x_mm": 7500,
-        "y_mm": 0,
-        "section": "unknown",
+        "type": "column",
+        "grid_x": "4",
+        "grid_y": "B-C",
+        "x_mm": 15000,
+        "y_mm": 7500,
         "material": "concrete",
-        "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "height_mm": 3500
       },
       {
         "id": "C23",
-        "grid_x": "2.25",
-        "grid_y": "C.75",
-        "x_mm": 3750,
-        "y_mm": 2250,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "C24",
-        "grid_x": "2.75",
-        "grid_y": "C.75",
-        "x_mm": 5250,
-        "y_mm": 2250,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "C25",
-        "grid_x": "2.25",
-        "grid_y": "D.25",
-        "x_mm": 3750,
-        "y_mm": 750,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "C26",
-        "grid_x": "2.75",
-        "grid_y": "D.25",
-        "x_mm": 5250,
-        "y_mm": 750,
-        "section": "unknown",
-        "material": "concrete",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "200UB_BP",
-        "section": "200UB",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "250UB_BP",
-        "section": "250UB",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "310UB_BP",
-        "section": "310UB",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "360UB_BP",
-        "section": "360UB",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "410UB_BP",
-        "section": "410UB",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "460UB_BP",
-        "section": "460UB",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "530UB_BP",
-        "section": "530UB",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "150UC_BP",
-        "section": "150UC",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "200UC_BP",
-        "section": "200UC",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "250UC_BP",
-        "section": "250UC",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "310UC_BP",
-        "section": "310UC",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "75SHS_BP",
-        "section": "75SHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "89SHS_BP",
-        "section": "89SHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "100SHS_BP",
-        "section": "100SHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "125SHS_BP",
-        "section": "125SHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "200SHS_BP",
-        "section": "200SHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "250SHS_BP",
-        "section": "250SHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "219CHS_BP",
-        "section": "219CHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "273CHS_BP",
-        "section": "273CHS",
-        "grade": null,
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "Column D",
-        "section": "Concrete Column",
-        "height_mm": 3500,
-        "material": "Concrete",
-        "grid_x": "D",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "Column C",
-        "section": "Concrete Column",
-        "height_mm": 3500,
-        "material": "Concrete",
-        "grid_x": "C",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "Column B",
-        "section": "Concrete Column",
-        "height_mm": 3500,
-        "material": "Concrete",
-        "grid_x": "B",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "Column A",
-        "section": "Concrete Column",
-        "height_mm": 3500,
-        "material": "Concrete",
-        "grid_x": "A",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "Column 4",
-        "section": "Concrete Column",
-        "height_mm": 3500,
-        "material": "Concrete",
+        "type": "column",
         "grid_x": "4",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
+        "grid_y": "C-D",
+        "x_mm": 15000,
+        "y_mm": 2500,
+        "material": "concrete",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500
+      },
+      {
+        "id": "WS1-H6.0-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 6000,
+        "z_base_mm": 0,
+        "z_top_mm": 6000
+      },
+      {
+        "id": "WS1-H6.0-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 6000,
+        "z_base_mm": 0,
+        "z_top_mm": 6000
+      },
+      {
+        "id": "WS1-H6.0-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 6000,
+        "z_base_mm": 0,
+        "z_top_mm": 6000
+      },
+      {
+        "id": "WS1-H6.0-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 6000,
+        "z_base_mm": 0,
+        "z_top_mm": 6000
+      },
+      {
+        "id": "WS1-H5.5-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5500,
+        "z_base_mm": 0,
+        "z_top_mm": 5500
+      },
+      {
+        "id": "WS1-H5.5-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5500,
+        "z_base_mm": 0,
+        "z_top_mm": 5500
+      },
+      {
+        "id": "WS1-H5.5-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5500,
+        "z_base_mm": 0,
+        "z_top_mm": 5500
+      },
+      {
+        "id": "WS1-H5.5-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5500,
+        "z_base_mm": 0,
+        "z_top_mm": 5500
+      },
+      {
+        "id": "WS1-H5.0-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5000,
+        "z_base_mm": 0,
+        "z_top_mm": 5000
+      },
+      {
+        "id": "WS1-H5.0-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5000,
+        "z_base_mm": 0,
+        "z_top_mm": 5000
+      },
+      {
+        "id": "WS1-H5.0-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5000,
+        "z_base_mm": 0,
+        "z_top_mm": 5000
+      },
+      {
+        "id": "WS1-H5.0-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 5000,
+        "z_base_mm": 0,
+        "z_top_mm": 5000
+      },
+      {
+        "id": "WS1-H4.5-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4500,
+        "z_base_mm": 0,
+        "z_top_mm": 4500
+      },
+      {
+        "id": "WS1-H4.5-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4500,
+        "z_base_mm": 0,
+        "z_top_mm": 4500
+      },
+      {
+        "id": "WS1-H4.5-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4500,
+        "z_base_mm": 0,
+        "z_top_mm": 4500
+      },
+      {
+        "id": "WS1-H4.5-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4500,
+        "z_base_mm": 0,
+        "z_top_mm": 4500
+      },
+      {
+        "id": "WS1-H4.0-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4000,
+        "z_base_mm": 0,
+        "z_top_mm": 4000
+      },
+      {
+        "id": "WS1-H4.0-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4000,
+        "z_base_mm": 0,
+        "z_top_mm": 4000
+      },
+      {
+        "id": "WS1-H4.0-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4000,
+        "z_base_mm": 0,
+        "z_top_mm": 4000
+      },
+      {
+        "id": "WS1-H4.0-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 4000,
+        "z_base_mm": 0,
+        "z_top_mm": 4000
+      },
+      {
+        "id": "WS1-H3.5-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 3500,
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "id": "Column 3",
-        "section": "Concrete Column",
+        "id": "WS1-H3.5-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
         "height_mm": 3500,
-        "material": "Concrete",
-        "grid_x": "3",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "id": "Column 2",
-        "section": "Concrete Column",
+        "id": "WS1-H3.5-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
         "height_mm": 3500,
-        "material": "Concrete",
-        "grid_x": "2",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "id": "Column 1",
-        "section": "Concrete Column",
+        "id": "WS1-H3.5-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
         "height_mm": 3500,
-        "material": "Concrete",
-        "grid_x": "1",
-        "grid_y": "T",
-        "base_connection": "unknown",
-        "level_from": "below LEVEL 01",
-        "level_to": "above LEVEL 03",
         "z_base_mm": 0,
         "z_top_mm": 3500
+      },
+      {
+        "id": "WS1-H3.0-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 3000,
+        "z_base_mm": 0,
+        "z_top_mm": 3000
+      },
+      {
+        "id": "WS1-H3.0-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 3000,
+        "z_base_mm": 0,
+        "z_top_mm": 3000
+      },
+      {
+        "id": "WS1-H3.0-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 3000,
+        "z_base_mm": 0,
+        "z_top_mm": 3000
+      },
+      {
+        "id": "WS1-H3.0-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 3000,
+        "z_base_mm": 0,
+        "z_top_mm": 3000
+      },
+      {
+        "id": "WS1-H2.6-NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 2600,
+        "z_base_mm": 0,
+        "z_top_mm": 2600
+      },
+      {
+        "id": "WS1-H2.6-60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 2600,
+        "z_base_mm": 0,
+        "z_top_mm": 2600
+      },
+      {
+        "id": "WS1-H2.6-90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 2600,
+        "z_base_mm": 0,
+        "z_top_mm": 2600
+      },
+      {
+        "id": "WS1-H2.6-120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "height_mm": 2600,
+        "z_base_mm": 0,
+        "z_top_mm": 2600
+      },
+      {
+        "id": "WS3-H6.0-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 6000,
+        "z_base_mm": 0,
+        "z_top_mm": 6000
+      },
+      {
+        "id": "WS3-H5.5-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 5500,
+        "z_base_mm": 0,
+        "z_top_mm": 5500
+      },
+      {
+        "id": "WS3-H5.0-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 5000,
+        "z_base_mm": 0,
+        "z_top_mm": 5000
+      },
+      {
+        "id": "WS3-H4.5-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 4500,
+        "z_base_mm": 0,
+        "z_top_mm": 4500
+      },
+      {
+        "id": "WS3-H4.0-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 4000,
+        "z_base_mm": 0,
+        "z_top_mm": 4000
+      },
+      {
+        "id": "WS3-H3.5-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500
+      },
+      {
+        "id": "WS3-H3.0-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 3000,
+        "z_base_mm": 0,
+        "z_top_mm": 3000
+      },
+      {
+        "id": "WS3-H2.6-180-240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "height_mm": 2600,
+        "z_base_mm": 0,
+        "z_top_mm": 2600
+      },
+      {
+        "id": "WS2-H7.0-NOFRL",
+        "section": "100x100x9SHS",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500
       }
     ],
     "beams": [
       {
-        "id": "UB20d",
-        "section": "UB20d",
-        "grade": "G350L",
-        "span_mm": 7200,
-        "from_col": "1",
-        "to_col": "2",
+        "id": "SH20a",
+        "section": "SHS200x200x8",
+        "grade": "C350",
         "z_mm": 3500
       },
       {
-        "id": "UB35c",
-        "section": "UB35c",
-        "grade": "G350L",
-        "span_mm": 7200,
-        "from_col": "1",
-        "to_col": "2",
+        "id": "Z25d",
+        "section": "Z250",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "UB38c",
-        "section": "UB38c",
-        "grade": "G350L",
-        "span_mm": 7200,
-        "from_col": "1",
-        "to_col": "2",
-        "z_mm": 3500
-      },
-      {
-        "id": "PF15a",
-        "section": "PF15a",
-        "grade": "G350L",
-        "span_mm": 7200,
-        "from_col": "1",
-        "to_col": "2",
+        "id": "PF20a",
+        "section": "PFC200",
+        "grade": "G350",
         "z_mm": 3500
       },
       {
         "id": "PF25a",
-        "section": "PF25a",
-        "grade": "G350L",
-        "span_mm": 7200,
-        "from_col": "1",
-        "to_col": "2",
+        "section": "PFC250",
+        "grade": "G350",
         "z_mm": 3500
       },
       {
-        "id": "SH20a",
-        "section": "SH20a",
-        "grade": "G350L",
-        "span_mm": 7200,
-        "from_col": "1",
-        "to_col": "2",
-        "z_mm": 3500
-      },
-      {
-        "type": "beam",
         "id": "B1",
+        "type": "primary",
+        "material": "concrete",
+        "section": "unknown",
+        "height_mm": "unknown",
         "start_point_mm": {
           "x": 0,
-          "y": 6000
+          "y": 8000
         },
         "end_point_mm": {
-          "x": 18000,
-          "y": 6000
+          "x": 24000,
+          "y": 8000
         },
-        "section": "hidden beam",
-        "material": "concrete",
+        "span_mm": 24000,
+        "grid_x": null,
+        "grid_y": "C",
         "z_mm": 3500
       },
       {
-        "type": "beam",
         "id": "B2",
+        "type": "primary",
+        "material": "concrete",
+        "section": "unknown",
+        "height_mm": "unknown",
         "start_point_mm": {
           "x": 0,
           "y": 0
         },
         "end_point_mm": {
-          "x": 18000,
+          "x": 24000,
           "y": 0
         },
-        "section": "hidden beam",
-        "material": "concrete",
+        "span_mm": 24000,
+        "grid_x": null,
+        "grid_y": "D",
         "z_mm": 3500
       },
       {
-        "type": "beam",
         "id": "B3",
+        "type": "tie",
+        "material": "concrete",
+        "section": "unknown",
+        "height_mm": "unknown",
         "start_point_mm": {
           "x": 0,
           "y": 0
         },
         "end_point_mm": {
           "x": 0,
-          "y": 6000
+          "y": 8000
         },
-        "section": "hidden beam",
-        "material": "concrete",
+        "span_mm": 8000,
+        "grid_x": "1",
+        "grid_y": null,
         "z_mm": 3500
       },
       {
-        "type": "beam",
         "id": "B4",
+        "type": "tie",
+        "material": "concrete",
+        "section": "unknown",
+        "height_mm": "unknown",
         "start_point_mm": {
-          "x": 18000,
+          "x": 8000,
           "y": 0
         },
         "end_point_mm": {
-          "x": 18000,
-          "y": 6000
+          "x": 8000,
+          "y": 8000
         },
-        "section": "hidden beam",
-        "material": "concrete",
+        "span_mm": 8000,
+        "grid_x": "2",
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B5",
-        "type": "secondary",
-        "start_x_mm": 6000,
-        "start_y_mm": 0,
-        "end_x_mm": 6000,
-        "end_y_mm": 3000,
-        "span_mm": 3000,
-        "section": "unknown",
+        "type": "tie",
         "material": "concrete",
-        "reinforcement": "4N16 CENTRAL",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 16000,
+          "y": 0
+        },
+        "end_point_mm": {
+          "x": 16000,
+          "y": 8000
+        },
+        "span_mm": 8000,
+        "grid_x": "3",
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B6",
-        "type": "secondary",
-        "start_x_mm": 9000,
-        "start_y_mm": 0,
-        "end_x_mm": 9000,
-        "end_y_mm": 3000,
-        "span_mm": 3000,
-        "section": "unknown",
+        "type": "tie",
         "material": "concrete",
-        "reinforcement": "4N16 CENTRAL",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 24000,
+          "y": 0
+        },
+        "end_point_mm": {
+          "x": 24000,
+          "y": 8000
+        },
+        "span_mm": 8000,
+        "grid_x": "4",
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B7",
-        "type": "secondary",
-        "start_x_mm": 1500,
-        "start_y_mm": 0,
-        "end_x_mm": 1500,
-        "end_y_mm": 3000,
-        "span_mm": 3000,
-        "section": "unknown",
+        "type": "transfer",
         "material": "concrete",
-        "reinforcement": "4N16 CENTRAL",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 8000,
+          "y": 5500
+        },
+        "end_point_mm": {
+          "x": 16000,
+          "y": 5500
+        },
+        "span_mm": 8000,
+        "grid_x": null,
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B8",
-        "type": "secondary",
-        "start_x_mm": 4500,
-        "start_y_mm": 0,
-        "end_x_mm": 4500,
-        "end_y_mm": 3000,
-        "span_mm": 3000,
-        "section": "unknown",
+        "type": "transfer",
         "material": "concrete",
-        "reinforcement": "4N16 CENTRAL",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 8000,
+          "y": 2500
+        },
+        "end_point_mm": {
+          "x": 16000,
+          "y": 2500
+        },
+        "span_mm": 8000,
+        "grid_x": null,
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B9",
-        "type": "secondary",
-        "start_x_mm": 7500,
-        "start_y_mm": 0,
-        "end_x_mm": 7500,
-        "end_y_mm": 3000,
-        "span_mm": 3000,
-        "section": "unknown",
+        "type": "transfer",
         "material": "concrete",
-        "reinforcement": "4N16 CENTRAL",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 8000,
+          "y": 2500
+        },
+        "end_point_mm": {
+          "x": 8000,
+          "y": 5500
+        },
+        "span_mm": 3000,
+        "grid_x": null,
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B10",
-        "type": "core_wall",
-        "start_x_mm": 3750,
-        "start_y_mm": 2250,
-        "end_x_mm": 5250,
-        "end_y_mm": 2250,
-        "span_mm": 1500,
-        "section": "unknown",
+        "type": "transfer",
         "material": "concrete",
-        "reinforcement": "N16-175",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 16000,
+          "y": 2500
+        },
+        "end_point_mm": {
+          "x": 16000,
+          "y": 5500
+        },
+        "span_mm": 3000,
+        "grid_x": null,
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B11",
-        "type": "core_wall",
-        "start_x_mm": 3750,
-        "start_y_mm": 750,
-        "end_x_mm": 5250,
-        "end_y_mm": 750,
-        "span_mm": 1500,
-        "section": "unknown",
+        "type": "secondary",
         "material": "concrete",
-        "reinforcement": "N16-175",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 16000,
+          "y": 4000
+        },
+        "end_point_mm": {
+          "x": 24000,
+          "y": 4000
+        },
+        "span_mm": 8000,
+        "grid_x": null,
+        "grid_y": null,
         "z_mm": 3500
       },
       {
         "id": "B12",
-        "type": "core_wall",
-        "start_x_mm": 3750,
-        "start_y_mm": 750,
-        "end_x_mm": 3750,
-        "end_y_mm": 2250,
-        "span_mm": 1500,
-        "section": "unknown",
+        "type": "secondary",
         "material": "concrete",
-        "reinforcement": "N16-175",
+        "section": "unknown",
+        "height_mm": "unknown",
+        "start_point_mm": {
+          "x": 0,
+          "y": 4000
+        },
+        "end_point_mm": {
+          "x": 8000,
+          "y": 4000
+        },
+        "span_mm": 8000,
+        "grid_x": null,
+        "grid_y": null,
         "z_mm": 3500
       },
       {
-        "id": "B13",
-        "type": "core_wall",
-        "start_x_mm": 5250,
-        "start_y_mm": 750,
-        "end_x_mm": 5250,
-        "end_y_mm": 2250,
-        "span_mm": 1500,
-        "section": "unknown",
-        "material": "concrete",
-        "reinforcement": "N16-175",
-        "z_mm": 3500
-      },
-      {
-        "id": "B14",
-        "type": "core_wall_internal",
-        "start_x_mm": 3750,
-        "start_y_mm": 1500,
-        "end_x_mm": 5250,
-        "end_y_mm": 1500,
-        "span_mm": 1500,
-        "section": "unknown",
-        "material": "concrete",
-        "reinforcement": "N16-175",
-        "z_mm": 3500
-      },
-      {
-        "id": "B15",
-        "type": "core_wall_internal",
-        "start_x_mm": 4500,
-        "start_y_mm": 750,
-        "end_x_mm": 4500,
-        "end_y_mm": 2250,
-        "span_mm": 1500,
-        "section": "unknown",
-        "material": "concrete",
-        "reinforcement": "N16-175",
-        "z_mm": 3500
-      },
-      {
-        "id": "B-CH32a-1",
         "type": "beam",
+        "id": "BEAM-CH32a-Detail1",
         "section": "CH32a",
-        "material": "steel",
         "span_mm": null,
+        "material": "Steel",
         "end_connections": [
           {
+            "to_member_id": "COL-CH40b-G2-Detail1",
             "connection_type": "welded",
-            "connected_to": "C-CH40b-1",
-            "description": "Full Penetration Butt Weld (FPBW) with shop welded stiffeners to create T-post."
+            "details": "FPBW, shop welded stiffeners to create T-post"
           }
         ],
-        "notes": "Circular Hollow Section beam, shown in Detail 1, 1A, 1B.",
         "z_mm": 3500
       },
       {
-        "id": "B-UB36c-1",
         "type": "beam",
+        "id": "BEAM-UB36c-Detail2",
         "section": "UB36c",
-        "material": "steel",
         "span_mm": null,
+        "material": "Steel",
         "end_connections": [
           {
+            "to_member_id": "COL-CH35a-G2-Detail2",
             "connection_type": "welded",
-            "connected_to": "C-CH35a-1",
-            "description": "Connection shown in Detail 2, specific weld type not detailed."
-          },
-          {
-            "connection_type": "welded",
-            "connected_to": "C-CH13c-1",
-            "description": "Connection shown in Section 2A, specific weld type not detailed."
+            "details": "shop welded stub to column"
           }
         ],
-        "notes": "Universal Beam, shown in Detail 2 and Section 2A.",
         "z_mm": 3500
       },
       {
-        "id": "B-SH15b-1",
         "type": "beam",
-        "section": "SH15b",
-        "material": "steel",
-        "span_mm": 1300,
+        "id": "BEAM-CH13c-Detail2",
+        "section": "CH13c",
+        "span_mm": null,
+        "material": "Steel",
         "end_connections": [
           {
+            "to_member_id": "COL-CH35a-G2-Detail2",
             "connection_type": "welded",
-            "connected_to": "C-CH35a-1",
-            "description": "Shop welded stub to column with annular plate."
-          },
-          {
-            "connection_type": "welded",
-            "connected_to": "C-CH13c-1",
-            "description": "Shop welded connection."
+            "details": "shop welded connection"
           }
         ],
-        "notes": "Square Hollow Section beam, shown in Detail 2 and Section 2A. Span is '1300 MAX'.",
         "z_mm": 3500
       },
       {
-        "id": "B-PF15a-1",
         "type": "beam",
+        "id": "BEAM-PF15a-Detail2",
         "section": "PF15a",
-        "material": "steel",
-        "span_mm": null,
+        "span_mm": 1300,
+        "material": "Steel",
         "end_connections": [
           {
-            "connection_type": "bolted",
-            "connected_to": "B-SH15b-1",
-            "description": "Connection shown in Detail 2."
+            "to_member_id": "BEAM-SH15b-Detail2",
+            "connection_type": "bolted"
           }
         ],
-        "notes": "Parallel Flange Channel section, shown in Detail 2.",
+        "notes": "Max span",
         "z_mm": 3500
       },
       {
-        "id": "B-PF25a-1",
         "type": "beam",
-        "section": "PF25a",
-        "material": "steel",
-        "span_mm": null,
-        "end_connections": [
-          {
-            "connection_type": "bolted",
-            "connected_to": "B-SH15b-1",
-            "description": "Connection shown in Detail 2 and Section 2A, with counter sunk bolts."
-          }
-        ],
-        "notes": "Parallel Flange Channel section, shown in Detail 2 and Section 2A.",
-        "z_mm": 3500
-      },
-      {
-        "id": "B-Unlabeled-D-1",
-        "type": "beam",
-        "section": "RHS (unspecified)",
-        "material": "steel",
-        "span_mm": null,
-        "end_connections": [
-          {
-            "connection_type": "bolted",
-            "connected_to": "C-RHS-D-1",
-            "description": "Bolted connection to column, shown in Section 3A."
-          }
-        ],
-        "notes": "Unlabeled beam connecting to column at Grid D, appears to be RHS.",
-        "z_mm": 3500
-      },
-      {
-        "id": "UB_Beam_Type_200UB22.3",
-        "type": "beam",
-        "section": "200UB22.3",
-        "material": "steel",
-        "connections": [
-          {
-            "connection_id": "UB_Beam_to_UB_Beam_Moment_Splice",
-            "description": "UB Beam to UB Beam Moment Splice Connection"
-          },
-          {
-            "connection_id": "Column_Cap_Connection",
-            "description": "Cap Plate for 168 to 250 SHS/CHS/UC Columns"
-          }
-        ],
-        "z_mm": 3500
-      },
-      {
-        "id": "UB_Beam_Type_200UB29.8",
-        "type": "beam",
-        "section": "200UB29.8",
-        "material": "steel",
-        "connections": [
-          {
-            "connection_id": "UB_Beam_to_UB_Beam_Moment_Splice",
-            "description": "UB Beam to UB Beam Moment Splice Connection"
-          },
-          {
-            "connection_id": "Column_Cap_Connection",
-            "description": "Cap Plate for 168 to 250 SHS/CHS/UC Columns"
-          }
-        ],
-        "z_mm": 3500
-      },
-      {
-        "id": "UB_Beam_Type_360UB50.7",
-        "type": "beam",
-        "section": "360UB50.7",
-        "material": "steel",
-        "connections": [
-          {
-            "connection_id": "UB_Beam_to_UB_Beam_Moment_Splice",
-            "description": "UB Beam to UB Beam Moment Splice Connection"
-          },
-          {
-            "connection_id": "Column_Cap_Connection",
-            "description": "Cap Plate for 168 to 250 SHS/CHS/UC Columns"
-          }
-        ],
-        "z_mm": 3500
-      },
-      {
-        "id": "UB_Beam_Type_360UB56.7",
-        "type": "beam",
-        "section": "360UB56.7",
-        "material": "steel",
-        "connections": [
-          {
-            "connection_id": "UB_Beam_to_UB_Beam_Moment_Splice",
-            "description": "UB Beam to UB Beam Moment Splice Connection"
-          },
-          {
-            "connection_id": "Column_Cap_Connection",
-            "description": "Cap Plate for 168 to 250 SHS/CHS/UC Columns"
-          }
-        ],
-        "z_mm": 3500
-      },
-      {
-        "id": "Z10-a",
-        "section": "Z10010",
-        "grade": "G550",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z10-b",
-        "section": "Z10012",
-        "grade": "G500",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z10-c",
-        "section": "Z10015",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z10-d",
-        "section": "Z10019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z15-b",
-        "section": "Z15012",
-        "grade": "G500",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z15-c",
-        "section": "Z15015",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z15-d",
-        "section": "Z15019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z15-e",
-        "section": "Z15024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z20-c",
-        "section": "Z20015",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z20-d",
-        "section": "Z20019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z20-e",
-        "section": "Z20024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z25-d",
-        "section": "Z25019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z25-e",
-        "section": "Z25024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z30-e",
-        "section": "Z30024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z30-f",
-        "section": "Z30030",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "Z35-f",
-        "section": "Z35030",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C10-a",
-        "section": "C10010",
-        "grade": "G550",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C10-b",
-        "section": "C10012",
-        "grade": "G500",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C10-c",
-        "section": "C10015",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C10-d",
-        "section": "C10019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C15-b",
-        "section": "C15012",
-        "grade": "G500",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C15-c",
-        "section": "C15015",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C15-d",
-        "section": "C15019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C15-e",
-        "section": "C15024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C20-c",
-        "section": "C20015",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C20-d",
-        "section": "C20019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C20-e",
-        "section": "C20024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C25-d",
-        "section": "C25019",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C25-e",
-        "section": "C25024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C30-e",
-        "section": "C30024",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C30-f",
-        "section": "C30030",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "C35-f",
-        "section": "C35030",
-        "grade": "G450",
-        "span_mm": null,
-        "from_col": null,
-        "to_col": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "SH10a",
-        "section": "SH10a",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH10d",
-        "section": "SH10d",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH10f",
-        "section": "SH10f",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH10i",
-        "section": "SH10i",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH15a",
-        "section": "SH15a",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH15b",
+        "id": "BEAM-SH15b-Detail2",
         "section": "SH15b",
-        "grade": "G350",
+        "span_mm": null,
+        "material": "Steel",
+        "end_connections": [
+          {
+            "to_member_id": "BEAM-UB36c-Detail2",
+            "connection_type": "welded",
+            "details": "shop welded"
+          },
+          {
+            "to_member_id": "BEAM-PF25a-Detail2A",
+            "connection_type": "bolted",
+            "details": "provide counter sunk bolts"
+          }
+        ],
         "z_mm": 3500
       },
       {
-        "id": "SH15c",
-        "section": "SH15c",
-        "grade": "G350",
+        "type": "beam",
+        "id": "BEAM-PF25a-Detail2A",
+        "section": "PF25a",
+        "span_mm": null,
+        "material": "Steel",
+        "end_connections": [
+          {
+            "to_member_id": "BEAM-SH15b-Detail2",
+            "connection_type": "bolted",
+            "details": "provide counter sunk bolts"
+          }
+        ],
         "z_mm": 3500
       },
       {
-        "id": "SH15d",
-        "section": "SH15d",
-        "grade": "G350",
+        "type": "beam",
+        "id": "BEAM-PF25a-Detail3",
+        "section": "PF25a",
+        "span_mm": null,
+        "material": "Steel",
+        "end_connections": [
+          {
+            "to_member_id": "COL-CHS-G_D-Detail3",
+            "connection_type": "bolted"
+          }
+        ],
         "z_mm": 3500
       },
       {
-        "id": "SH15e",
-        "section": "SH15e",
-        "grade": "G350",
+        "id": "Z10",
+        "section": "Z10",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH15f",
-        "section": "SH15f",
-        "grade": "G350",
+        "id": "Z15",
+        "section": "Z15",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH15g",
-        "section": "SH15g",
-        "grade": "G350",
+        "id": "Z20",
+        "section": "Z20",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH15h",
-        "section": "SH15h",
-        "grade": "G350",
+        "id": "Z25",
+        "section": "Z25",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH15i",
-        "section": "SH15i",
-        "grade": "G350",
+        "id": "Z30",
+        "section": "Z30",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH15j",
-        "section": "SH15j",
-        "grade": "G350",
+        "id": "Z35",
+        "section": "Z35",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH07g",
-        "section": "SH07g",
-        "grade": "G350",
+        "id": "C10",
+        "section": "C10",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH08d",
-        "section": "SH08d",
-        "grade": "G350",
+        "id": "C15",
+        "section": "C15",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH08e",
-        "section": "SH08e",
-        "grade": "G350",
+        "id": "C20",
+        "section": "C20",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH08f",
-        "section": "SH08f",
-        "grade": "G350",
+        "id": "C25",
+        "section": "C25",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH08g",
-        "section": "SH08g",
-        "grade": "G350",
+        "id": "C30",
+        "section": "C30",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
-        "id": "SH08h",
-        "section": "SH08h",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08i",
-        "section": "SH08i",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08j",
-        "section": "SH08j",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08k",
-        "section": "SH08k",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08l",
-        "section": "SH08l",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08m",
-        "section": "SH08m",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08n",
-        "section": "SH08n",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08o",
-        "section": "SH08o",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08p",
-        "section": "SH08p",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08q",
-        "section": "SH08q",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08r",
-        "section": "SH08r",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08s",
-        "section": "SH08s",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08t",
-        "section": "SH08t",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08u",
-        "section": "SH08u",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08v",
-        "section": "SH08v",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08w",
-        "section": "SH08w",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08x",
-        "section": "SH08x",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08y",
-        "section": "SH08y",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08z",
-        "section": "SH08z",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08aa",
-        "section": "SH08aa",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ab",
-        "section": "SH08ab",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ac",
-        "section": "SH08ac",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ad",
-        "section": "SH08ad",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ae",
-        "section": "SH08ae",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08af",
-        "section": "SH08af",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ag",
-        "section": "SH08ag",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ah",
-        "section": "SH08ah",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ai",
-        "section": "SH08ai",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08aj",
-        "section": "SH08aj",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08ak",
-        "section": "SH08ak",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "SH08al",
-        "section": "SH08al",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "UB36b",
-        "section": "UB36b",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "UB31b",
-        "section": "UB31b",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "PF25b",
-        "section": "PF25b",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "RB20a",
-        "section": "RB20a",
-        "grade": "G350",
+        "id": "C35",
+        "section": "C35",
+        "grade": "G450",
         "z_mm": 3500
       },
       {
         "id": "CB1",
-        "type": "capping_beam",
-        "width_mm": 750,
-        "depth_mm": 600,
+        "section": "750x600",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
         "longitudinal_reinf": "5N28 TOP & BOTTOM",
         "ties_reinf": "N12-300",
-        "grade": null,
+        "side_face_reinf": "N16-300",
         "z_mm": 3500
       }
     ],
@@ -1722,144 +1540,282 @@
       {
         "id": "P1",
         "type": "pile",
-        "diameter_mm": 750,
-        "socket_length_mm": 600,
         "width_mm": 750,
         "depth_mm": 750,
-        "height_mm": null,
-        "z_top_mm": 3500,
-        "z_base_mm": 2900
+        "height_mm": 600,
+        "z_top_mm": -1000,
+        "z_base_mm": -1600
       },
       {
         "id": "P2",
         "type": "pile",
-        "diameter_mm": 750,
-        "socket_length_mm": 3000,
         "width_mm": 750,
         "depth_mm": 750,
-        "height_mm": null,
-        "z_top_mm": 3500,
-        "z_base_mm": 1500
+        "height_mm": 3000,
+        "z_top_mm": -1000,
+        "z_base_mm": -3000
       },
       {
         "id": "P3",
         "type": "pile",
-        "diameter_mm": 600,
-        "socket_length_mm": 300,
         "width_mm": 600,
         "depth_mm": 600,
-        "height_mm": null,
-        "z_top_mm": 3500,
-        "z_base_mm": 3200
+        "height_mm": 300,
+        "z_top_mm": -1000,
+        "z_base_mm": -1300
       },
       {
         "id": "P4",
         "type": "pile",
-        "diameter_mm": 750,
-        "socket_length_mm": 7000,
         "width_mm": 750,
         "depth_mm": 750,
-        "height_mm": null,
-        "z_top_mm": 3500,
-        "z_base_mm": 1500
+        "height_mm": 7000,
+        "z_top_mm": -1000,
+        "z_base_mm": -3000
       },
       {
         "id": "P5",
         "type": "pile",
-        "diameter_mm": 750,
-        "socket_length_mm": 19000,
         "width_mm": 750,
         "depth_mm": 750,
-        "height_mm": null,
-        "z_top_mm": 3500,
-        "z_base_mm": 1500
+        "height_mm": 19000,
+        "z_top_mm": -1000,
+        "z_base_mm": -3000
       },
       {
         "id": "RF1",
         "type": "raft",
-        "width_mm": 6500,
-        "depth_mm": 5600,
+        "width_mm": 5600,
+        "depth_mm": 6500,
         "height_mm": 1000,
-        "long_dir_reinf": "N24-200 TOP & BTM. + 10N32",
-        "short_dir_reinf": "N24-200 TOP & BTM. + 10N32",
+        "long_reinf_long_dir": "N24-200 TOP & BTM. + 10N32",
+        "long_reinf_short_dir": "N24-200 TOP & BTM. + 10N32",
         "ties_reinf": "N16-200",
-        "z_top_mm": 3500,
-        "z_base_mm": 2500
+        "side_face_reinf": "N16-300",
+        "z_top_mm": -1000,
+        "z_base_mm": -2000
       }
     ],
     "bracing": [
       {
         "id": "RB16a",
-        "section": "RB16a",
-        "grade": "G350L",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "CH13c",
-        "section": "CH13c",
-        "grade": "C350",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "P80HS",
-        "section": "P80HS",
+        "section": "16mm Round Bar",
         "grade": "G350",
         "z_base_mm": 0,
         "z_top_mm": 3500
       },
       {
-        "id": "P90HS",
-        "section": "P90HS",
+        "id": "FB",
+        "section": "Flat Bar",
         "grade": "G350",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "BR1",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "BR2",
-        "section": "100x100x9SHS",
-        "grade": "C350",
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "BR3",
-        "section": "89x89x5SHS",
-        "grade": "C350",
         "z_base_mm": 0,
         "z_top_mm": 3500
       }
     ],
     "slabs": [
       {
-        "id": "S_AUTO_LEVEL 03",
-        "level_id": "LEVEL 03",
+        "id": "S_AUTO_Ground Level",
+        "level_id": "Ground Level",
+        "elevation_mm": 0,
+        "thickness_mm": 200,
+        "boundary": [
+          [
+            4000,
+            2500
+          ],
+          [
+            22000,
+            2500
+          ],
+          [
+            22000,
+            15000
+          ],
+          [
+            4000,
+            15000
+          ]
+        ],
+        "material": "reinforced_concrete",
+        "auto_generated": true
+      },
+      {
+        "id": "S_AUTO_Level 01",
+        "level_id": "Level 01",
+        "elevation_mm": 0,
+        "thickness_mm": 200,
+        "boundary": [
+          [
+            4000,
+            2500
+          ],
+          [
+            22000,
+            2500
+          ],
+          [
+            22000,
+            15000
+          ],
+          [
+            4000,
+            15000
+          ]
+        ],
+        "material": "reinforced_concrete",
+        "auto_generated": true
+      },
+      {
+        "id": "S_AUTO_Level 02",
+        "level_id": "Level 02",
+        "elevation_mm": 0,
+        "thickness_mm": 200,
+        "boundary": [
+          [
+            4000,
+            2500
+          ],
+          [
+            22000,
+            2500
+          ],
+          [
+            22000,
+            15000
+          ],
+          [
+            4000,
+            15000
+          ]
+        ],
+        "material": "reinforced_concrete",
+        "auto_generated": true
+      },
+      {
+        "id": "S_AUTO_Level 03",
+        "level_id": "Level 03",
         "elevation_mm": 3500,
         "thickness_mm": 200,
         "boundary": [
           [
-            1500,
-            750
+            4000,
+            2500
           ],
           [
-            9000,
-            750
+            22000,
+            2500
           ],
           [
-            9000,
-            3000
+            22000,
+            15000
           ],
           [
-            1500,
-            3000
+            4000,
+            15000
+          ]
+        ],
+        "material": "reinforced_concrete",
+        "auto_generated": true
+      },
+      {
+        "id": "S_AUTO_Level 04",
+        "level_id": "Level 04",
+        "elevation_mm": 0,
+        "thickness_mm": 200,
+        "boundary": [
+          [
+            4000,
+            2500
+          ],
+          [
+            22000,
+            2500
+          ],
+          [
+            22000,
+            15000
+          ],
+          [
+            4000,
+            15000
+          ]
+        ],
+        "material": "reinforced_concrete",
+        "auto_generated": true
+      },
+      {
+        "id": "S_AUTO_Level 05",
+        "level_id": "Level 05",
+        "elevation_mm": 0,
+        "thickness_mm": 200,
+        "boundary": [
+          [
+            4000,
+            2500
+          ],
+          [
+            22000,
+            2500
+          ],
+          [
+            22000,
+            15000
+          ],
+          [
+            4000,
+            15000
+          ]
+        ],
+        "material": "reinforced_concrete",
+        "auto_generated": true
+      },
+      {
+        "id": "S_AUTO_Lower Roof",
+        "level_id": "Lower Roof",
+        "elevation_mm": 0,
+        "thickness_mm": 200,
+        "boundary": [
+          [
+            4000,
+            2500
+          ],
+          [
+            22000,
+            2500
+          ],
+          [
+            22000,
+            15000
+          ],
+          [
+            4000,
+            15000
+          ]
+        ],
+        "material": "reinforced_concrete",
+        "auto_generated": true
+      },
+      {
+        "id": "S_AUTO_Upper Roof",
+        "level_id": "Upper Roof",
+        "elevation_mm": 0,
+        "thickness_mm": 200,
+        "boundary": [
+          [
+            4000,
+            2500
+          ],
+          [
+            22000,
+            2500
+          ],
+          [
+            22000,
+            15000
+          ],
+          [
+            4000,
+            15000
           ]
         ],
         "material": "reinforced_concrete",
@@ -1867,23 +1823,15 @@
       }
     ]
   },
-  "levels": [
-    {
-      "name": "LEVEL 03",
-      "elevation_mm": 3500,
-      "notes": "Level indicated on drawing, specific elevation not provided.",
-      "height_from_datum_mm": 3500
-    }
-  ],
   "summary": {
-    "total_columns": 53,
-    "total_beams": 118,
-    "total_slabs": 1,
+    "total_columns": 66,
+    "total_beams": 36,
+    "total_slabs": 8,
     "total_walls": 0,
     "total_footings": 6,
-    "total_bracing": 7,
+    "total_bracing": 2,
     "num_levels": 1
   },
   "synthesis_method": "llm",
-  "elapsed_s": 78.7
+  "elapsed_s": 75.9
 }

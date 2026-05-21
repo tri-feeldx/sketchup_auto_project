@@ -4,6 +4,7 @@ Converts structural model into executable .rb scripts.
 LOD300/350: uses exact cross-section profiles (I-beam, CHS, SHS/RHS, solid rect).
 """
 
+import re
 from typing import List, Optional
 from pipelines.prompt_factory import PromptFactory
 
@@ -120,7 +121,8 @@ class RubyGeneratorV5:
             "steel_primary": "200,200,220",
         }
         for mn in sorted(member_mats):
-            var = "mat_" + mn.replace(" ", "_").replace("-", "_")
+            _slug = re.sub(r"[^a-z0-9]+", "_", mn.lower()).strip("_") or "material"
+            var = "mat_" + _slug
             color = mat_colors.get(mn, "190,190,190")
             lines.append(f"{var} = model.materials.add('{mn}')")
             lines.append(f"{var}.color = Sketchup::Color.new({color})")
@@ -663,13 +665,21 @@ class RubyGeneratorV5:
         if fid and fid in col_map:
             pos = col_map[fid]
             x = self._n(pos["x"]); y = self._n(pos["y"])
-        # Fallback: if still at origin (0,0), snap to i-th sorted column position
+        # Fallback: if still at origin (0,0), distribute footings across x-groups
+        # so they don't all pile up on the lowest-x column line
         if x == 0 and y == 0 and col_map:
-            sorted_cols = sorted(col_map.values(),
-                                 key=lambda p: (self._n(p.get("x"), 0),
-                                                self._n(p.get("y"), 0)))
-            if i < len(sorted_cols):
-                snap = sorted_cols[i]
+            valid_cols = [p for p in col_map.values()
+                          if self._n(p.get("x"), 0) != 0 or self._n(p.get("y"), 0) != 0]
+            if valid_cols:
+                # Group by x position, cycle i across groups for spatial distribution
+                x_groups: dict = {}
+                for p in valid_cols:
+                    xi = int(self._n(p.get("x"), 0))
+                    x_groups.setdefault(xi, []).append(p)
+                x_keys = sorted(x_groups.keys())
+                target_x = x_keys[i % len(x_keys)]
+                group = x_groups[target_x]
+                snap = group[i % len(group)]
                 x = self._n(snap.get("x"), 0)
                 y = self._n(snap.get("y"), 0)
                 print(f"  [XY-FOOTING] {ftg.get('id','')} -> col pos ({x},{y})")

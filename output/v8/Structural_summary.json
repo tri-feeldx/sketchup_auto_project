@@ -1,6 +1,6 @@
 {
   "success": false,
-  "pdf_path": "C:\\Users\\minht\\Feeldx\\sketchup_auto_project\\data\\input_pdf\\Structural.pdf",
+  "pdf_path": "D:\\FeelDX_Workspace\\sketchup_auto_project_clone\\data\\input_pdf\\Structural.pdf",
   "duration_sec": 0.0,
   "forensic_summary": {
     "pages": 29,
@@ -10,42 +10,42 @@
   },
   "routed_page_count": 29,
   "structural_model_summary": {
-    "columns": 53,
-    "beams": 118,
-    "slabs": 1,
+    "columns": 66,
+    "beams": 36,
+    "slabs": 8,
     "walls": 0,
     "footings": 6,
-    "bracing": 7,
+    "bracing": 2,
     "levels": 1
   },
   "verification": {
     "schedule_counts": {
       "columns": 44,
-      "beams": 59,
-      "bracing": 3,
+      "beams": 12,
+      "bracing": 2,
       "footings": 6
     },
     "extracted_counts": {
-      "columns": 53,
-      "beams": 118,
-      "slabs": 1,
+      "columns": 66,
+      "beams": 36,
+      "slabs": 8,
       "walls": 0,
       "footings": 6,
-      "bracing": 7
+      "bracing": 2
     },
     "discrepancies": [
       {
         "type": "columns",
         "expected": 44,
-        "got": 53,
+        "got": 66,
         "deficit": 0,
         "recall": 1.0,
         "needs_repass": false
       },
       {
         "type": "beams",
-        "expected": 59,
-        "got": 118,
+        "expected": 12,
+        "got": 36,
         "deficit": 0,
         "recall": 1.0,
         "needs_repass": false
@@ -60,8 +60,8 @@
       },
       {
         "type": "bracing",
-        "expected": 3,
-        "got": 7,
+        "expected": 2,
+        "got": 2,
         "deficit": 0,
         "recall": 1.0,
         "needs_repass": false
@@ -77,19 +77,19 @@
   "accuracy_target_met": true,
   "accuracy_per_type": {
     "columns": {
-      "extracted": 53,
+      "extracted": 66,
       "expected": 44,
       "recall": 1.0,
       "deficit": 0
     },
     "beams": {
-      "extracted": 118,
-      "expected": 59,
+      "extracted": 36,
+      "expected": 12,
       "recall": 1.0,
       "deficit": 0
     },
     "slabs": {
-      "extracted": 1,
+      "extracted": 8,
       "expected": null,
       "recall": null,
       "deficit": 0
@@ -107,14 +107,14 @@
       "deficit": 0
     },
     "bracing": {
-      "extracted": 7,
-      "expected": 3,
+      "extracted": 2,
+      "expected": 2,
       "recall": 1.0,
       "deficit": 0
     }
   },
-  "output_rb_path": "C:\\Users\\minht\\Feeldx\\sketchup_auto_project\\output\\v8\\Structural_structural.rb",
-  "output_json_path": "C:\\Users\\minht\\Feeldx\\sketchup_auto_project\\output\\v8\\Structural_model.json",
+  "output_rb_path": "D:\\FeelDX_Workspace\\sketchup_auto_project_clone\\output\\v8\\Structural_structural.rb",
+  "output_json_path": "D:\\FeelDX_Workspace\\sketchup_auto_project_clone\\output\\v8\\Structural_model.json",
   "output_ifc_path": "",
   "errors": []
 }

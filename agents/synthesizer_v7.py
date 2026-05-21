@@ -25,6 +25,22 @@ from typing import Dict, List, Optional
 from core.llm_wrapper import call_llm
 from pipelines.prompt_factory import PromptFactory
 
+ASNZS_STRUCTURAL_SECTIONS = """
+STRUCTURAL STEEL SECTIONS (AS/NZS 3678/3679):
+  Columns: UC (Universal Column), CHS (Circular Hollow Section),
+           RHS (Rectangular Hollow Section), SHS (Square Hollow Section),
+           PFC (Parallel Flange Channel used as column)
+  Beams:   UB (Universal Beam), PFC, RHS, CHS
+  Piles:   CHS pile, concrete pile, micropile
+  Bracing: flat plate, RHS, angle, rod
+
+NOT structural columns — filter these out:
+  _BP suffix  = baseplates (connection hardware, not a column instance)
+  WS1/WS2/WS3 = wall stud fire-rating schedule rows (not column instances)
+  SH*, CH*, C_S* = connection hardware / stud references
+  depth or width < 50mm = non-structural fastener or bracket
+"""
+
 
 class SynthesizerV7:
     """
@@ -37,14 +53,15 @@ class SynthesizerV7:
         self.language = language
         self.prompt_factory = PromptFactory(region=region, language=language)
 
-    def synthesize(self, scanner_output: dict) -> dict:
+    def synthesize(self, scanner_output: dict, plan_positions: dict = None) -> dict:
         """
         Build unified structural model from scanner results.
-        
+
         Args:
             scanner_output: Output from ScannerV6.run()
-                Expected keys: forensic, page_results, batches
-        
+            plan_positions: Optional dict from PlanPageColumnExtractor —
+                            {MARK_UPPER: {grid_x_mm, grid_y_mm, ...}}
+
         Returns:
             Unified building structural model dict
         """
@@ -69,6 +86,7 @@ class SynthesizerV7:
             building_type=forensic.get("building_type", "general"),
             region=self.region,
         )
+        system_prompt = system_prompt + "\n\n## AS/NZS SECTION REFERENCE\n" + ASNZS_STRUCTURAL_SECTIONS
         user_prompt = self.prompt_factory.user_prompt_synthesize(
             page_results=valid_results,
             profile=forensic,
@@ -79,6 +97,8 @@ class SynthesizerV7:
             model = self._parse_json(response)
             if model:
                 model = self._merge_members(model, valid_results, forensic)
+                model = self._enrich_from_plan(model, plan_positions)
+                model["members"] = self._assign_confidence(model["members"])
                 model["synthesis_method"] = "llm"
                 model["elapsed_s"] = round(time.time() - t0, 1)
                 return model
@@ -88,6 +108,7 @@ class SynthesizerV7:
         # Fallback: deterministic merge
         print("[SYNTH] Using deterministic merge fallback")
         model = self._deterministic_merge(valid_results, forensic)
+        model = self._enrich_from_plan(model, plan_positions)
         model["synthesis_method"] = "deterministic"
         model["elapsed_s"] = round(time.time() - t0, 1)
         return model
@@ -175,6 +196,7 @@ class SynthesizerV7:
         # Upgrade grid coords from scanner-extracted grid_coords if better than PDFExtractor
         model["grid_system"] = self._upgrade_grid_from_pages(model["grid_system"], page_results)
 
+        model["members"] = self._assign_confidence(model["members"])
         return model
 
     def _merge_members(self, llm_model: dict, page_results: List[dict],
@@ -201,6 +223,18 @@ class SynthesizerV7:
                 return False
             if any(mark_str.startswith(p) for p in hw_prefixes):
                 return False
+            if sec.upper().endswith("_BP") or mark_str.upper().endswith("_BP"):
+                return False
+            # Wall stud fire-rating schedule entries: WS1-H6.0-NOFRL, WS2-H5.5-60MIN, etc.
+            if re.match(r"^WS\d", mark_str):
+                return False
+            # Reject structurally impossible depth (fire-rating table rows have depth=5–6mm)
+            sec_depth = col.get("depth_mm") or col.get("depth")
+            try:
+                if sec_depth is not None and 0 < float(sec_depth) < 50:
+                    return False
+            except (ValueError, TypeError):
+                pass
             w = col.get("width_mm") or col.get("width") or 999
             try:
                 if float(w) < 50:
@@ -543,6 +577,48 @@ class SynthesizerV7:
         levels.sort(key=lambda l: l.get("height_from_datum_mm") or l.get("elevation_mm") or 0)
         return levels
 
+    def _enrich_from_plan(self, model: dict, plan_positions: dict) -> dict:
+        """Enrich column XY positions from PlanPageColumnExtractor results."""
+        if not plan_positions:
+            return model
+        enriched = 0
+        for col in model.get("members", {}).get("columns", []):
+            mark = str(col.get("mark") or col.get("id") or "").strip().upper()
+            if mark in plan_positions:
+                pos = plan_positions[mark]
+                if pos.get("grid_x_mm") is not None:
+                    col["x_mm"] = int(pos["grid_x_mm"])
+                    col["x"] = col["x_mm"]
+                if pos.get("grid_y_mm") is not None:
+                    col["y_mm"] = int(pos["grid_y_mm"])
+                    col["y"] = col["y_mm"]
+                if pos.get("grid_label_x"):
+                    col["grid_x"] = str(pos["grid_label_x"])
+                if pos.get("grid_label_y"):
+                    col["grid_y"] = str(pos["grid_label_y"])
+                enriched += 1
+        if enriched:
+            print(f"  [PLAN-ENRICH] {enriched} columns got grid position from plan pages")
+        return model
+
+    def _assign_confidence(self, members: dict) -> dict:
+        """Assign _confidence (0.0–1.0) to every member based on data completeness."""
+        for col in members.get("columns", []):
+            try:
+                x = float(col.get("x") or col.get("x_mm") or 0)
+                y = float(col.get("y") or col.get("y_mm") or 0)
+            except (ValueError, TypeError):
+                x, y = 0.0, 0.0
+            has_grid = bool(col.get("grid_x") or col.get("grid_y"))
+            has_xy = (x != 0.0 or y != 0.0)
+            col["_confidence"] = 1.0 if (has_xy and has_grid) else (0.7 if has_xy else 0.4)
+        for beam in members.get("beams", []):
+            beam["_confidence"] = 0.8 if (beam.get("from_col") and beam.get("to_col")) else 0.5
+        for m_type in ("slabs", "walls", "footings", "bracing"):
+            for m in members.get(m_type, []):
+                m["_confidence"] = 0.8
+        return members
+
     def _resolve_level_elevations(self, levels: List[dict],
                                     page_results: List[dict]) -> dict:
         """Build a map of level_id → elevation_mm, filling nulls intelligently."""
@@ -615,11 +691,29 @@ class SynthesizerV7:
         # Columns
         roof_elev = sorted_levels[-1][1] if sorted_levels else DEFAULT_F2F
         for col in members.get("columns", []):
-            base_lid = col.get("base_level") or col.get("level_id", "")
-            top_lid = col.get("top_level", "")
+            # Support both base_level/level_id and start_level/end_level naming
+            base_lid = (col.get("base_level") or col.get("level_id") or
+                        col.get("start_level", ""))
+            top_lid = col.get("top_level") or col.get("end_level", "")
             z_base = _get_elev(base_lid, 0)
+            # coordinates_mm fallback — LLM sometimes puts z values here
+            coords = col.get("coordinates_mm") or col.get("local_coordinates_mm") or {}
+            z_start_coord = coords.get("z_start") or coords.get("z_base_mm")
+            z_end_coord = coords.get("z_end") or coords.get("z_top_mm")
+            if z_start_coord is not None and z_base == 0:
+                try:
+                    z_base = max(int(float(z_start_coord)), 0)
+                except (ValueError, TypeError):
+                    pass
             if top_lid:
                 z_top = _get_elev(top_lid, z_base + DEFAULT_F2F)
+            elif z_end_coord is not None:
+                try:
+                    z_top = int(float(z_end_coord))
+                    if z_top <= z_base:
+                        z_top = _next_level_elev(z_base)
+                except (ValueError, TypeError):
+                    z_top = _next_level_elev(z_base)
             elif col.get("height_mm"):
                 try:
                     z_top = z_base + int(float(col["height_mm"]))
@@ -678,8 +772,9 @@ class SynthesizerV7:
                 if xy:
                     ftg["x"] = xy[0]; ftg["y"] = xy[1]
 
-        # Footing Z: place at lowest level (footing/basement elevation)
-        footing_z_top = min(lmap.values()) if lmap else -1000
+        # Footing Z: place below datum — guard against lmap having only positive levels
+        _lmap_min = min(lmap.values()) if lmap else -1000
+        footing_z_top = _lmap_min if _lmap_min < 0 else -1000
         for ftg in members.get("footings", []):
             raw_h = ftg.get("socket_length_mm") or ftg.get("height_mm") or ftg.get("height") or 600
             try:

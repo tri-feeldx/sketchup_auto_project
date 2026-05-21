@@ -48,6 +48,7 @@ class PipelineV8Result:
 
     # Stage outputs
     scanner_output: dict = field(default_factory=dict)
+    plan_positions: dict = field(default_factory=dict)
     structural_model: dict = field(default_factory=dict)
     verification: Optional[dict] = None
     validation: Optional[dict] = None
@@ -192,9 +193,24 @@ class PipelineV8:
             print(f"  -> {num_pages} pages, {len(page_results)} scanned, "
                   f"types: {list(routing.get('types', {}).keys())}")
 
+            # ── STAGE 2.5: Plan Page Column Extractor ────────
+            print("[V8 STAGE 2.5] PlanPageExtractor: Reading plan pages for column XY...")
+            try:
+                from agents.plan_page_extractor import PlanPageColumnExtractor
+                _pex = PlanPageColumnExtractor(
+                    str(pdf_path),
+                    region=self.region,
+                    language=self.language,
+                )
+                plan_positions = _pex.run(scanner_output)
+            except Exception as _pex_err:
+                print(f"  [PLAN-EXTRACT] WARN: extractor failed ({_pex_err}) — skipping")
+                plan_positions = {}
+            result.plan_positions = plan_positions
+
             # ── STAGE 3: Synthesize ───────────────────────────
             print("[V8 STAGE 3] SynthesizerV7: Building structural model...")
-            model = self.synthesizer.synthesize(scanner_output)
+            model = self.synthesizer.synthesize(scanner_output, plan_positions=plan_positions)
             result.structural_model = model
             m = model.get("members", {})
             print(f"  -> {len(m.get('columns',[]))}c "
@@ -223,6 +239,16 @@ class PipelineV8:
                     verification["discrepancies"],
                     scanner_output,
                 )
+                # Re-apply Z assignment to cover newly-added members from MultiPass
+                _page_results_list = list(scanner_output.get("page_results", {}).values())
+                _lmap = self.synthesizer._resolve_level_elevations(
+                    model.get("levels", []), _page_results_list
+                )
+                if _lmap:
+                    model["members"] = self.synthesizer._assign_z_to_all_members(
+                        model["members"], _lmap
+                    )
+                    print(f"  [Z] Re-applied Z to all members after MultiPass")
                 result.structural_model = model
                 m = model.get("members", {})
                 print(f"  -> After re-scan: {len(m.get('columns',[]))}c "

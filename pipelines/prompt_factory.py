@@ -621,6 +621,35 @@ class PromptFactory:
         half = self.max_chars // 2
         return text[:half] + "\n...(truncated)...\n" + text[-half:]
 
+    def system_prompt_plan_extractor(self) -> str:
+        return (
+            "You are a senior structural detailer reading a structural plan drawing.\n"
+            "Your task: identify every column mark (e.g. C1, C2, UC1, 1C, etc.) visible "
+            "on the plan and record its exact grid intersection position.\n\n"
+            "Output JSON only — no explanation:\n"
+            '{\n'
+            '  "C1": {\n'
+            '    "grid_label_x": "A",\n'
+            '    "grid_label_y": "1",\n'
+            '    "grid_x_mm": 0,\n'
+            '    "grid_y_mm": 7000\n'
+            '  }\n'
+            '}\n\n'
+            "Rules:\n"
+            "- Only include columns you can clearly identify at a grid intersection\n"
+            "- grid_x_mm and grid_y_mm must be integers in millimetres from the grid origin\n"
+            "- If a scale bar is shown, use it to calibrate distances\n"
+            "- Do NOT include beams, slabs, walls, or non-structural items\n"
+            "- If you cannot determine a position, omit that mark rather than guessing\n"
+        )
+
+    def user_prompt_plan_extract(self, page_idx: int) -> str:
+        return (
+            f"Structural plan page {page_idx}. "
+            "Extract all column marks and their grid XY positions from this plan drawing. "
+            "Output valid JSON only — no text before or after the JSON object."
+        )
+
     def build_full_system_prompt(self, agent_type: str, **kwargs) -> str:
         """Build complete system prompt for any agent."""
         agent_prompts = {
@@ -629,6 +658,7 @@ class PromptFactory:
             "validator": self.system_prompt_validator(),
             "ruby_generator": self.system_prompt_ruby_generator(),
             "ruby_validator": self.system_prompt_ruby_validator(),
+            "plan_extractor": self.system_prompt_plan_extractor(),
         }
         prompt = agent_prompts.get(agent_type, agent_prompts["scanner"])
         prompt += self.get_region_prompt()

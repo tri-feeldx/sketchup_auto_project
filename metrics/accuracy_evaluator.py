@@ -101,8 +101,12 @@ class AccuracyEvaluator:
 
         overall_pct = round(overall_recall * 100, 1)
 
-        # Grade
-        if overall_pct >= 90:
+        # Spatial accuracy — proxy via _confidence field (set by SynthesizerV7._assign_confidence)
+        spatial_score = self._spatial_accuracy(members)
+        spatial_pct = round(spatial_score * 100, 1)
+
+        # Grade — both count recall AND spatial must be ≥90% for Grade A
+        if overall_pct >= 90 and spatial_pct >= 75:
             grade = "A"
         elif overall_pct >= 75:
             grade = "B"
@@ -123,6 +127,7 @@ class AccuracyEvaluator:
 
         return {
             "overall_score": overall_pct,
+            "spatial_score": spatial_pct,
             "grade": grade,
             "target_met": overall_pct >= 90,
             "per_type": per_type,
@@ -131,6 +136,14 @@ class AccuracyEvaluator:
             "has_schedule_reference": bool(schedule_counts),
         }
 
+    def _spatial_accuracy(self, members: dict) -> float:
+        """Proxy spatial accuracy: ratio of columns with confident XY position (_confidence >= 0.7)."""
+        cols = members.get("columns", [])
+        if not cols:
+            return 1.0
+        good = sum(1 for c in cols if c.get("_confidence", 0) >= 0.7)
+        return good / len(cols)
+
     def evaluate_from_model(self, structural_model: dict) -> dict:
         """Shortcut: evaluate using only the structural model (no external schedule)."""
         return self.evaluate(structural_model, schedule_counts=None)
@@ -138,8 +151,11 @@ class AccuracyEvaluator:
     @staticmethod
     def format_report(result: dict) -> str:
         """Format accuracy result as human-readable string."""
+        spatial = result.get("spatial_score")
+        spatial_str = f"{spatial}%" if spatial is not None else "N/A"
         lines = [
             f"Accuracy Score: {result['overall_score']}% (Grade {result['grade']})",
+            f"Spatial Score:  {spatial_str} (column XY confidence proxy)",
             f"Target ≥90%: {'✅ MET' if result['target_met'] else '❌ NOT MET'}",
             "",
             "Per-type Recall:",

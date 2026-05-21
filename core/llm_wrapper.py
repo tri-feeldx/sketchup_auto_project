@@ -129,7 +129,7 @@ def clear_cache() -> int:
 
 
 # ── Rate limiter — light 1 s gap (Vertex AI allows 60+ RPM) ─────────────────
-_MIN_CALL_GAP_S = 1.0
+_MIN_CALL_GAP_S = 0.2
 _last_call_at   = 0.0
 
 
