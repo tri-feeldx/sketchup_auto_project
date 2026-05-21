@@ -391,3 +391,143 @@ class ArchitectReviewer:
                 except json.JSONDecodeError:
                     pass
         return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TIER 2B: ARR PRINCIPAL — Lightweight rule-based gate checks
+# No LLM calls. Runs at 3 checkpoints: post-scan, post-synthesize, post-generate.
+# ─────────────────────────────────────────────────────────────────────────────
+
+from dataclasses import dataclass as _dc, field as _dcf
+from typing import List as _List
+
+
+@_dc
+class ProjectContext:
+    expected_col_count: int = 0
+    plan_page_indices: _List[int] = _dcf(default_factory=list)
+    has_schedule_page: bool = False
+
+
+@_dc
+class GateResult:
+    passed: bool = True
+    warnings: _List[str] = _dcf(default_factory=list)
+
+    def fail(self, msg: str):
+        self.passed = False
+        self.warnings.append(msg)
+
+    def warn(self, msg: str):
+        self.warnings.append(msg)
+
+
+class ARRPrincipal:
+    """Lightweight rule-based gate checks at 3 pipeline checkpoints."""
+
+    def build_context(self, scanner_output: dict) -> ProjectContext:
+        ctx = ProjectContext()
+        page_results = scanner_output.get("page_results", {})
+        for k, v in page_results.items():
+            ptype = (v or {}).get("page_type", "")
+            if ptype == "PLAN":
+                try:
+                    ctx.plan_page_indices.append(int(k))
+                except (ValueError, TypeError):
+                    pass
+            elif ptype == "SCHEDULE":
+                ctx.has_schedule_page = True
+        for v in page_results.values():
+            cols = (v or {}).get("members", {}).get("columns") or []
+            if len(cols) > ctx.expected_col_count:
+                ctx.expected_col_count = len(cols)
+        return ctx
+
+    def gate_post_scan(self, scanner_output: dict, ctx: ProjectContext) -> GateResult:
+        r = GateResult()
+        page_results = scanner_output.get("page_results", {})
+        total = len(page_results)
+        if total == 0:
+            r.fail("Scanner returned zero page results")
+            return r
+        null_pages = sum(1 for v in page_results.values()
+                         if not v or not v.get("members"))
+        null_ratio = null_pages / total
+        if null_ratio > 0.5:
+            r.fail(f"Scan quality low: {null_pages}/{total} pages returned no members")
+        elif null_ratio > 0.3:
+            r.warn(f"Scan quality marginal: {null_pages}/{total} pages returned no members")
+        if not ctx.plan_page_indices:
+            r.warn("No PLAN pages found — column XY will all use fallback positions")
+        if not ctx.has_schedule_page:
+            r.warn("No SCHEDULE page found — count verification will be skipped")
+        return r
+
+    def gate_post_synthesize(self, model: dict, ctx: ProjectContext) -> GateResult:
+        r = GateResult()
+        cols = model.get("members", {}).get("columns", [])
+        if not cols:
+            r.fail("Synthesizer produced zero columns")
+            return r
+        hardware = [c for c in cols
+                    if self._depth(c) is not None and 0 < self._depth(c) < 50]
+        if hardware:
+            pct = len(hardware) / len(cols) * 100
+            msg = f"Hardware leak: {len(hardware)}/{len(cols)} columns depth<50mm ({pct:.0f}%)"
+            if pct > 20:
+                r.fail(msg)
+            else:
+                r.warn(msg)
+        low_conf = [c for c in cols if c.get("_confidence", 1.0) < 0.7]
+        if low_conf:
+            pct = len(low_conf) / len(cols) * 100
+            msg = f"Spatial coverage: {len(low_conf)}/{len(cols)} columns at fallback XY ({pct:.0f}%)"
+            if pct > 80:
+                r.fail(msg)
+            else:
+                r.warn(msg)
+        with_grid = sum(1 for c in cols if c.get("grid_x") or c.get("grid_y"))
+        if with_grid / len(cols) < 0.3:
+            r.warn(f"Grid coverage low: {with_grid}/{len(cols)} columns have grid labels")
+        return r
+
+    def gate_post_generate(self, model: dict) -> GateResult:
+        r = GateResult()
+        cols = model.get("members", {}).get("columns", [])
+        footings = model.get("members", {}).get("footings", [])
+        if cols:
+            try:
+                at_origin = sum(1 for c in cols
+                                if abs(float(c.get("x") or 0)) < 1
+                                and abs(float(c.get("y") or 0)) < 1)
+                if at_origin / len(cols) > 0.5:
+                    r.fail(f"XY clustering: {at_origin}/{len(cols)} columns at or near origin")
+            except (ValueError, TypeError):
+                pass
+        if footings:
+            try:
+                above_datum = [f for f in footings if float(f.get("z_top") or -1) > 0]
+                if above_datum:
+                    r.fail(f"{len(above_datum)} footing(s) have Z above datum (should be negative)")
+                xs = [float(f.get("x") or 0) for f in footings]
+                if len(set(xs)) == 1:
+                    r.warn("All footings share identical X — distribution may be broken")
+            except (ValueError, TypeError):
+                pass
+        return r
+
+    @staticmethod
+    def _depth(col: dict):
+        v = col.get("depth_mm") or col.get("depth")
+        try:
+            return float(v) if v is not None else None
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _print_gate(name: str, result: GateResult):
+        status = "✅ PASS" if result.passed else "❌ FAIL"
+        print(f"  [GATE {name}] {status}")
+        for w in result.warnings:
+            prefix = "  FAIL" if not result.passed else "  WARN"
+            print(f"    {prefix}: {w}")

@@ -29,7 +29,7 @@ from agents.validator_v7 import ValidatorV7
 from agents.schedule_verifier import ScheduleVerifier
 from agents.multi_pass_extractor import MultiPassExtractor
 from agents.structural_reviewer import StructuralReviewer
-from agents.architect_reviewer import ArchitectReviewer
+from agents.architect_reviewer import ArchitectReviewer, ARRPrincipal
 from agents.code_reviewer import CodeReviewer
 from generators.ruby_generator_v5 import RubyGeneratorV5
 from generators.ruby_validator import RubyValidator
@@ -154,6 +154,8 @@ class PipelineV8:
             os.makedirs(output_dir, exist_ok=True)
             base_name = os.path.splitext(os.path.basename(pdf_path))[0]
 
+            _arr_principal = ARRPrincipal()
+
             # ── STAGE 0-2: ScannerV6 ─────────────────────────
             print("[V8 STAGE 0-2] ScannerV6: Forensic + Routing + Scanning...")
             scanner = ScannerV6(
@@ -163,6 +165,12 @@ class PipelineV8:
             scanner_output = scanner.run(skip_vision=False)
             scanner.close()
             result.scanner_output = scanner_output
+
+            # ── GATE: POST-SCAN ───────────────────────────────
+            print("[V8 GATE POST-SCAN]")
+            _arr_ctx = _arr_principal.build_context(scanner_output)
+            _gate_scan = _arr_principal.gate_post_scan(scanner_output, _arr_ctx)
+            ARRPrincipal._print_gate("POST-SCAN", _gate_scan)
 
             forensic = scanner_output.get("forensic", {})
             num_pages = scanner_output.get("num_pages", 0)
@@ -212,6 +220,12 @@ class PipelineV8:
             print("[V8 STAGE 3] SynthesizerV7: Building structural model...")
             model = self.synthesizer.synthesize(scanner_output, plan_positions=plan_positions)
             result.structural_model = model
+
+            # ── GATE: POST-SYNTHESIZE ─────────────────────────
+            print("[V8 GATE POST-SYNTHESIZE]")
+            _gate_synth = _arr_principal.gate_post_synthesize(model, _arr_ctx)
+            ARRPrincipal._print_gate("POST-SYNTHESIZE", _gate_synth)
+
             m = model.get("members", {})
             print(f"  -> {len(m.get('columns',[]))}c "
                   f"{len(m.get('beams',[]))}b "
@@ -270,6 +284,11 @@ class PipelineV8:
             ruby = self.ruby_gen.generate(model, val.to_dict())
             result.ruby_script = ruby
             print(f"  -> {len(ruby.splitlines())} lines")
+
+            # ── GATE: POST-GENERATE ───────────────────────────
+            print("[V8 GATE POST-GENERATE]")
+            _gate_gen = _arr_principal.gate_post_generate(model)
+            ARRPrincipal._print_gate("POST-GENERATE", _gate_gen)
 
             # ── STAGE 8: Validate Ruby ────────────────────────
             print("[V8 STAGE 8] RubyValidator: Checking script...")
