@@ -18,6 +18,7 @@ Key features:
 """
 
 import json
+import re
 import time
 from typing import Dict, List, Optional
 
@@ -190,10 +191,15 @@ class SynthesizerV7:
         # Filter out hardware/connection items misidentified as structural columns
         def _is_structural_col(col: dict) -> bool:
             sec = str(col.get("section") or col.get("mark") or "").strip()
+            mark_str = str(col.get("mark") or col.get("id") or "").strip().upper()
             if "*" in sec or "#" in sec:
                 return False
-            hw_prefixes = ("SH", "CH*", "P80", "PF2", "RH", "UA", "EA")
+            # CH = connection hardware (not AS/NZS structural sections — those use UC/UB/PFC/RHS/SHS/CHS)
+            # C_S = stud/connection references (C_S9, C_S10, etc.)
+            hw_prefixes = ("SH", "CH", "P80", "PF2", "RH", "UA", "EA", "C_S")
             if any(sec.upper().startswith(p) for p in hw_prefixes):
+                return False
+            if any(mark_str.startswith(p) for p in hw_prefixes):
                 return False
             w = col.get("width_mm") or col.get("width") or 999
             try:
@@ -209,6 +215,31 @@ class SynthesizerV7:
             print(f"  [FILTER] Removed {len(raw_cols) - len(filtered_cols)} "
                   f"hardware items from columns ({len(filtered_cols)} structural remain)")
             llm_model["members"]["columns"] = filtered_cols
+
+        # Bug #4: Infer grid_x/grid_y from mark ID for columns with no position info
+        # e.g. mark "C_1A_SH150U" → grid_x="1", grid_y="A"
+        _grid_sys = llm_model.get("grid_system") or det.get("grid_system") or {}
+        _gx_set = set(str(k) for k in _grid_sys.get("x_coords", {}).keys()) or \
+                  set(str(k) for k in _grid_sys.get("x_axes", []))
+        _gy_set = set(str(k).upper() for k in _grid_sys.get("y_coords", {}).keys()) or \
+                  set(str(k).upper() for k in _grid_sys.get("y_axes", []))
+        _inferred = 0
+        for col in llm_model["members"].get("columns", []):
+            has_xy = (col.get("x_mm") is not None or col.get("x") is not None)
+            has_grid = (col.get("grid_x") is not None and col.get("grid_y") is not None)
+            if has_xy or has_grid:
+                continue
+            mark = str(col.get("mark") or col.get("id") or "")
+            m = re.search(r'(\d+)([A-Ea-e])', mark)
+            if m:
+                gx_cand = m.group(1)
+                gy_cand = m.group(2).upper()
+                if (_gx_set and gx_cand in _gx_set) and (_gy_set and gy_cand in _gy_set):
+                    col["grid_x"] = gx_cand
+                    col["grid_y"] = gy_cand
+                    _inferred += 1
+        if _inferred:
+            print(f"  [XY-INFER] Assigned grid_x/y to {_inferred} position-less columns from mark IDs")
 
         # Beams: merge LLM + deterministic, deduplicate by id
         llm_beams = llm_model["members"].get("beams", [])
@@ -629,7 +660,7 @@ class SynthesizerV7:
                 beam_z = _get_elev(beam_lid, DEFAULT_F2F)
             beam["z_mm"] = beam_z
 
-        # Footings — snap to column XY, place at negative Z
+        # Footings — snap to column XY, assign Z
         col_xy_map: dict = {}
         for col in members.get("columns", []):
             cid = col.get("id") or col.get("mark", "")
@@ -639,12 +670,24 @@ class SynthesizerV7:
                 y = col.get("y") or col.get("y_mm") or coords.get("y") or 0
                 col_xy_map[cid] = (x, y)
 
+        # Footing XY: try column ID match only (grid resolution happens in generator)
         for ftg in members.get("footings", []):
             if not (ftg.get("x") or ftg.get("x_mm")):
                 col_ref = ftg.get("column") or ftg.get("col_id") or ftg.get("id", "")
                 xy = col_xy_map.get(col_ref)
                 if xy:
                     ftg["x"] = xy[0]; ftg["y"] = xy[1]
+
+        # Footing Z: place at lowest level (footing/basement elevation)
+        footing_z_top = min(lmap.values()) if lmap else -1000
+        for ftg in members.get("footings", []):
+            raw_h = ftg.get("socket_length_mm") or ftg.get("height_mm") or ftg.get("height") or 600
+            try:
+                display_h = min(int(raw_h), 2000)
+            except (ValueError, TypeError):
+                display_h = 600
+            ftg["z_top_mm"] = footing_z_top
+            ftg["z_base_mm"] = footing_z_top - display_h
 
         # Slabs — ensure elevation_mm set from level
         for slab in members.get("slabs", []):

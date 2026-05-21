@@ -1,0 +1,176 @@
+============================================================
+PIPELINE V8 SUCCESS in 1093.7s | Accuracy: 100.0%
+============================================================
+[V8 STAGE 0-2] ScannerV6: Forensic + Routing + Scanning...
+[SCAN V6] Stage 0: Forensic analysis (A0)...
+  -> 29 pages, region=au, lang=en
+[SCAN V6] Stage 1: Page routing (A1)...
+  -> Types: SCHEDULE=18, PLAN=4, DETAIL=4, ELEVATION=1, TITLE=1, FOUNDATION=1
+[SCAN V6] Stage 2: Page scanning (A2)...
+  Scanning page 1/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [7e8aa8aa]
+  Scanning page 2/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [4d0eec00]
+  Scanning page 3/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [862610e4]
+  Scanning page 4/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 5/29 (PLAN)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [2df0cf8d]
+  Scanning page 6/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [06b33de8]
+  Scanning page 7/29 (PLAN)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [3dd4b06e]
+  Scanning page 8/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [6e1f0ac0]
+  Scanning page 9/29 (PLAN)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [5a46768f]
+    [INFO] LLM returned array, wrapping as dict
+  Scanning page 10/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 11/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 12/29 (DETAIL)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 13/29 (DETAIL)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 14/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 15/29 (ELEVATION)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 16/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [4a5d7f4d]
+    [INFO] LLM returned array, wrapping as dict
+  Scanning page 17/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 18/29 (DETAIL)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [70047094]
+    [INFO] LLM returned array, wrapping as dict
+  Scanning page 20/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [3a263413]
+  Scanning page 21/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [76816ec8]
+  Scanning page 22/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 23/29 (DETAIL)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  Scanning page 24/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [9de9e236]
+  Scanning page 25/29 (PLAN)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [84ff364f]
+  Scanning page 26/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [061815d8]
+  Scanning page 27/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [1f9f4de1]
+  Scanning page 28/29 (FOUNDATION)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [13b0a9d3]
+  Scanning page 29/29 (SCHEDULE)...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved [72d42512]
+  [RETRY] 6 null sections → re-scanning 3 schedule page(s)
+  [OK] V6 Complete: 29 pages scanned in 923.9s
+  -> Auto-detected: region=au, lang=en
+  -> 29 pages, 29 scanned, types: ['SCHEDULE', 'PLAN', 'DETAIL', 'ELEVATION', 'TITLE', 'FOUNDATION']
+[V8 STAGE 3] SynthesizerV7: Building structural model...
+  LLM call -> Vertex AI (attempt 1/6)
+  Cache MISS -> saved 
+  [Z] Level map resolved: 1 levels (3500mm–3500mm)
+  [FILTER] Removed 6 hardware items from columns (58 structural remain)
+  [Z] Level map resolved: 8 levels (-1000mm–20000mm)
+  -> 58c 52b 8s 0w 6f 2br
+[V8 STAGE 4] ScheduleVerifier: Cross-checking against schedules...
+[VERIFY] Schedule cross-check: overall_recall=1.0
+  ✓ columns: expected=52, got=58, recall=100%
+  ✓ beams: expected=8, got=52, recall=100%
+  ✓ footings: expected=6, got=6, recall=100%
+  ✓ bracing: expected=1, got=2, recall=100%
+  -> Overall recall: 100% (✓)
+[V8 STAGE 5] MultiPassExtractor: Skipped (all recalls ≥ 70%)
+[V8 STAGE 6] ValidatorV7: Checking model geometry...
+[VALIDATOR] PASSED  Score=0.00  Err=0 Warn=111 Info=58
+  [WARN] 111 issues (details in result.issues)
+  [INFO] 58 issues (details in result.issues)
+  -> PASSED (score=0.00)
+[V8 STAGE 7] RubyGeneratorV5: Building .rb script...
+  [XY] Column positions — real:0 grid:37 fallback:21/58
+  [WARN] >36% columns using fallback positions — X/Y may be wrong
+[GEN] WARN: col CH35c width=35 < 100mm, using 100
+[GEN] WARN: col CH35c depth=35 < 100mm, using 100
+[GEN] WARN: col CH40b width=40 < 100mm, using 100
+[GEN] WARN: col CH40b depth=40 < 100mm, using 100
+[GEN] WARN: col UB36c width=36 < 100mm, using 100
+[GEN] WARN: col UB36c depth=36 < 100mm, using 100
+[GEN] WARN: col UB20d width=20 < 100mm, using 100
+[GEN] WARN: col UB20d depth=20 < 100mm, using 100
+[GEN] WARN: col CH13c width=13 < 100mm, using 100
+[GEN] WARN: col CH13c depth=13 < 100mm, using 100
+[GEN] WARN: col CH35a width=35 < 100mm, using 100
+[GEN] WARN: col CH35a depth=35 < 100mm, using 100
+[GEN] WARN: col C_S9_A width=35 < 100mm, using 100
+[GEN] WARN: col C_S9_A depth=35 < 100mm, using 100
+[GEN] WARN: col C_S9_B width=35 < 100mm, using 100
+[GEN] WARN: col C_S9_B depth=35 < 100mm, using 100
+[GEN] WARN: col C_S9_C width=35 < 100mm, using 100
+[GEN] WARN: col C_S9_C depth=35 < 100mm, using 100
+[GEN] WARN: col C_S9_D width=35 < 100mm, using 100
+[GEN] WARN: col C_S9_D depth=35 < 100mm, using 100
+[GEN] WARN: col C_S10_A width=35 < 100mm, using 100
+[GEN] WARN: col C_S10_A depth=35 < 100mm, using 100
+[GEN] WARN: col C_S10_B width=35 < 100mm, using 100
+[GEN] WARN: col C_S10_B depth=35 < 100mm, using 100
+[GEN] WARN: col C_S10_C width=35 < 100mm, using 100
+[GEN] WARN: col C_S10_C depth=35 < 100mm, using 100
+[GEN] WARN: col C_S10_D width=35 < 100mm, using 100
+[GEN] WARN: col C_S10_D depth=35 < 100mm, using 100
+  -> 3731 lines
+[V8 STAGE 8] RubyValidator: Checking script...
+  -> PASSED (entities~480)
+[V8 STAGE 9] AccuracyEvaluator: Computing recall-based score...
+  -> Accuracy: 100.0% (Grade A) ✅ TARGET MET
+Accuracy Score: 100.0% (Grade A)
+Target ≥90%: ✅ MET
+
+Per-type Recall:
+  columns    [██████████]  100%  (58/52)
+  beams      [██████████]  100%  (52/8)
+  slabs       extracted=8  (no schedule ref)
+  walls       extracted=0  (no schedule ref)
+  footings   [██████████]  100%  (6/6)
+  bracing    [██████████]  100%  (2/1)
+[V8 STAGE 9.5] CodeReviewer: 1 issue(s) (no auto-fix available)
+[V8 STAGE 9.5] ARR: Skipped (accuracy=100.0% ≥ 95.0%, no 3D issues)
+[V8 STAGE 10] Saving outputs...
+  -> Ruby: C:\Users\minht\Feeldx\sketchup_auto_project\output\v8\Structural_structural.rb
+  -> JSON: C:\Users\minht\Feeldx\sketchup_auto_project\output\v8\Structural_model.json
+  -> Summary: C:\Users\minht\Feeldx\sketchup_auto_project\output\v8\Structural_summary.json
+
+============================================================
+PIPELINE V8 SUCCESS in 1004.4s | Accuracy: 100.0%
+============================================================

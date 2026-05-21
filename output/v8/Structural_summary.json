@@ -1,0 +1,120 @@
+{
+  "success": false,
+  "pdf_path": "C:\\Users\\minht\\Feeldx\\sketchup_auto_project\\data\\input_pdf\\Structural.pdf",
+  "duration_sec": 0.0,
+  "forensic_summary": {
+    "pages": 29,
+    "type": "unknown",
+    "region": "au",
+    "language": "en"
+  },
+  "routed_page_count": 29,
+  "structural_model_summary": {
+    "columns": 53,
+    "beams": 118,
+    "slabs": 1,
+    "walls": 0,
+    "footings": 6,
+    "bracing": 7,
+    "levels": 1
+  },
+  "verification": {
+    "schedule_counts": {
+      "columns": 44,
+      "beams": 59,
+      "bracing": 3,
+      "footings": 6
+    },
+    "extracted_counts": {
+      "columns": 53,
+      "beams": 118,
+      "slabs": 1,
+      "walls": 0,
+      "footings": 6,
+      "bracing": 7
+    },
+    "discrepancies": [
+      {
+        "type": "columns",
+        "expected": 44,
+        "got": 53,
+        "deficit": 0,
+        "recall": 1.0,
+        "needs_repass": false
+      },
+      {
+        "type": "beams",
+        "expected": 59,
+        "got": 118,
+        "deficit": 0,
+        "recall": 1.0,
+        "needs_repass": false
+      },
+      {
+        "type": "footings",
+        "expected": 6,
+        "got": 6,
+        "deficit": 0,
+        "recall": 1.0,
+        "needs_repass": false
+      },
+      {
+        "type": "bracing",
+        "expected": 3,
+        "got": 7,
+        "deficit": 0,
+        "recall": 1.0,
+        "needs_repass": false
+      }
+    ],
+    "needs_repass": false,
+    "overall_recall": 1.0
+  },
+  "validation_passed": true,
+  "ruby_validation_passed": true,
+  "accuracy_score": 100.0,
+  "accuracy_grade": "A",
+  "accuracy_target_met": true,
+  "accuracy_per_type": {
+    "columns": {
+      "extracted": 53,
+      "expected": 44,
+      "recall": 1.0,
+      "deficit": 0
+    },
+    "beams": {
+      "extracted": 118,
+      "expected": 59,
+      "recall": 1.0,
+      "deficit": 0
+    },
+    "slabs": {
+      "extracted": 1,
+      "expected": null,
+      "recall": null,
+      "deficit": 0
+    },
+    "walls": {
+      "extracted": 0,
+      "expected": null,
+      "recall": null,
+      "deficit": 0
+    },
+    "footings": {
+      "extracted": 6,
+      "expected": 6,
+      "recall": 1.0,
+      "deficit": 0
+    },
+    "bracing": {
+      "extracted": 7,
+      "expected": 3,
+      "recall": 1.0,
+      "deficit": 0
+    }
+  },
+  "output_rb_path": "C:\\Users\\minht\\Feeldx\\sketchup_auto_project\\output\\v8\\Structural_structural.rb",
+  "output_json_path": "C:\\Users\\minht\\Feeldx\\sketchup_auto_project\\output\\v8\\Structural_model.json",
+  "output_ifc_path": "",
+  "errors": []
+}

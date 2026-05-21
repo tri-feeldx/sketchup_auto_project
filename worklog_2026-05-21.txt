@@ -1,0 +1,196 @@
+============================================================
+WORK LOG — 2026-05-21
+Project: SketchUp Auto LOD300 Pipeline (UNE Tamworth)
+Engineer: Minh Tri + Claude (AI pair)
+============================================================
+
+-----------------------------------------------------------
+SUMMARY
+-----------------------------------------------------------
+Session focused on diagnosing and fixing visual accuracy
+issues in the V8 pipeline output. Pipeline reports 100%
+accuracy (count recall) but SketchUp model is visually
+broken — Grade D. Root causes identified and partially fixed.
+Full roadmap planned for LOD300/350/400.
+
+-----------------------------------------------------------
+EVALUATION — CURRENT MODEL vs. COVER SHEET
+-----------------------------------------------------------
+Cover sheet target:
+  - University of New England, Tamworth Central Campus
+  - Multi-storey steel frame, ~5 floors, stairs, lift core
+  - Pile foundations + raft slab
+
+Current output (Grade D — NOT usable):
+  - 36% of columns (19/53) placed at wrong XY positions
+    → cluster in one corner instead of distributed on grid
+  - All 6 footings stacked at origin (0, 0) — not distributed
+  - Hardware items (baseplates 75SHS_BP, 89SHS_BP) rendering
+    as structural columns
+  - Footings placed at Z=3500mm (above ground, not below datum)
+  - Beams disconnected from columns
+
+Accuracy metric is COUNT RECALL ONLY — does not measure
+spatial position. This is why pipeline says 100% while
+model looks completely wrong.
+
+-----------------------------------------------------------
+BUGS FIXED TODAY (Phase 3)
+-----------------------------------------------------------
+
+Fix 1 — Hardware Filter (agents/synthesizer_v7.py ~line 191)
+  Problem: "CH*" = literal asterisk → CH35c, CH40b not caught
+           C_S9_A through C_S10_D studs not caught
+           Only checked "section" field, not "mark" field
+  Fix: Changed "CH*" → "CH", added "C_S" to hw_prefixes,
+       added mark field check in _is_structural_col()
+  Result: Removed 13 hardware items (was 6) ✓
+
+Fix 2 — Footing XY (agents/synthesizer_v7.py ~line 673)
+  Problem: Footing IDs (P1-P5, RF1) don't match column IDs
+           → ID lookup fails → footings at (0,0)
+  Fix: Added ID-based snap; removed broken sorted fallback
+       from synthesizer (col_xy_map is all (0,0) at this
+       stage since grid→mm resolution happens in generator)
+  Status: Partial — ID snap works but fallback still broken
+          (see Remaining Bug A below)
+
+Fix 3 — Pile Dimensions (generators/ruby_generator_v5.py ~line 678)
+  Problem: Generator read width_mm/height_mm but piles have
+           diameter_mm/socket_length_mm → 1600x1600mm boxes
+  Fix: Added pile type branch reading correct fields,
+       socket_length capped at 2000mm for display
+  Result: Piles now rendered at correct 750mm diameter ✓
+
+Fix 4 — Footing Z (agents/synthesizer_v7.py ~line 681)
+  Problem: _assign_z_to_all_members() never set Z for footings
+  Fix: Added footing Z block using min(lmap.values())
+  Status: Partial — still broken when lmap min > 0 (see Bug B)
+
+Fix 4b — Footing fallback in Generator (generators/ruby_generator_v5.py ~line 667)
+  Problem: No fallback to distribute footings if no ID match
+  Fix: Added sorted col_map fallback in _footing_ruby_v5()
+  Status: Broken — sorted_cols includes (0,0) entries (Bug A)
+
+-----------------------------------------------------------
+REMAINING BUGS (NOT YET FIXED — for next session)
+-----------------------------------------------------------
+
+Bug A — Footing XY sorted fallback picks (0,0) entries
+  File: generators/ruby_generator_v5.py line 667-674
+  Problem: sorted_cols includes all 19 columns at (0,0)
+           → (0,0) sorts first → footings pick (0,0)
+  Fix needed:
+    valid_cols = [p for p in col_map.values()
+                  if self._n(p.get("x"),0) != 0
+                  or self._n(p.get("y"),0) != 0]
+    sorted_cols = sorted(valid_cols, ...)
+    snap = sorted_cols[i % len(sorted_cols)]
+
+Bug B — Footing Z placed at 3500mm (above ground)
+  File: agents/synthesizer_v7.py line 682
+  Problem: min(lmap.values()) = 3500 when lmap has only
+           1 level (3500mm = first floor slab)
+  Fix needed:
+    _lmap_min = min(lmap.values()) if lmap else -1000
+    footing_z_top = _lmap_min if _lmap_min < 0 else -1000
+
+Bug C — Baseplates 75SHS_BP, 89SHS_BP still leaking
+  File: agents/synthesizer_v7.py ~line 200
+  Problem: _BP suffix not in hardware filter
+  Fix needed: Add suffix check:
+    if sec.upper().endswith("_BP") or mark_str.endswith("_BP"):
+        return False
+
+Bug D — Column XY fallback 36% (architectural fix required)
+  19/53 columns have no grid reference → placed at (0,0)
+  Root cause: Scanner reads each page independently.
+  PLAN pages have grid layout; SCHEDULE pages have column
+  marks. Scanner doesn't correlate them → grid_x=null.
+  Fix: New agent "Plan Page Column Extractor" (Tier 2 work)
+
+-----------------------------------------------------------
+ARR AGENT ANALYSIS
+-----------------------------------------------------------
+Original design intent: Senior Architect + AI Engineer who
+reads entire PDF, supervises each stage as a gatekeeper
+before pipeline proceeds to next step.
+
+Actual implementation: Post-processing fallback at stage 9.5,
+only triggers if count_recall < 95% (never happens) or Z=0.
+Does NOT check XY positions. Does NOT read PDF. Does NOT
+gate between stages.
+
+Three-layer failure:
+  1. Never triggers (accuracy=100% → skip)
+  2. _verify_3d_positions() checks Z only, not XY clustering
+  3. _apply_corrections() cannot update XY coordinates
+
+ARR redesign required (Tier 2) — see plan file for details.
+
+-----------------------------------------------------------
+ROADMAP AGREED
+-----------------------------------------------------------
+
+Tier 1 — Immediate (today/tomorrow):
+  → Bug A: Footing XY filter fix (generator)
+  → Bug B: Footing Z guard (synthesizer)
+  → Bug C: _BP suffix filter (synthesizer)
+  → Visual model: footings distributed, correct size, below ground
+
+Tier 2 — 2-3 weeks:
+  → ARR Redesign: inter-stage supervisor/gatekeeper
+  → Plan Page Column Extractor: fix 36% column fallback → <5%
+  → Deterministic synthesizer cache: reproducible runs
+
+Tier 3 — 1-2 months:
+  → Spatial accuracy metric (position-based, not count-only)
+  → Scale bar parser
+  → Structural logic validator
+  → LOD350 connections
+
+Tier 4 — 3-4 months:
+  → LOD400 fabrication details
+  → AS/NZS 4600 compliance check
+  → IFC LOD400 export
+
+-----------------------------------------------------------
+FILES MODIFIED TODAY
+-----------------------------------------------------------
+agents/synthesizer_v7.py
+  - _is_structural_col() lines 191-210 (hardware filter)
+  - _assign_z_to_all_members() lines 663-695 (footing XY/Z)
+
+generators/ruby_generator_v5.py
+  - _footing_ruby_v5() lines 657-710 (pile dims, Z, fallback)
+
+C:\Users\minht\.claude\plans\serialized-singing-emerson.md
+  - Full execution plan for next session (A-Z handoff)
+
+-----------------------------------------------------------
+TEST RESULTS
+-----------------------------------------------------------
+Run 1 (logs1.txt — pre-fix):  SUCCESS 100% | Grade D visual
+Run 2 (logs2.txt — post-fix): SUCCESS 100% | Grade D visual
+                               (Tier 1 fixes not complete yet)
+
+Key log changes log1→log2:
+  [FILTER] Removed 6 → 13  ✓ hardware filter improved
+  CH35c, C_S9_A warns → Gone ✓
+  75SHS_BP warns → New (Bug C, not yet fixed)
+  Footings XY still (0,0) (Bug A, not yet fixed)
+  Beams: 52→118 (LLM variance issue — known)
+
+-----------------------------------------------------------
+NEXT SESSION INSTRUCTIONS
+-----------------------------------------------------------
+1. Read plan file: C:\Users\minht\.claude\plans\serialized-singing-emerson.md
+2. Fix Bug A (generator line 667-674)
+3. Fix Bug B (synthesizer line 682)
+4. Fix Bug C (synthesizer ~line 200)
+5. Ask user to run pipeline and verify logs
+6. Then proceed to Tier 2 (ARR redesign)
+
+============================================================
+END OF WORK LOG
+============================================================

@@ -143,6 +143,7 @@ class RubyGeneratorV5:
 
         # Build column lookup (id → resolved x,y,z) — all values forced to int
         col_positions = {}
+        _pos_real = _pos_grid = _pos_fallback = 0
         for i, c in enumerate(cols):
             cid = c.get("id") or c.get("mark", f"COL_{i}")
             gx = c.get("grid_x")
@@ -153,8 +154,16 @@ class RubyGeneratorV5:
                 x = grid_to_mm_x(gx)
             if y is None and gy is not None:
                 y = grid_to_mm_y(gy)
+            _had_real = x is not None and y is not None and gx is None
+            _had_grid = x is not None and gx is not None
             x = self._n(x, (i % 4) * spacing_x)
             y = self._n(y, (i // 4) * spacing_y)
+            if _had_real:
+                _pos_real += 1
+            elif _had_grid:
+                _pos_grid += 1
+            else:
+                _pos_fallback += 1
             zb = self._n(c.get("z_base_mm") or c.get("z_base"), 0)
             zt = self._n(c.get("z_top_mm") or c.get("z_top"), None)
             if zt is not None and zt > zb:
@@ -162,6 +171,11 @@ class RubyGeneratorV5:
             else:
                 zh = self._n(c.get("height_mm") or c.get("height"), 3500)
             col_positions[cid] = {"x": x, "y": y, "z_base": zb, "z_top": zb + zh}
+        total_cols = len(cols)
+        if total_cols:
+            print(f"  [XY] Column positions — real:{_pos_real} grid:{_pos_grid} fallback:{_pos_fallback}/{total_cols}")
+            if _pos_fallback / total_cols > 0.2:
+                print(f"  [WARN] >{int(_pos_fallback/total_cols*100)}% columns using fallback positions — X/Y may be wrong")
 
         # ── Columns ──
         if cols:
@@ -644,33 +658,55 @@ class RubyGeneratorV5:
                           mat_vars: dict) -> List[str]:
         x = self._n(ftg.get("x") or ftg.get("x_mm"), 0)
         y = self._n(ftg.get("y") or ftg.get("y_mm"), 0)
-        # Try to snap to a column position
+        # Try to snap to a column position by ID
         fid = ftg.get("column") or ftg.get("col_id") or ftg.get("id", "")
         if fid and fid in col_map:
             pos = col_map[fid]
             x = self._n(pos["x"]); y = self._n(pos["y"])
-        w = ftg.get("width_mm") or ftg.get("width", 1600)
-        d = ftg.get("depth_mm") or ftg.get("depth", 1600)
-        h = ftg.get("height_mm") or ftg.get("height", 600)
+        # Fallback: if still at origin (0,0), snap to i-th sorted column position
+        if x == 0 and y == 0 and col_map:
+            sorted_cols = sorted(col_map.values(),
+                                 key=lambda p: (self._n(p.get("x"), 0),
+                                                self._n(p.get("y"), 0)))
+            if i < len(sorted_cols):
+                snap = sorted_cols[i]
+                x = self._n(snap.get("x"), 0)
+                y = self._n(snap.get("y"), 0)
+                print(f"  [XY-FOOTING] {ftg.get('id','')} -> col pos ({x},{y})")
+        # Pile footings use diameter_mm + socket_length_mm; raft/pad use width/depth/height
+        ftg_type = str(ftg.get("type", "")).lower()
+        if ftg_type == "pile":
+            diam = ftg.get("diameter_mm") or ftg.get("diameter") or 600
+            w = diam; d = diam
+            raw_h = ftg.get("socket_length_mm") or ftg.get("height_mm") or ftg.get("height") or 600
+            h = min(int(raw_h), 2000)  # cap at 2m for display
+        else:
+            w = ftg.get("width_mm") or ftg.get("width") or 1600
+            d = ftg.get("depth_mm") or ftg.get("depth") or 1600
+            h = ftg.get("height_mm") or ftg.get("height") or 600
         mat = self._get_mat(ftg, mat_vars)
         try:
             w = int(w); d = int(d); h = int(h)
         except (ValueError, TypeError):
-            w = 1600; d = 1600; h = 600
+            w = 600; d = 600; h = 600
         w = max(w, 200); d = max(d, 200); h = max(h, 100)
         hw = w // 2; hd = d // 2
+        # Use Z from synthesizer if available; fallback to -h (below datum)
+        z_top = self._n(ftg.get("z_top_mm"), 0)
+        z_base = self._n(ftg.get("z_base_mm"), -h)
+        actual_h = max(abs(z_top - z_base), h)
         return [
-            f"# Footing {i+1}: {ftg.get('id','')}",
+            f"# Footing {i+1}: {ftg.get('id','')} ({ftg_type})",
             f"pts_{i} = [",
-            f"  Geom::Point3d.new(ox+{x-hw}, oy+{y-hd}, -{h}),",
-            f"  Geom::Point3d.new(ox+{x+hw}, oy+{y-hd}, -{h}),",
-            f"  Geom::Point3d.new(ox+{x+hw}, oy+{y+hd}, -{h}),",
-            f"  Geom::Point3d.new(ox+{x-hw}, oy+{y+hd}, -{h})",
+            f"  Geom::Point3d.new(ox+{x-hw}, oy+{y-hd}, {z_base}),",
+            f"  Geom::Point3d.new(ox+{x+hw}, oy+{y-hd}, {z_base}),",
+            f"  Geom::Point3d.new(ox+{x+hw}, oy+{y+hd}, {z_base}),",
+            f"  Geom::Point3d.new(ox+{x-hw}, oy+{y+hd}, {z_base})",
             f"]",
             f"f_{i} = ents.add_face(pts_{i})",
             f"f_{i}.material = {mat} if f_{i}",
             f"f_{i}.layer = layers['ftgs'] if f_{i}",
-            f"f_{i}.pushpull({h}) if f_{i}",
+            f"f_{i}.pushpull({actual_h}) if f_{i}",
         ]
 
     # ── LOD350 CONNECTIONS ───────────────────────────────
