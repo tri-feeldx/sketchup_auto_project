@@ -1,0 +1,44 @@
+# RuboCop configuration for SketchUp Auto Pipeline
+# Used to lint AI-generated .rb scripts before loading into SketchUp.
+# Run: rubocop output/v8/Structural_structural.rb
+
+plugins:
+  - rubocop-sketchup
+
+AllCops:
+  DisabledByDefault: true     # Only SketchUp-specific cops enabled
+  CacheRootDirectory: .rubocop_cache
+  SuggestExtensions: false
+  DisplayCopNames: true
+  DisplayStyleGuide: true
+  ExtraDetails: true
+  NewCops: enable
+
+  TargetRubyVersion: 3.2       # SketchUp 2024+ ships Ruby 3.2
+  TargetSketchUpVersion: 2024  # Our minimum supported version
+
+  # Exclude everything except generated Ruby output
+  Include:
+    - "output/**/*.rb"
+    - "src/**/*.rb"
+  Exclude:
+    - "legacy/**"
+    - "tests/**"
+    - "tools/**"
+    - "**/*.py"
+
+# ── Enable SketchUp-specific cop departments ──────────────────────────────────
+SketchupDeprecations:
+  Enabled: true   # Catch removed API calls (e.g. view.draw_points deprecated in 2020)
+
+SketchupPerformance:
+  Enabled: true   # Catch slow patterns (e.g. model.entities.each in tight loops)
+
+SketchupRequirements:
+  Enabled: true   # Extension Warehouse requirements (required for distribution)
+
+SketchupSuggestions:
+  Enabled: true   # Best-practice suggestions
+
+SketchupBugs:
+  Enabled: true   # Known SketchUp Ruby API bugs to avoid

@@ -1,0 +1,14 @@
+# Solargraph configuration for SketchUp Ruby API autocomplete
+# Provides full intellisense for Sketchup::*, Geom::*, Layout::* in VS Code.
+#
+# Setup: Install Ruby + run `bundle install` then reload VS Code window.
+
+require_paths:
+  - "C:/Program Files/SketchUp/SketchUp 2026/Tools"  # SketchUp Ruby Tools path
+  - "src"
+
+require:
+  - sketchup-api-stubs   # Full SketchUp Ruby API stubs for autocomplete
+
+reporters:
+  - rubocop              # Inline linting feedback in VS Code editor

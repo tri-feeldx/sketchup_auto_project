@@ -1,0 +1,35 @@
+root = true
+
+# All files
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# Python (PEP 8)
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# Ruby (community standard: 2 spaces)
+[*.rb]
+indent_style = space
+indent_size = 2
+max_line_length = 120
+
+# JSON / YAML
+[*.{json,yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Markdown
+[*.md]
+max_line_length = 100
+trim_trailing_whitespace = false
+
+# Gemfile / Rakefile
+[{Gemfile,Rakefile,*.gemspec}]
+indent_style = space
+indent_size = 2

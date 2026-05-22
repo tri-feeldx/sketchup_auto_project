@@ -34,11 +34,21 @@ data/**/*.ifc
 *.dwg
 *.ifc
 
-# IDE
-.vscode/
+# IDE — track settings.json + extensions.json, ignore everything else
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-snippets
 .idea/
 *.swp
 *.swo
+
+# Temporary editor swap files (Claude Code / VSCode edits)
+*.tmp.*
+*.tmp
+
+# Ruby tools
+.rubocop_cache/
+.bundle/
 
 # OS
 .DS_Store

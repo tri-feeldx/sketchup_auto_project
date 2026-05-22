@@ -1,9 +1,15 @@
 """
 B2: RUBY VALIDATOR — SketchUp Ruby Script Quality Gate.
 Checks generated .rb scripts for safety, correctness, and performance.
+Optionally runs rubocop-sketchup if Ruby is installed (graceful fallback).
 """
 
+import json
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from typing import List
 
@@ -60,6 +66,13 @@ class RubyValidator:
     REQUIRED_METHODS = [
         "start_operation", "commit_operation",
     ]
+    # SketchUp API calls deprecated since SU2020+ — rubocop-sketchup SketchupDeprecations
+    DEPRECATED_CALLS = [
+        ("Sketchup.active_model.materials.current=", "Use material= on entities directly"),
+        ("view.draw_points(", "Deprecated in SU2020 — use view.draw() with GL_POINTS"),
+        (".selected_page=", "Use model.pages.selected= instead"),
+        ("model.shadow_info[", "Use model.shadow_info.set_value() instead"),
+    ]
 
     def __init__(self, region="vn"):
         self.region = region
@@ -92,9 +105,15 @@ class RubyValidator:
         # Transaction wrapping
         self._check_transactions(result, ruby_script)
 
+        # SketchUp deprecated API calls
+        self._check_deprecated(result, ruby_script)
+
         # Region-specific checks
         if self.region == "vn":
             self._check_vn_patterns(result, ruby_script)
+
+        # Optional: rubocop-sketchup (if Ruby installed)
+        self._check_rubocop_sketchup(result, ruby_script)
 
         # Aggregate
         for issue in result.issues:
@@ -199,6 +218,77 @@ class RubyValidator:
                 "no_transaction_commit", "WARNING", 0,
                 "No model.commit_operation() — transaction may leak"
             ))
+
+    # ── DEPRECATED API CALLS ───────────────────────────
+
+    def _check_deprecated(self, result: RubyValidationResult, script: str):
+        for call, hint in self.DEPRECATED_CALLS:
+            if call in script:
+                line_no = script[:script.find(call)].count("\n") + 1
+                result.issues.append(RubyIssue(
+                    "deprecated_api", "WARNING", line_no,
+                    f"Deprecated SketchUp API: '{call}' — {hint}"
+                ))
+
+    # ── RUBOCOP-SKETCHUP (optional, requires Ruby + gems) ──────────────────
+
+    def _check_rubocop_sketchup(self, result: RubyValidationResult, ruby_script: str):
+        """Run rubocop-sketchup if available. Completely non-fatal if Ruby not installed."""
+        rubocop_bin = shutil.which("rubocop")
+        if not rubocop_bin:
+            return  # Ruby not installed — skip silently
+
+        rubocop_yml = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            ".rubocop.yml"
+        )
+
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=".rb", mode="w", delete=False, encoding="utf-8"
+            ) as f:
+                f.write(ruby_script)
+                tmp_path = f.name
+
+            cmd = [rubocop_bin, "--format", "json", tmp_path]
+            if os.path.exists(rubocop_yml):
+                cmd += ["--config", rubocop_yml]
+
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            try:
+                data = json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                return
+
+            for file_result in data.get("files", []):
+                for offense in file_result.get("offenses", []):
+                    cop = offense.get("cop_name", "rubocop")
+                    raw_sev = offense.get("severity", "convention").lower()
+                    sev = "ERROR" if raw_sev in ("error", "fatal") else (
+                        "WARNING" if raw_sev in ("warning", "convention") else "INFO"
+                    )
+                    result.issues.append(RubyIssue(
+                        rule=f"rubocop:{cop}",
+                        severity=sev,
+                        line=offense.get("location", {}).get("line", 0),
+                        message=offense.get("message", "")
+                    ))
+
+            if data.get("files"):
+                total = sum(len(f.get("offenses", [])) for f in data["files"])
+                print(f"  [RUBOCOP] {total} offense(s) from rubocop-sketchup")
+
+        except subprocess.TimeoutExpired:
+            print("  [RUBOCOP] Timed out after 30s — skipping")
+        except Exception:
+            pass  # Never crash the pipeline
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     # ── VN REGION CHECKS ───────────────────────────────
 
