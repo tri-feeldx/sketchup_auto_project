@@ -37,7 +37,7 @@ from generators.ifc_generator import IFCGenerator, _ifc_available
 from metrics.accuracy_evaluator import AccuracyEvaluator
 
 ARR_ACCURACY_THRESHOLD = 95.0
-ARR_MAX_RETRIES = 3
+ARR_MAX_RETRIES = 1
 
 import re as _re
 _ANSI_RE = _re.compile(r'\x1b\[[0-9;]*m')  # strip ANSI color codes for log file
@@ -170,8 +170,26 @@ class PipelineV8:
         result = PipelineV8Result(pdf_path=pdf_path)
         t0 = time.time()
 
-        # ── Auto-log: tee stdout+stderr to file ──────────────────────────────
+        # ── Pipeline lock: prevent concurrent runs (doubles API cost) ────────
         os.makedirs(output_dir, exist_ok=True)
+        _lock_path = os.path.join(output_dir, ".pipeline_v8.lock")
+        if os.path.exists(_lock_path):
+            try:
+                _lock_age = time.time() - os.path.getmtime(_lock_path)
+            except OSError:
+                _lock_age = 9999
+            if _lock_age < 3600:  # stale after 1 hour
+                result.errors.append(
+                    f"Pipeline already running (lock file: {_lock_path}, "
+                    f"age={_lock_age:.0f}s). Wait for it to finish or delete the lock."
+                )
+                return result
+        try:
+            open(_lock_path, "w").close()
+        except OSError:
+            pass
+
+        # ── Auto-log: tee stdout+stderr to file ──────────────────────────────
         _pdf_base = os.path.splitext(os.path.basename(pdf_path))[0]
         _log_path = os.path.join(output_dir, f"{_pdf_base}_run.log")
         _log_fh = open(_log_path, "w", encoding="utf-8", buffering=1)
@@ -524,6 +542,10 @@ class PipelineV8:
             sys.stdout = _orig_out
             sys.stderr = _orig_err
             _log_fh.close()
+            try:
+                os.remove(_lock_path)
+            except OSError:
+                pass
 
         return result
 

@@ -16,13 +16,18 @@ Key V6 improvements over V5:
 =============================================================================
 """
 
+import io
 import json
 import time
+import hashlib
 import concurrent.futures
 from pathlib import Path
 from typing import Optional, Dict, List
 
 PARALLEL_SCAN_WORKERS = 6
+_DEDUP_DPI = 25          # very low-res thumbnail for near-duplicate detection
+_DEDUP_THUMB_SIZE = 16   # resize to 16×16 before hashing
+_DEDUP_TYPES = {"SCHEDULE"}  # only dedup schedule pages (18 pages → ~5-6 unique)
 
 from core.llm_wrapper import call_llm
 from core.vision_renderer import VisionRenderer
@@ -58,6 +63,57 @@ class ScannerV6:
         self.forensic_result: Optional[Dict] = None
         self.router = PageRouter()
         self.prompt_factory = PromptFactory(region=region, language=language)
+
+    def _dedup_pages(self, routed: list) -> list:
+        """Remove near-duplicate pages (same visual content) before scanning.
+        Uses 16×16 average-hash at very low DPI — fast and purely local.
+        Only applied to page types listed in _DEDUP_TYPES (SCHEDULE by default).
+        """
+        from PIL import Image as _PILImage
+
+        dedup_pages = [rp for rp in routed if rp.page_type not in _DEDUP_TYPES]
+        dedup_candidates = [rp for rp in routed if rp.page_type in _DEDUP_TYPES]
+        if len(dedup_candidates) <= 1:
+            return routed
+
+        seen_hashes: set = set()
+        kept = 0
+        skipped = 0
+        try:
+            renderer = VisionRenderer(str(self.pdf_path), dpi=_DEDUP_DPI)
+            for rp in dedup_candidates:
+                try:
+                    img_bytes = renderer.render_page_as_bytes(rp.page_idx, format="PNG")
+                    img = _PILImage.open(io.BytesIO(img_bytes)).convert("L").resize(
+                        (_DEDUP_THUMB_SIZE, _DEDUP_THUMB_SIZE), _PILImage.LANCZOS
+                    )
+                    pixels = list(img.getdata())
+                    avg = sum(pixels) / len(pixels)
+                    ahash = hashlib.md5(
+                        bytes(1 if p >= avg else 0 for p in pixels)
+                    ).hexdigest()
+                except Exception:
+                    ahash = f"err_{rp.page_idx}"
+
+                if ahash not in seen_hashes:
+                    seen_hashes.add(ahash)
+                    dedup_pages.append(rp)
+                    kept += 1
+                else:
+                    print(f"  [DEDUP] Page {rp.page_idx+1} ({rp.page_type}) is near-duplicate — skipped")
+                    skipped += 1
+        except Exception as e:
+            print(f"  [DEDUP] Thumbnail render failed ({e}) — skipping dedup")
+            return routed
+        finally:
+            try:
+                renderer.close()
+            except Exception:
+                pass
+
+        if skipped:
+            print(f"  [DEDUP] {skipped} duplicate page(s) removed, {kept} unique kept")
+        return sorted(dedup_pages, key=lambda rp: rp.page_idx)
 
     def _open(self):
         """Open PDF renderer."""
@@ -100,6 +156,9 @@ class ScannerV6:
         batches = self.router.batch_pages(routed)
         summary = self.router.get_summary(routed)
         print(f"  -> Types: {', '.join(f'{k}={len(v)}' for k,v in batches.items())}")
+
+        # ── STAGE 1b: DEDUP ─────────────────────────────────
+        routed = self._dedup_pages(routed)
 
         # ── STAGE 2: SCAN ───────────────────────────────────
         print("[SCAN V6] Stage 2: Page scanning (A2)...")
