@@ -32,7 +32,6 @@ from core.llm_wrapper import call_llm
 from core.vision_renderer import VisionRenderer
 from pipelines.prompt_factory import PromptFactory
 
-MAX_VISION_PAGES = 4
 MAX_TEXT_PER_PAGE = 3000
 MAX_MODEL_EXCERPT = 6000
 
@@ -49,9 +48,11 @@ class ArchitectReviewer:
         self.dpi = dpi
         self.prompt_factory = PromptFactory(region=region)
 
-    def review(self, scanner_output: dict, structural_model: dict) -> dict:
+    def review(self, scanner_output: dict, structural_model: dict,
+               ground_truth: dict = None) -> dict:
         """
         Full architect review: page-by-page analysis + 3D position verification.
+        When ground_truth is provided, validates model against locked ProjectFacts.
 
         Returns structured corrections that pipeline_v8 can apply.
         """
@@ -64,8 +65,6 @@ class ArchitectReviewer:
         all_corrections: Dict = {"add": {}, "update": {}, "remove": {}}
         all_3d_issues = []
         all_diagnostics: List[dict] = []
-        vision_used = 0
-
         # ── Stage 1: Title page → project profile ───────────
         title_pages = [
             idx for idx, pr in page_results.items()
@@ -81,9 +80,15 @@ class ArchitectReviewer:
                           f"| std={project_profile.get('standard','?')} "
                           f"| floors={project_profile.get('floor_count','?')}")
 
+        # ── Stage 1.5: Ground Truth validation ──────────────
+        if ground_truth and ground_truth.get("confidence", 0) >= 0.4:
+            self._validate_against_ground_truth(structural_model, ground_truth,
+                                                all_corrections, all_diagnostics)
+
         # ── Stage 2: Per-page review ─────────────────────────
         model_excerpt = self._build_model_excerpt(structural_model)
         sys_p = self.prompt_factory.system_prompt_architect_reviewer()
+        vision_used = 0
 
         for idx_str, pr in sorted(page_results.items(), key=lambda kv: int(kv[0])):
             ptype = pr.get("page_type", "UNKNOWN")
@@ -95,16 +100,16 @@ class ArchitectReviewer:
             if not pt:
                 continue
 
-            # Use vision for PLAN and ELEVATION pages (highest value)
-            use_vision = (ptype in ("PLAN", "ELEVATION") and
-                          vision_used < MAX_VISION_PAGES)
+            # Use vision for all structural pages — no cap, every page gets rendered
+            use_vision = ptype in ("PLAN", "ELEVATION", "SCHEDULE", "DETAIL", "FOUNDATION")
             img_bytes = None
             if use_vision:
                 try:
                     renderer = VisionRenderer(str(self.pdf_path), dpi=self.dpi)
                     img_bytes = renderer.render_page_as_bytes(page_idx, format="PNG")
                     renderer.close()
-                    vision_used += 1
+                    if img_bytes:
+                        vision_used += 1
                 except Exception as e:
                     print(f"    [ARR] Vision render page {page_idx} failed: {e}")
 
@@ -297,6 +302,67 @@ class ArchitectReviewer:
             print(f"    [ARR] Project profile extract failed: {e}")
         return {}
 
+    def _validate_against_ground_truth(self, model: dict, ground_truth: dict,
+                                       corrections: dict, diagnostics: list):
+        """
+        Compare current model against locked ProjectFacts.
+        Adds diagnostics and auto-corrections where possible.
+        """
+        members = model.get("members", {})
+        cols = members.get("columns", [])
+
+        # Check 1: column count vs expected
+        expected = ground_truth.get("col_count_expected")
+        if expected is not None:
+            actual = len(cols)
+            diff_pct = abs(actual - expected) / max(expected, 1) * 100
+            status = "✓" if diff_pct <= 20 else "⚠"
+            print(f"  [ARR-GT] Column count: {actual} vs expected {expected} "
+                  f"({diff_pct:.0f}% diff) {status}")
+            if diff_pct > 40:
+                diagnostics.append({
+                    "type": "count_mismatch",
+                    "detail": f"Got {actual} columns, expected {expected} (>{40}% diff)"
+                })
+
+        # Check 2: grid conformance — are columns using locked grid values?
+        gx_mm = ground_truth.get("grid_x_mm") or {}
+        gy_mm = ground_truth.get("grid_y_mm") or {}
+        if gx_mm and gy_mm:
+            valid_xs = set(int(v) for v in gx_mm.values())
+            valid_ys = set(int(v) for v in gy_mm.values())
+            off_grid = 0
+            for col in cols:
+                cx = col.get("x_mm") or col.get("x")
+                cy = col.get("y_mm") or col.get("y")
+                if cx is None or cy is None:
+                    continue
+                cx, cy = int(float(cx)), int(float(cy))
+                # Allow ±200mm tolerance for real-world positioning
+                on_x = any(abs(cx - vx) <= 200 for vx in valid_xs)
+                on_y = any(abs(cy - vy) <= 200 for vy in valid_ys)
+                if not (on_x and on_y):
+                    off_grid += 1
+            if off_grid:
+                print(f"  [ARR-GT] {off_grid}/{len(cols)} columns off locked grid")
+                diagnostics.append({
+                    "type": "off_grid",
+                    "detail": f"{off_grid} columns not on locked grid lines"
+                })
+
+        # Check 3: floor height conformance
+        fh = ground_truth.get("floor_heights_mm") or {}
+        if fh and len(fh) >= 2:
+            max_valid_z = max(int(v) for v in fh.values())
+            bad_z = [c for c in cols
+                     if (c.get("z_top_mm") or 0) > max_valid_z * 1.1]
+            if bad_z:
+                print(f"  [ARR-GT] {len(bad_z)} columns have z_top > roof "
+                      f"({max_valid_z}mm) — clamping")
+                for col in bad_z:
+                    col["z_top_mm"] = max_valid_z
+                    col["height_mm"] = max_valid_z - col.get("z_base_mm", 0)
+
     def _verify_3d_positions(self, model: dict) -> List[dict]:
         """Check if elements have valid Z positions (not all at zero)."""
         issues = []
@@ -438,7 +504,7 @@ class ARRPrincipal:
             elif ptype == "SCHEDULE":
                 ctx.has_schedule_page = True
         for v in page_results.values():
-            cols = (v or {}).get("members", {}).get("columns") or []
+            cols = (v or {}).get("columns") or (v or {}).get("members", {}).get("columns") or []
             if len(cols) > ctx.expected_col_count:
                 ctx.expected_col_count = len(cols)
         return ctx
@@ -498,11 +564,18 @@ class ARRPrincipal:
         footings = model.get("members", {}).get("footings", [])
         if cols:
             try:
-                at_origin = sum(1 for c in cols
-                                if abs(float(c.get("x") or 0)) < 1
-                                and abs(float(c.get("y") or 0)) < 1)
-                if at_origin / len(cols) > 0.5:
-                    r.fail(f"XY clustering: {at_origin}/{len(cols)} columns at or near origin")
+                # Use bounding-box spread instead of origin proximity.
+                # None positions (no data) must not be mistaken for x=0 (grid line 1 at origin).
+                xs = [float(v) for c in cols
+                      for v in (c.get("x_mm") or c.get("x"),) if v is not None]
+                ys = [float(v) for c in cols
+                      for v in (c.get("y_mm") or c.get("y"),) if v is not None]
+                if xs and ys:
+                    spread_x = max(xs) - min(xs)
+                    spread_y = max(ys) - min(ys)
+                    if spread_x < 500 and spread_y < 500:
+                        r.fail(f"XY clustering: columns not spread (<500mm bbox: "
+                               f"x={spread_x:.0f}mm y={spread_y:.0f}mm)")
             except (ValueError, TypeError):
                 pass
         if footings:
@@ -510,8 +583,9 @@ class ARRPrincipal:
                 above_datum = [f for f in footings if float(f.get("z_top") or -1) > 0]
                 if above_datum:
                     r.fail(f"{len(above_datum)} footing(s) have Z above datum (should be negative)")
-                xs = [float(f.get("x") or 0) for f in footings]
-                if len(set(xs)) == 1:
+                xs = [float(f.get("x") or f.get("x_mm") or 0) for f in footings]
+                # Only warn if all X are identical AND non-zero (zero = pre-generator, normal)
+                if len(set(xs)) == 1 and xs[0] != 0:
                     r.warn("All footings share identical X — distribution may be broken")
             except (ValueError, TypeError):
                 pass

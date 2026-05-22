@@ -53,14 +53,16 @@ class SynthesizerV7:
         self.language = language
         self.prompt_factory = PromptFactory(region=region, language=language)
 
-    def synthesize(self, scanner_output: dict, plan_positions: dict = None) -> dict:
+    def synthesize(self, scanner_output: dict, plan_positions: dict = None,
+                   ground_truth: dict = None) -> dict:
         """
         Build unified structural model from scanner results.
 
         Args:
-            scanner_output: Output from ScannerV6.run()
-            plan_positions: Optional dict from PlanPageColumnExtractor —
-                            {MARK_UPPER: {grid_x_mm, grid_y_mm, ...}}
+            scanner_output:  Output from ScannerV6.run()
+            plan_positions:  Optional dict from PlanPageColumnExtractor
+            ground_truth:    Optional ProjectFacts from GroundTruthBuilder —
+                             grid + floors are LOCKED and override LLM output
 
         Returns:
             Unified building structural model dict
@@ -98,6 +100,8 @@ class SynthesizerV7:
             if model:
                 model = self._merge_members(model, valid_results, forensic)
                 model = self._enrich_from_plan(model, plan_positions)
+                model = self._apply_ground_truth_lock(model, ground_truth)
+                model = self._ensure_walls(model)
                 model["members"] = self._assign_confidence(model["members"])
                 model["synthesis_method"] = "llm"
                 model["elapsed_s"] = round(time.time() - t0, 1)
@@ -109,6 +113,8 @@ class SynthesizerV7:
         print("[SYNTH] Using deterministic merge fallback")
         model = self._deterministic_merge(valid_results, forensic)
         model = self._enrich_from_plan(model, plan_positions)
+        model = self._apply_ground_truth_lock(model, ground_truth)
+        model = self._ensure_walls(model)
         model["synthesis_method"] = "deterministic"
         model["elapsed_s"] = round(time.time() - t0, 1)
         return model
@@ -237,6 +243,17 @@ class SynthesizerV7:
                 return False
             # Wall stud fire-rating schedule entries: WS1-H6.0-NOFRL, WS2-H5.5-60MIN, etc.
             if re.match(r"^WS\d", mark_str):
+                return False
+            # Bare UB designations from steelwork marking schedule (beam entries, not columns).
+            # Valid column UB sections start with the depth number: "360UB", "310UB44.7", etc.
+            # Invalid (hardware catalog): "UB36b", "UB 36b", "UB20d", "UB36c" — digit≤2 + letter suffix.
+            sec_norm = re.sub(r"[\s\-_]+", "", sec.upper())
+            if re.match(r"^UB\d{1,2}[A-Z]", sec_norm):
+                return False
+            # Also check mark for hardware UB pattern — catches: "C-UB-36b-1" → "CUB36B1",
+            # "UB36b-1" → "UB36B1". Uses search (not match) so prefix "C-" is allowed.
+            mark_norm = re.sub(r"[\s\-_]+", "", mark_str)
+            if re.search(r"UB\d{1,2}[A-Z]", mark_norm):
                 return False
             # Reject structurally impossible depth (fire-rating table rows have depth=5–6mm)
             sec_depth = col.get("depth_mm") or col.get("depth")
@@ -437,6 +454,8 @@ class SynthesizerV7:
         # Supplement from page results
         for pr in page_results:
             for col in pr.get("columns", []):
+                if not isinstance(col, dict):
+                    continue
                 gx = col.get("grid_x")
                 gy = col.get("grid_y")
                 for v in self._flatten_grid_value(gx):
@@ -598,6 +617,12 @@ class SynthesizerV7:
                             })
                             seen_ids.add(lvl_id)
 
+        # If only 1 non-datum level found (likely a floor-to-floor spacing, not absolute levels)
+        # treat as incomplete and fall through to default 4-level template
+        if len(levels) == 1 and levels[0].get("elevation_mm", 0) > 100:
+            print(f"  [Z] Only 1 non-datum level ({levels[0].get('elevation_mm')}mm) — using default 4-level template")
+            levels = []
+
         if not levels:
             levels = [
                 {"id": "GROUND", "name": "Ground Floor", "height_from_datum_mm": 0, "elevation_mm": 0, "floor_to_floor_mm": 3500},
@@ -654,6 +679,160 @@ class SynthesizerV7:
             if ly and my is not None:
                 gs.setdefault("y_coords", {})[str(ly)] = int(my)
 
+        return model
+
+    def _apply_ground_truth_lock(self, model: dict, ground_truth: dict) -> dict:
+        """
+        Lock grid + floor heights from ProjectFacts (GroundTruthBuilder output).
+        LLM-produced values are overridden; plan_positions XY coords are preserved.
+        Only runs when ground_truth has high-confidence data (confidence >= 0.4).
+        """
+        if not ground_truth or ground_truth.get("confidence", 0) < 0.4:
+            return model
+
+        gs = model.setdefault("grid_system", {})
+
+        # Lock X grid
+        gx_mm = ground_truth.get("grid_x_mm") or {}
+        if len(gx_mm) >= 2:
+            gs["x_coords"] = {str(k): int(v) for k, v in gx_mm.items()}
+            # Also update x_axes list (used by generator)
+            gs["x_axes"] = sorted(
+                [{"label": str(k), "coordinate_mm": int(v), "confidence": 1.0}
+                 for k, v in gx_mm.items()],
+                key=lambda a: a["coordinate_mm"]
+            )
+            print(f"  [GRID-LOCK] X grid locked from ground_truth: {gs['x_coords']}")
+
+        # Lock Y grid
+        gy_mm = ground_truth.get("grid_y_mm") or {}
+        if len(gy_mm) >= 2:
+            gs["y_coords"] = {str(k): int(v) for k, v in gy_mm.items()}
+            gs["y_axes"] = sorted(
+                [{"label": str(k), "coordinate_mm": int(v), "confidence": 1.0}
+                 for k, v in gy_mm.items()],
+                key=lambda a: a["coordinate_mm"]
+            )
+            print(f"  [GRID-LOCK] Y grid locked from ground_truth: {gs['y_coords']}")
+
+        # Lock floor heights — REPLACE model levels entirely with GTB-derived levels
+        fh = ground_truth.get("floor_heights_mm") or {}
+        if len(fh) >= 2:
+            gt_levels = sorted([
+                {
+                    "id": str(level_name),
+                    "name": str(level_name),
+                    "height_from_datum_mm": int(elev_mm),
+                    "elevation_mm": int(elev_mm),
+                    "floor_to_floor_mm": ground_truth.get("floor_to_floor_mm"),
+                    "confidence": 0.95,
+                }
+                for level_name, elev_mm in fh.items()
+            ], key=lambda l: l["elevation_mm"])
+            model["levels"] = gt_levels
+            print(f"  [GRID-LOCK] Floor levels REPLACED from ground_truth ({len(gt_levels)} levels): "
+                  + ", ".join(f"{l['name']}={l['elevation_mm']}mm" for l in gt_levels))
+
+        # Snap all column grid_x/grid_y → x_mm/y_mm using locked grid
+        if gx_mm and gy_mm:
+            gx_lookup = {str(k): int(v) for k, v in gx_mm.items()}
+            gy_lookup = {str(k): int(v) for k, v in gy_mm.items()}
+            snapped = 0
+            for col in model.get("members", {}).get("columns", []):
+                gx = str(col.get("grid_x") or "")
+                gy = str(col.get("grid_y") or "")
+                if gx in gx_lookup and (col.get("x_mm") is None and col.get("x") is None):
+                    col["x_mm"] = gx_lookup[gx]
+                    col["x"] = gx_lookup[gx]
+                    snapped += 1
+                if gy in gy_lookup and (col.get("y_mm") is None and col.get("y") is None):
+                    col["y_mm"] = gy_lookup[gy]
+                    col["y"] = gy_lookup[gy]
+            if snapped:
+                print(f"  [GRID-LOCK] Snapped {snapped} column coords to locked grid")
+
+        return model
+
+    def _ensure_walls(self, model: dict) -> dict:
+        """
+        If no walls extracted from PDF, synthesize basic structural concrete walls
+        from building grid + levels. Creates concrete core walls + perimeter walls at
+        each floor level. This gives LOD200 wall geometry so the building looks correct
+        in SketchUp even before INSITU WALL ELEVATION pages are fully parsed.
+        """
+        existing_walls = model.get("members", {}).get("walls", [])
+        if existing_walls:
+            return model  # PDF-extracted walls take priority
+
+        gs = model.get("grid_system", {})
+        x_coords = gs.get("x_coords") or {}
+        y_coords = gs.get("y_coords") or {}
+        levels = model.get("levels", [])
+
+        # Need at least a 2x2 grid and 1 level to synthesize walls
+        x_vals = sorted([v for v in x_coords.values() if isinstance(v, (int, float))])
+        y_vals = sorted([v for v in y_coords.values() if isinstance(v, (int, float))])
+        if len(x_vals) < 2 or len(y_vals) < 2 or not levels:
+            return model
+
+        x_min, x_max = x_vals[0], x_vals[-1]
+        y_min, y_max = y_vals[0], y_vals[-1]
+
+        synth_walls = []
+        wall_id = 1
+
+        for lvl in levels:
+            z_base = int(lvl.get("elevation_mm") or lvl.get("height_from_datum_mm") or 0)
+            f2f = int(lvl.get("floor_to_floor_mm") or 3500)
+            z_top = z_base + f2f
+            h = f2f
+            lvl_name = lvl.get("id") or lvl.get("name", "")
+
+            # Perimeter RC walls along outer grid boundaries (200mm concrete)
+            # North wall (y = y_max)
+            synth_walls.append({
+                "id": f"W{wall_id}", "type": "concrete_wall",
+                "thickness_mm": 200, "height_mm": h,
+                "z_base_mm": z_base, "z_top_mm": z_top,
+                "level": lvl_name, "material": "reinforced_concrete", "grade": "N32",
+                "x1": int(x_min), "y1": int(y_max),
+                "x2": int(x_max), "y2": int(y_max),
+            })
+            wall_id += 1
+            # South wall (y = y_min)
+            synth_walls.append({
+                "id": f"W{wall_id}", "type": "concrete_wall",
+                "thickness_mm": 200, "height_mm": h,
+                "z_base_mm": z_base, "z_top_mm": z_top,
+                "level": lvl_name, "material": "reinforced_concrete", "grade": "N32",
+                "x1": int(x_min), "y1": int(y_min),
+                "x2": int(x_max), "y2": int(y_min),
+            })
+            wall_id += 1
+            # West wall (x = x_min)
+            synth_walls.append({
+                "id": f"W{wall_id}", "type": "concrete_wall",
+                "thickness_mm": 200, "height_mm": h,
+                "z_base_mm": z_base, "z_top_mm": z_top,
+                "level": lvl_name, "material": "reinforced_concrete", "grade": "N32",
+                "x1": int(x_min), "y1": int(y_min),
+                "x2": int(x_min), "y2": int(y_max),
+            })
+            wall_id += 1
+            # East wall (x = x_max)
+            synth_walls.append({
+                "id": f"W{wall_id}", "type": "concrete_wall",
+                "thickness_mm": 200, "height_mm": h,
+                "z_base_mm": z_base, "z_top_mm": z_top,
+                "level": lvl_name, "material": "reinforced_concrete", "grade": "N32",
+                "x1": int(x_max), "y1": int(y_min),
+                "x2": int(x_max), "y2": int(y_max),
+            })
+            wall_id += 1
+
+        model["members"]["walls"] = synth_walls
+        print(f"  [WALL-SYNTH] No PDF walls found — synthesized {len(synth_walls)} perimeter walls "
+              f"from grid ({len(x_vals)}x{len(y_vals)}) × {len(levels)} levels")
         return model
 
     def _assign_confidence(self, members: dict) -> dict:
