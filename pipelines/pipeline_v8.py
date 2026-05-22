@@ -166,11 +166,28 @@ class PipelineV8:
             scanner.close()
             result.scanner_output = scanner_output
 
-            # ── GATE: POST-SCAN ───────────────────────────────
+            # ── GATE: POST-SCAN (with escalating DPI retry) ──
             print("[V8 GATE POST-SCAN]")
-            _arr_ctx = _arr_principal.build_context(scanner_output)
-            _gate_scan = _arr_principal.gate_post_scan(scanner_output, _arr_ctx)
-            ARRPrincipal._print_gate("POST-SCAN", _gate_scan)
+            _scan_dpi = self.dpi
+            for _scan_retry in range(3):
+                _arr_ctx = _arr_principal.build_context(scanner_output)
+                _gate_scan = _arr_principal.gate_post_scan(scanner_output, _arr_ctx)
+                ARRPrincipal._print_gate("POST-SCAN", _gate_scan)
+                if _gate_scan.status != "FAIL":
+                    break
+                if _scan_retry < 2:
+                    _scan_dpi += 50
+                    print(f"  [GATE] Scan quality FAIL — retrying at {_scan_dpi} DPI "
+                          f"(attempt {_scan_retry + 2}/3)...")
+                    _retry_scanner = ScannerV6(
+                        pdf_path, dpi=_scan_dpi, region=self.region,
+                        language=self.language, max_pages=self.max_pages,
+                    )
+                    scanner_output = _retry_scanner.run(skip_vision=False)
+                    _retry_scanner.close()
+                    result.scanner_output = scanner_output
+                else:
+                    print("  [GATE] Scan quality FAIL after 3 attempts — proceeding with best result")
 
             forensic = scanner_output.get("forensic", {})
             num_pages = scanner_output.get("num_pages", 0)

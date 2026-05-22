@@ -450,8 +450,9 @@ class ARRPrincipal:
         if total == 0:
             r.fail("Scanner returned zero page results")
             return r
+        _MEMBER_KEYS = ("columns", "beams", "footings", "bracing", "slabs", "walls")
         null_pages = sum(1 for v in page_results.values()
-                         if not v or not v.get("members"))
+                         if not v or not any(v.get(k) for k in _MEMBER_KEYS))
         null_ratio = null_pages / total
         if null_ratio > 0.5:
             r.fail(f"Scan quality low: {null_pages}/{total} pages returned no members")

@@ -552,6 +552,9 @@ class SynthesizerV7:
         seen_ids = set()
 
         # First priority: level_elevations from scanner ELEVATION page extraction
+        elev_pages = [pr for pr in page_results if pr.get("page_type") == "ELEVATION"]
+        print(f"  [Z-DEBUG] {len(elev_pages)} ELEVATION page(s) — "
+              f"level_elevations: {[ep.get('level_elevations') for ep in elev_pages]}")
         for pr in page_results:
             for le in pr.get("level_elevations", []):
                 lvl_id = le.get("id") or le.get("label", "")
@@ -575,6 +578,26 @@ class SynthesizerV7:
                     levels.append(lvl)
                     seen_ids.add(lvl_id)
 
+        # Third: RL values from raw text of ELEVATION pages (fallback if LLM didn't parse)
+        if not levels:
+            for pr in page_results:
+                if pr.get("page_type") != "ELEVATION":
+                    continue
+                raw = pr.get("raw_text") or str(pr.get("llm_response") or "")
+                rl_vals = sorted(set(float(x) for x in re.findall(r'RL\s*([\d.]+)', raw)))
+                if rl_vals:
+                    base = rl_vals[0]
+                    for rl in rl_vals:
+                        mm = int((rl - base) * 1000)
+                        lvl_id = f"RL{rl:.3f}"
+                        if lvl_id not in seen_ids:
+                            levels.append({
+                                "id": lvl_id, "name": f"RL {rl:.3f}m",
+                                "height_from_datum_mm": mm, "elevation_mm": mm,
+                                "floor_to_floor_mm": None, "confidence": 0.7,
+                            })
+                            seen_ids.add(lvl_id)
+
         if not levels:
             levels = [
                 {"id": "GROUND", "name": "Ground Floor", "height_from_datum_mm": 0, "elevation_mm": 0, "floor_to_floor_mm": 3500},
@@ -587,15 +610,25 @@ class SynthesizerV7:
         levels.sort(key=lambda l: l.get("height_from_datum_mm") or l.get("elevation_mm") or 0)
         return levels
 
+    @staticmethod
+    def _norm_id(s) -> str:
+        """Normalize mark/ID: strip hyphens, spaces, underscores → uppercase alphanumeric."""
+        return re.sub(r'[-_\s]+', '', str(s or '')).upper()
+
     def _enrich_from_plan(self, model: dict, plan_positions: dict) -> dict:
         """Enrich column XY positions from PlanPageColumnExtractor results."""
         if not plan_positions:
             return model
+
+        # Normalize plan position keys to alphanumeric-only uppercase (Bug 3a)
+        plan_norm = {self._norm_id(k): v for k, v in plan_positions.items()
+                     if isinstance(v, dict)}
+
         enriched = 0
         for col in model.get("members", {}).get("columns", []):
-            mark = str(col.get("mark") or col.get("id") or "").strip().upper()
-            if mark in plan_positions:
-                pos = plan_positions[mark]
+            mark = self._norm_id(col.get("mark") or col.get("id") or "")
+            if mark in plan_norm:
+                pos = plan_norm[mark]
                 if pos.get("grid_x_mm") is not None:
                     col["x_mm"] = int(pos["grid_x_mm"])
                     col["x"] = col["x_mm"]
@@ -607,8 +640,20 @@ class SynthesizerV7:
                 if pos.get("grid_label_y"):
                     col["grid_y"] = str(pos["grid_label_y"])
                 enriched += 1
+
         if enriched:
             print(f"  [PLAN-ENRICH] {enriched} columns got grid position from plan pages")
+
+        # Sync plan-derived mm coords into grid_system so generator uses them (Bug 3b)
+        gs = model.setdefault("grid_system", {})
+        for pos in plan_norm.values():
+            lx, mx = pos.get("grid_label_x"), pos.get("grid_x_mm")
+            ly, my = pos.get("grid_label_y"), pos.get("grid_y_mm")
+            if lx and mx is not None:
+                gs.setdefault("x_coords", {})[str(lx)] = int(mx)
+            if ly and my is not None:
+                gs.setdefault("y_coords", {})[str(ly)] = int(my)
+
         return model
 
     def _assign_confidence(self, members: dict) -> dict:
@@ -634,10 +679,12 @@ class SynthesizerV7:
         """Build a map of level_id → elevation_mm, filling nulls intelligently."""
         lmap: dict = {}
 
-        # Collect from levels list
+        # Collect from levels list — explicit None check so elevation=0 (ground) is included
         for lvl in levels:
             lid = lvl.get("id") or lvl.get("name", "")
-            elev = lvl.get("height_from_datum_mm") or lvl.get("elevation_mm")
+            h = lvl.get("height_from_datum_mm")
+            e = lvl.get("elevation_mm")
+            elev = h if h is not None else e
             if lid and elev is not None:
                 try:
                     lmap[lid] = int(float(elev))

@@ -12,6 +12,13 @@ import json
 import re
 
 from core.llm_wrapper import call_llm
+
+
+def _norm_id(s) -> str:
+    """Normalize column mark to alphanumeric-only uppercase for consistent matching.
+    Handles: 'C-1' == 'C1', 'HB 1' == 'HB1', 'col_2' == 'COL2'
+    """
+    return re.sub(r'[-_\s]+', '', str(s or '')).upper()
 from core.vision_renderer import VisionRenderer
 from pipelines.prompt_factory import PromptFactory
 
@@ -62,8 +69,8 @@ class PlanPageColumnExtractor:
                     user_prompt = self.prompt_factory.user_prompt_plan_extract(page_idx)
                     response = call_llm(user_prompt, system=system_prompt, images=[img_bytes])
                     parsed = self._parse(response, debug=self.debug)
-                    # Normalise keys to uppercase for consistent lookup
-                    parsed_upper = {k.strip().upper(): v for k, v in parsed.items()
+                    # Normalise keys: strip hyphens/spaces/underscores, uppercase
+                    parsed_upper = {_norm_id(k): v for k, v in parsed.items()
                                     if isinstance(v, dict)}
                     positions.update(parsed_upper)
                     print(f"  [PLAN-EXTRACT] Page {page_idx}: {len(parsed_upper)} column positions")
