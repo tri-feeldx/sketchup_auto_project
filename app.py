@@ -185,6 +185,7 @@ if run_btn and uploaded_file:
                     "accuracy_score": acc_score,
                     "accuracy_grade": acc_grade,
                     "accuracy_target_met": acc_met,
+                    "log_path": presult.log_path,
                     "error": None,
                 }
             elif use_v7:
@@ -381,6 +382,10 @@ if run_btn and uploaded_file:
                     "3. Script tự chạy và **auto-save** vào thư mục Downloads  \n"
                     "4. File `.skp` LOD300 sẵn sàng để dùng ✅"
                 )
+
+                _log_path = result_holder.get("log_path", "")
+                if _log_path and Path(_log_path).exists():
+                    st.success(f"📋 Log tự động lưu → `{_log_path}`")
 
     full_log = "\n".join(log_lines)
     with tab_term:

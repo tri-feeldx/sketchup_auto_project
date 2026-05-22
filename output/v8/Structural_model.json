@@ -1,55 +1,76 @@
 {
+  "project_info": {
+    "name": "THE UNIVERSITY OF NEW ENGLAND TAMWORTH CENTRAL CAMPUS",
+    "region": "AU",
+    "language": "en",
+    "primary_material": "steel",
+    "building_type": "general",
+    "drawing_size": "A1",
+    "status": "FOR TENDER - NOT TO BE USED FOR CONSTRUCTION",
+    "notes": "This model synthesizes data from multiple pages. Grid system and levels are established based on the most explicit and consistent information. Member locations are nominal based on grid intersections unless specific dimensions are provided. Schedules take precedence for member properties. Elevations/sections take precedence for dimensions. Plans provide layout and relative positions."
+  },
   "grid_system": {
     "x_axes": [
       {
         "label": "1",
         "coordinate_mm": 0,
-        "confidence": 0.9
+        "confidence": 1.0
       },
       {
         "label": "2",
         "coordinate_mm": 8000,
-        "confidence": 0.9
+        "confidence": 1.0
       },
       {
         "label": "3",
         "coordinate_mm": 16000,
-        "confidence": 0.9
+        "confidence": 1.0
       },
       {
         "label": "4",
         "coordinate_mm": 24000,
-        "confidence": 0.9
+        "confidence": 1.0
       }
     ],
     "y_axes": [
       {
         "label": "D",
         "coordinate_mm": 0,
-        "confidence": 0.9
+        "confidence": 1.0
       },
       {
         "label": "C",
         "coordinate_mm": 8000,
-        "confidence": 0.9
+        "confidence": 1.0
       },
       {
         "label": "B",
         "coordinate_mm": 16000,
-        "confidence": 0.9
+        "confidence": 1.0
       },
       {
         "label": "A",
         "coordinate_mm": 24000,
-        "confidence": 0.9
+        "confidence": 1.0
       }
     ],
-    "origin_description": "Bottom-left corner at Grid 1-D",
-    "confidence": 0.9
+    "notes": "Grid system derived primarily from Page 8, which explicitly defines grid coordinates. Other pages show varying dimensions, indicating these grids might be nominal or refer to different areas/scales. This model uses the 3000mm uniform spacing.",
+    "x_coords": {
+      "1": 0,
+      "2": 8000,
+      "3": 16000,
+      "4": 24000
+    },
+    "y_coords": {
+      "A": 24000,
+      "B": 16000,
+      "C": 8000,
+      "D": 0
+    }
   },
   "levels": [
     {
-      "name": "LEVEL 03",
+      "id": "LEVEL 03",
       "height_mm": null,
       "height_from_datum_mm": 3500,
       "elevation_mm": 3500
@@ -57,1483 +78,2961 @@
   ],
   "columns": [
     {
+      "type": "concrete_column",
       "id": "C1",
-      "type": "concrete_column",
-      "grid_x": "1",
-      "grid_y": "C",
-      "x_mm": 0,
-      "y_mm": 8000,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "1",
+      "grid_y": "A",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C2",
-      "type": "concrete_column",
-      "grid_x": "2",
-      "grid_y": "C",
-      "x_mm": 8000,
-      "y_mm": 8000,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "2",
+      "grid_y": "A",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C3",
-      "type": "concrete_column",
-      "grid_x": "3",
-      "grid_y": "C",
-      "x_mm": 16000,
-      "y_mm": 8000,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "3",
+      "grid_y": "A",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C4",
-      "type": "concrete_column",
-      "grid_x": "4",
-      "grid_y": "C",
-      "x_mm": 24000,
-      "y_mm": 8000,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "4",
+      "grid_y": "A",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C5",
-      "type": "concrete_column",
-      "grid_x": "1",
-      "grid_y": "D",
-      "x_mm": 0,
-      "y_mm": 0,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "1",
+      "grid_y": "B",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C6",
-      "type": "concrete_column",
-      "grid_x": "2",
-      "grid_y": "D",
-      "x_mm": 8000,
-      "y_mm": 0,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "2",
+      "grid_y": "B",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C7",
-      "type": "concrete_column",
-      "grid_x": "3",
-      "grid_y": "D",
-      "x_mm": 16000,
-      "y_mm": 0,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "3",
+      "grid_y": "B",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C8",
-      "type": "concrete_column",
-      "grid_x": "4",
-      "grid_y": "D",
-      "x_mm": 24000,
-      "y_mm": 0,
       "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 03",
+      "material": "concrete",
+      "grade": "N50",
+      "grid_x": "4",
+      "grid_y": "B",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        }
+      ],
       "confidence": 0.9
     },
     {
+      "type": "concrete_column",
       "id": "C9",
-      "type": "concrete_column",
+      "section": "600x600",
+      "material": "concrete",
+      "grade": "N50",
       "grid_x": "1",
-      "grid_y": "B",
-      "x_mm": 0,
-      "y_mm": 16000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 05",
-      "confidence": 0.9
-    },
-    {
-      "id": "C10",
-      "type": "concrete_column",
-      "grid_x": "2",
-      "grid_y": "B",
-      "x_mm": 8000,
-      "y_mm": 16000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N24",
-        "ties": "N12-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 05",
-      "confidence": 0.9
-    },
-    {
-      "id": "C11",
-      "type": "concrete_column",
-      "grid_x": "3",
-      "grid_y": "B",
-      "x_mm": 16000,
-      "y_mm": 16000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N24",
-        "ties": "N12-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 05",
-      "confidence": 0.9
-    },
-    {
-      "id": "C12",
-      "type": "concrete_column",
-      "grid_x": "4",
-      "grid_y": "B",
-      "x_mm": 24000,
-      "y_mm": 16000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 05",
-      "confidence": 0.9
-    },
-    {
-      "id": "C13",
-      "type": "concrete_column",
-      "grid_x": "1",
-      "grid_y": "A",
-      "x_mm": 0,
-      "y_mm": 24000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 04",
-      "confidence": 0.9
-    },
-    {
-      "id": "C14",
-      "type": "concrete_column",
-      "grid_x": "2",
-      "grid_y": "A",
-      "x_mm": 8000,
-      "y_mm": 24000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 04",
-      "confidence": 0.9
-    },
-    {
-      "id": "C15",
-      "type": "concrete_column",
-      "grid_x": "3",
-      "grid_y": "A",
-      "x_mm": 16000,
-      "y_mm": 24000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 04",
-      "confidence": 0.9
-    },
-    {
-      "id": "C16",
-      "type": "concrete_column",
-      "grid_x": "4",
-      "grid_y": "A",
-      "x_mm": 24000,
-      "y_mm": 24000,
-      "section": "600x600",
-      "material": "Concrete",
-      "concrete_grade": "50MPa",
-      "reinforcement": {
-        "vertical": "12N20",
-        "ties": "N10-300"
-      },
-      "start_level": "Level 01",
-      "end_level": "Level 04",
-      "confidence": 0.9
-    },
-    {
-      "id": "CH35a_Elev_A",
-      "type": "steel_column",
-      "grid_x": "A",
-      "grid_y": "T",
-      "x_mm": null,
-      "y_mm": null,
-      "section": "CH35a",
-      "material": "G350",
-      "start_level": "Level 01",
-      "end_level": "Level 03",
-      "notes": "Location relative to grid A-T is schematic on elevation. Height inferred from levels.",
-      "confidence": 0.6
-    },
-    {
-      "id": "CH35a_Elev_D",
-      "type": "steel_column",
-      "grid_x": "D",
-      "grid_y": "T",
-      "x_mm": null,
-      "y_mm": null,
-      "section": "CH35a",
-      "material": "G350",
-      "start_level": "Level 01",
-      "end_level": "Level 03",
-      "notes": "Location relative to grid D-T is schematic on elevation. Height inferred from levels.",
-      "confidence": 0.6
-    }
-  ],
-  "beams": [
-    {
-      "id": "UB36c_LR_1C-2C",
-      "type": "steel_beam",
-      "start_point_mm": {
-        "x": 0,
-        "y": 8000,
-        "level": "Lower Roof"
-      },
-      "end_point_mm": {
-        "x": 8000,
-        "y": 8000,
-        "level": "Lower Roof"
-      },
-      "section": "UB360",
-      "material": "G350",
-      "span_mm": 8000,
-      "notes": "Inferred from Page 2 (Lower Roof Steelwork Marking Plan) at Grid 1-C to 2-C",
-      "confidence": 0.7
-    },
-    {
-      "id": "UB36c_LR_2C-3C",
-      "type": "steel_beam",
-      "start_point_mm": {
-        "x": 8000,
-        "y": 8000,
-        "level": "Lower Roof"
-      },
-      "end_point_mm": {
-        "x": 16000,
-        "y": 8000,
-        "level": "Lower Roof"
-      },
-      "section": "UB360",
-      "material": "G350",
-      "span_mm": 8000,
-      "notes": "Inferred from Page 2 (Lower Roof Steelwork Marking Plan) at Grid 2-C to 3-C",
-      "confidence": 0.7
-    },
-    {
-      "id": "UB36c_LR_3C-4C",
-      "type": "steel_beam",
-      "start_point_mm": {
-        "x": 16000,
-        "y": 8000,
-        "level": "Lower Roof"
-      },
-      "end_point_mm": {
-        "x": 24000,
-        "y": 8000,
-        "level": "Lower Roof"
-      },
-      "section": "UB360",
-      "material": "G350",
-      "span_mm": 8000,
-      "notes": "Inferred from Page 2 (Lower Roof Steelwork Marking Plan) at Grid 3-C to 4-C",
-      "confidence": 0.7
-    },
-    {
-      "id": "UB"
+      "grid_y": "C",
+      "segments": [
+        {
+          "from_level": "GL",
+          "to_level": "LEVEL 02",
+          "height_mm": 6000,
+          "vertical_reinforcement": "12N20",
+          "starter_bars": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 02",
+          "to_level": "LEVEL 03",
+          "height_mm": 3000,
+          "vertical_reinforcement": "12N20",
+          "ties": "Type A, N10-300",
+          "confidence": 0.9
+        },
+        {
+          "from_level": "LEVEL 03",
+          "to_level": "LEVEL 04",
+          "height_mm": 3000,
+          "vertical_reinforcement": "1"
+        }
+      ]
     }
   ],
   "members": {
     "columns": [
       {
-        "id": "UB36c",
-        "section": "UB360",
-        "grade": "G350",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "id": "UB36d",
-        "section": "UB360",
-        "grade": "G350",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
+        "type": "column",
         "id": "C1",
         "grid_x": "1",
-        "grid_y": "C",
-        "center_point_mm": {
-          "x": 0,
-          "y": 8000
-        },
+        "grid_y": "B",
+        "shape": "square",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 0,
+        "x": 0,
+        "y_mm": 16000,
+        "y": 16000
       },
       {
+        "type": "column",
         "id": "C2",
         "grid_x": "2",
-        "grid_y": "C",
-        "center_point_mm": {
-          "x": 8000,
-          "y": 8000
-        },
+        "grid_y": "B",
+        "shape": "square",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000,
+        "y_mm": 16000,
+        "y": 16000
       },
       {
+        "type": "column",
         "id": "C3",
         "grid_x": "3",
-        "grid_y": "C",
-        "center_point_mm": {
-          "x": 16000,
-          "y": 8000
-        },
+        "grid_y": "B",
+        "shape": "square",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000,
+        "y_mm": 16000,
+        "y": 16000
       },
       {
+        "type": "column",
         "id": "C4",
         "grid_x": "4",
-        "grid_y": "C",
-        "center_point_mm": {
-          "x": 24000,
-          "y": 8000
-        },
+        "grid_y": "B",
+        "shape": "square",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000,
+        "y_mm": 16000,
+        "y": 16000
       },
       {
+        "type": "wall",
+        "id": "W1",
+        "grid_x": "1",
+        "grid_y": "C",
+        "shape": "rectangular",
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 0,
+        "x": 0,
+        "y_mm": 8000,
+        "y": 8000
+      },
+      {
+        "type": "wall",
+        "id": "W2",
+        "grid_x": "2",
+        "grid_y": "C",
+        "shape": "rectangular",
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000,
+        "y_mm": 8000,
+        "y": 8000
+      },
+      {
+        "type": "wall",
+        "id": "W3",
+        "grid_x": "3",
+        "grid_y": "C",
+        "shape": "rectangular",
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000,
+        "y_mm": 8000,
+        "y": 8000
+      },
+      {
+        "type": "wall",
+        "id": "W4",
+        "grid_x": "4",
+        "grid_y": "C",
+        "shape": "rectangular",
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000,
+        "y_mm": 8000,
+        "y": 8000
+      },
+      {
+        "type": "column",
         "id": "C5",
         "grid_x": "1",
         "grid_y": "D",
-        "center_point_mm": {
-          "x": 0,
-          "y": 0
-        },
+        "shape": "circular",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 0.4,
+        "x_mm": 0,
+        "x": 0,
+        "y_mm": 0,
+        "y": 0
       },
       {
+        "type": "column",
         "id": "C6",
         "grid_x": "2",
         "grid_y": "D",
-        "center_point_mm": {
-          "x": 8000,
-          "y": 0
-        },
+        "shape": "circular",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000,
+        "y_mm": 0,
+        "y": 0
       },
       {
+        "type": "column",
         "id": "C7",
         "grid_x": "3",
         "grid_y": "D",
-        "center_point_mm": {
-          "x": 16000,
-          "y": 0
-        },
+        "shape": "circular",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000,
+        "y_mm": 0,
+        "y": 0
       },
       {
+        "type": "column",
         "id": "C8",
         "grid_x": "4",
         "grid_y": "D",
-        "center_point_mm": {
-          "x": 24000,
-          "y": 0
-        },
+        "shape": "circular",
+        "section": "not specified",
         "material": "concrete",
-        "section": "unknown",
         "height_mm": 3500,
         "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C9",
-        "grid_x": "1",
-        "grid_y": "C",
-        "x_mm": 4000,
-        "y_mm": 11000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
         "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C10",
-        "grid_x": "2",
-        "grid_y": "C",
-        "x_mm": 10000,
-        "y_mm": 11000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C11",
-        "grid_x": "3",
-        "grid_y": "C",
-        "x_mm": 16000,
-        "y_mm": 11000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C12",
-        "grid_x": "4",
-        "grid_y": "C",
-        "x_mm": 22000,
-        "y_mm": 11000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C13",
-        "grid_x": "1",
-        "grid_y": "D",
-        "x_mm": 4000,
-        "y_mm": 5000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C14",
-        "grid_x": "2",
-        "grid_y": "D",
-        "x_mm": 10000,
-        "y_mm": 5000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C15",
-        "grid_x": "3",
-        "grid_y": "D",
-        "x_mm": 16000,
-        "y_mm": 5000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "type": "column",
-        "id": "C16",
-        "grid_x": "4",
-        "grid_y": "D",
-        "x_mm": 22000,
-        "y_mm": 5000,
-        "section": "Rectangular Concrete Column (assumed)",
-        "material": "C40/50 (assumed)",
-        "notes": "Part of concrete diaphragm structure",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "id": "C17",
-        "type": "column",
-        "grid_x": "3-4",
-        "grid_y": "A",
-        "x_mm": 12500,
-        "y_mm": 15000,
-        "material": "concrete",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "id": "C18",
-        "type": "column",
-        "grid_x": "3-4",
-        "grid_y": "B",
-        "x_mm": 12500,
-        "y_mm": 10000,
-        "material": "concrete",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "id": "C19",
-        "type": "column",
-        "grid_x": "3-4",
-        "grid_y": "C",
-        "x_mm": 12500,
-        "y_mm": 5000,
-        "material": "concrete",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
-      },
-      {
-        "id": "C20",
-        "type": "column",
-        "grid_x": "3-4",
-        "grid_y": "D",
-        "x_mm": 12500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000,
         "y_mm": 0,
-        "material": "concrete",
-        "z_base_mm": 0,
-        "z_top_mm": 3500,
-        "height_mm": 3500
+        "y": 0
       },
       {
-        "id": "C21",
+        "id": "C9",
+        "section": null,
+        "grade": null,
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C10",
+        "section": null,
+        "grade": null,
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C11",
+        "section": null,
+        "grade": null,
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C12",
+        "section": null,
+        "grade": null,
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C13",
+        "section": null,
+        "grade": null,
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C14",
+        "section": null,
+        "grade": null,
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C15",
+        "section": null,
+        "grade": null,
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C16",
+        "section": "Concrete Column",
+        "grade": null,
+        "height_mm": 3500,
+        "grid_x": null,
+        "grid_y": null,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-1A",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-2A",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-3A",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-4A",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-1B",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-2B",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-3B",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-4B",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-1C",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-2C",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-3C",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-4C",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-1D",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-2D",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-3D",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35a-4D",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-1-AB",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-2-AB",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-3-AB",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-4-AB",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-1-BC",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-2-BC",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-3-BC",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-4-BC",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-1-CD",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-2-CD",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-3-CD",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35b-4-CD",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-12-A",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-23-A",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-34-A",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-12-B",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-23-B",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-34-B",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-12-C",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-23-C",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-34-C",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-12-D",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-23-D",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "id": "C-CH35c-34-D",
+        "section": "MISSING_ON_THIS_DRAWING",
+        "grade": "MISSING_ON_THIS_DRAWING",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
         "type": "column",
-        "grid_x": "4",
-        "grid_y": "A-B",
-        "x_mm": 15000,
-        "y_mm": 12500,
+        "id": "Concrete Column D-S9",
+        "section": null,
+        "height_mm": 3500,
         "material": "concrete",
+        "grid_x": "D",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 01 to above Level 03",
         "z_base_mm": 0,
         "z_top_mm": 3500,
-        "height_mm": 3500
+        "_confidence": 0.4
       },
       {
-        "id": "C22",
         "type": "column",
-        "grid_x": "4",
-        "grid_y": "B-C",
-        "x_mm": 15000,
-        "y_mm": 7500,
+        "id": "Concrete Column C-S9",
+        "section": null,
+        "height_mm": 3500,
         "material": "concrete",
+        "grid_x": "C",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 01 to above Level 03",
         "z_base_mm": 0,
         "z_top_mm": 3500,
-        "height_mm": 3500
+        "_confidence": 0.4
       },
       {
-        "id": "C23",
         "type": "column",
-        "grid_x": "4",
-        "grid_y": "C-D",
-        "x_mm": 15000,
-        "y_mm": 2500,
+        "id": "Concrete Column B-S9",
+        "section": null,
+        "height_mm": 3500,
         "material": "concrete",
+        "grid_x": "B",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 01 to above Level 03",
         "z_base_mm": 0,
         "z_top_mm": 3500,
-        "height_mm": 3500
+        "_confidence": 0.4
       },
       {
-        "id": "WS1-H6.0-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 6000,
-        "z_base_mm": 0,
-        "z_top_mm": 6000
-      },
-      {
-        "id": "WS1-H6.0-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 6000,
-        "z_base_mm": 0,
-        "z_top_mm": 6000
-      },
-      {
-        "id": "WS1-H6.0-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 6000,
-        "z_base_mm": 0,
-        "z_top_mm": 6000
-      },
-      {
-        "id": "WS1-H6.0-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 6000,
-        "z_base_mm": 0,
-        "z_top_mm": 6000
-      },
-      {
-        "id": "WS1-H5.5-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5500,
-        "z_base_mm": 0,
-        "z_top_mm": 5500
-      },
-      {
-        "id": "WS1-H5.5-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5500,
-        "z_base_mm": 0,
-        "z_top_mm": 5500
-      },
-      {
-        "id": "WS1-H5.5-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5500,
-        "z_base_mm": 0,
-        "z_top_mm": 5500
-      },
-      {
-        "id": "WS1-H5.5-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5500,
-        "z_base_mm": 0,
-        "z_top_mm": 5500
-      },
-      {
-        "id": "WS1-H5.0-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5000,
-        "z_base_mm": 0,
-        "z_top_mm": 5000
-      },
-      {
-        "id": "WS1-H5.0-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5000,
-        "z_base_mm": 0,
-        "z_top_mm": 5000
-      },
-      {
-        "id": "WS1-H5.0-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5000,
-        "z_base_mm": 0,
-        "z_top_mm": 5000
-      },
-      {
-        "id": "WS1-H5.0-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 5000,
-        "z_base_mm": 0,
-        "z_top_mm": 5000
-      },
-      {
-        "id": "WS1-H4.5-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4500,
-        "z_base_mm": 0,
-        "z_top_mm": 4500
-      },
-      {
-        "id": "WS1-H4.5-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4500,
-        "z_base_mm": 0,
-        "z_top_mm": 4500
-      },
-      {
-        "id": "WS1-H4.5-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4500,
-        "z_base_mm": 0,
-        "z_top_mm": 4500
-      },
-      {
-        "id": "WS1-H4.5-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4500,
-        "z_base_mm": 0,
-        "z_top_mm": 4500
-      },
-      {
-        "id": "WS1-H4.0-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4000,
-        "z_base_mm": 0,
-        "z_top_mm": 4000
-      },
-      {
-        "id": "WS1-H4.0-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4000,
-        "z_base_mm": 0,
-        "z_top_mm": 4000
-      },
-      {
-        "id": "WS1-H4.0-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4000,
-        "z_base_mm": 0,
-        "z_top_mm": 4000
-      },
-      {
-        "id": "WS1-H4.0-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 4000,
-        "z_base_mm": 0,
-        "z_top_mm": 4000
-      },
-      {
-        "id": "WS1-H3.5-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
+        "type": "column",
+        "id": "Concrete Column A-S10",
+        "section": null,
         "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "WS1-H3.5-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "WS1-H3.5-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "WS1-H3.5-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "WS1-H3.0-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 3000,
-        "z_base_mm": 0,
-        "z_top_mm": 3000
-      },
-      {
-        "id": "WS1-H3.0-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 3000,
-        "z_base_mm": 0,
-        "z_top_mm": 3000
-      },
-      {
-        "id": "WS1-H3.0-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 3000,
-        "z_base_mm": 0,
-        "z_top_mm": 3000
-      },
-      {
-        "id": "WS1-H3.0-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 3000,
-        "z_base_mm": 0,
-        "z_top_mm": 3000
-      },
-      {
-        "id": "WS1-H2.6-NOFRL",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 2600,
-        "z_base_mm": 0,
-        "z_top_mm": 2600
-      },
-      {
-        "id": "WS1-H2.6-60MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 2600,
-        "z_base_mm": 0,
-        "z_top_mm": 2600
-      },
-      {
-        "id": "WS1-H2.6-90MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 2600,
-        "z_base_mm": 0,
-        "z_top_mm": 2600
-      },
-      {
-        "id": "WS1-H2.6-120MIN",
-        "section": "100x50x6RHS",
-        "grade": "C350",
-        "height_mm": 2600,
-        "z_base_mm": 0,
-        "z_top_mm": 2600
-      },
-      {
-        "id": "WS3-H6.0-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 6000,
-        "z_base_mm": 0,
-        "z_top_mm": 6000
-      },
-      {
-        "id": "WS3-H5.5-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 5500,
-        "z_base_mm": 0,
-        "z_top_mm": 5500
-      },
-      {
-        "id": "WS3-H5.0-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 5000,
-        "z_base_mm": 0,
-        "z_top_mm": 5000
-      },
-      {
-        "id": "WS3-H4.5-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 4500,
-        "z_base_mm": 0,
-        "z_top_mm": 4500
-      },
-      {
-        "id": "WS3-H4.0-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 4000,
-        "z_base_mm": 0,
-        "z_top_mm": 4000
-      },
-      {
-        "id": "WS3-H3.5-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 3500,
-        "z_base_mm": 0,
-        "z_top_mm": 3500
-      },
-      {
-        "id": "WS3-H3.0-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 3000,
-        "z_base_mm": 0,
-        "z_top_mm": 3000
-      },
-      {
-        "id": "WS3-H2.6-180-240MIN",
-        "section": "89x89x5SHS",
-        "grade": "C350",
-        "height_mm": 2600,
-        "z_base_mm": 0,
-        "z_top_mm": 2600
-      },
-      {
-        "id": "WS2-H7.0-NOFRL",
-        "section": "100x100x9SHS",
+        "material": "concrete",
+        "grid_x": "A",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 01 to above Level 03",
         "z_base_mm": 0,
         "z_top_mm": 3500,
-        "height_mm": 3500
+        "_confidence": 0.4
+      },
+      {
+        "type": "column",
+        "id": "Concrete Column B-S10",
+        "section": null,
+        "height_mm": 3500,
+        "material": "concrete",
+        "grid_x": "B",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 01 to above Level 03",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "type": "column",
+        "id": "Concrete Column C-S10",
+        "section": null,
+        "height_mm": 3500,
+        "material": "concrete",
+        "grid_x": "C",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 01 to above Level 03",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "type": "column",
+        "id": "Concrete Column 4-S11",
+        "section": null,
+        "height_mm": 3500,
+        "material": "concrete",
+        "grid_x": "4",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 02 to above Level 03",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000
+      },
+      {
+        "type": "column",
+        "id": "Concrete Column 3-S11",
+        "section": null,
+        "height_mm": 3500,
+        "material": "concrete",
+        "grid_x": "3",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 02 to above Level 03",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000
+      },
+      {
+        "type": "column",
+        "id": "Concrete Column 2-S11",
+        "section": null,
+        "height_mm": 3500,
+        "material": "concrete",
+        "grid_x": "2",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 02 to above Level 03",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000
+      },
+      {
+        "type": "column",
+        "id": "Concrete Column 1-S11",
+        "section": null,
+        "height_mm": 3500,
+        "material": "concrete",
+        "grid_x": "1",
+        "grid_y": null,
+        "base_connection": null,
+        "description": "Extends from below Level 02 to above Level 03",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4,
+        "x_mm": 0,
+        "x": 0
+      },
+      {
+        "type": "column",
+        "id": "C_1_A",
+        "grid_x": "1",
+        "grid_y": "A",
+        "x_mm": 0,
+        "y_mm": 9000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_2_A",
+        "grid_x": "2",
+        "grid_y": "A",
+        "x_mm": 3000,
+        "y_mm": 9000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_3_A",
+        "grid_x": "3",
+        "grid_y": "A",
+        "x_mm": 6000,
+        "y_mm": 9000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_4_A",
+        "grid_x": "4",
+        "grid_y": "A",
+        "x_mm": 9000,
+        "y_mm": 9000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_1_B",
+        "grid_x": "1",
+        "grid_y": "B",
+        "x_mm": 0,
+        "y_mm": 6000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_2_B",
+        "grid_x": "2",
+        "grid_y": "B",
+        "x_mm": 3000,
+        "y_mm": 6000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_3_B",
+        "grid_x": "3",
+        "grid_y": "B",
+        "x_mm": 6000,
+        "y_mm": 6000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_4_B",
+        "grid_x": "4",
+        "grid_y": "B",
+        "x_mm": 9000,
+        "y_mm": 6000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_1_C",
+        "grid_x": "1",
+        "grid_y": "C",
+        "x_mm": 0,
+        "y_mm": 3000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_2_C",
+        "grid_x": "2",
+        "grid_y": "C",
+        "x_mm": 3000,
+        "y_mm": 3000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_3_C",
+        "grid_x": "3",
+        "grid_y": "C",
+        "x_mm": 6000,
+        "y_mm": 3000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_4_C",
+        "grid_x": "4",
+        "grid_y": "C",
+        "x_mm": 9000,
+        "y_mm": 3000,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_1_D",
+        "grid_x": "1",
+        "grid_y": "D",
+        "x_mm": 0,
+        "y_mm": 0,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
+      },
+      {
+        "type": "column",
+        "id": "C_2_D",
+        "grid_x": "2",
+        "grid_y": "D",
+        "x_mm": 3000,
+        "y_mm": 0,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_3_D",
+        "grid_x": "3",
+        "grid_y": "D",
+        "x_mm": 6000,
+        "y_mm": 0,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_4_D",
+        "grid_x": "4",
+        "grid_y": "D",
+        "x_mm": 9000,
+        "y_mm": 0,
+        "section": "Concrete Column",
+        "material": "Concrete",
+        "height_mm": 3500,
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 1.0
+      },
+      {
+        "type": "column",
+        "id": "C_2A",
+        "grid_x": "2",
+        "grid_y": "A",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000,
+        "y_mm": 24000,
+        "y": 24000
+      },
+      {
+        "type": "column",
+        "id": "C_3A",
+        "grid_x": "3",
+        "grid_y": "A",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000,
+        "y_mm": 24000,
+        "y": 24000
+      },
+      {
+        "type": "column",
+        "id": "C_4A",
+        "grid_x": "4",
+        "grid_y": "A",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000,
+        "y_mm": 24000,
+        "y": 24000
+      },
+      {
+        "type": "column",
+        "id": "C_4B",
+        "grid_x": "4",
+        "grid_y": "B",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000,
+        "y_mm": 16000,
+        "y": 16000
+      },
+      {
+        "type": "column",
+        "id": "C_4C",
+        "grid_x": "4",
+        "grid_y": "C",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000,
+        "y_mm": 8000,
+        "y": 8000
+      },
+      {
+        "type": "column",
+        "id": "C_4D",
+        "grid_x": "4",
+        "grid_y": "D",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 24000,
+        "x": 24000,
+        "y_mm": 0,
+        "y": 0
+      },
+      {
+        "type": "column",
+        "id": "C_3D",
+        "grid_x": "3",
+        "grid_y": "D",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000,
+        "y_mm": 0,
+        "y": 0
+      },
+      {
+        "type": "column",
+        "id": "C_2D",
+        "grid_x": "2",
+        "grid_y": "D",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000,
+        "y_mm": 0,
+        "y": 0
+      },
+      {
+        "type": "column",
+        "id": "C_2B",
+        "grid_x": "2",
+        "grid_y": "B",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000,
+        "y_mm": 16000,
+        "y": 16000
+      },
+      {
+        "type": "column",
+        "id": "C_3B",
+        "grid_x": "3",
+        "grid_y": "B",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000,
+        "y_mm": 16000,
+        "y": 16000
+      },
+      {
+        "type": "column",
+        "id": "C_2C",
+        "grid_x": "2",
+        "grid_y": "C",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 8000,
+        "x": 8000,
+        "y_mm": 8000,
+        "y": 8000
+      },
+      {
+        "type": "column",
+        "id": "C_3C",
+        "grid_x": "3",
+        "grid_y": "C",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "height_mm": 3500,
+        "_confidence": 1.0,
+        "x_mm": 16000,
+        "x": 16000,
+        "y_mm": 8000,
+        "y": 8000
+      },
+      {
+        "type": "column",
+        "id": "Generic Column for Wall Connection",
+        "position": null,
+        "size": null,
+        "height_mm": 3500,
+        "material": null,
+        "base_connection": null,
+        "description": "Columns are mentioned as connection points for walls, but no specific column details (size, material, height) are provided in this drawing. Connection involves a scabbled surface.",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.4
       }
     ],
     "beams": [
       {
-        "id": "SH20a",
-        "section": "SHS200x200x8",
-        "grade": "C350",
-        "z_mm": 3500
-      },
-      {
-        "id": "Z25d",
-        "section": "Z250",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "PF20a",
-        "section": "PFC200",
+        "id": "UB36b",
+        "section": "UB36b",
         "grade": "G350",
-        "z_mm": 3500
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB31b",
+        "section": "UB31b",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB20c",
+        "section": "UB20c",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB36c",
+        "section": "UB36c",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB20d",
+        "section": "UB20d",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
         "id": "PF25a",
-        "section": "PFC250",
-        "grade": "G350",
-        "z_mm": 3500
-      },
-      {
-        "id": "B1",
-        "type": "primary",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 0,
-          "y": 8000
-        },
-        "end_point_mm": {
-          "x": 24000,
-          "y": 8000
-        },
-        "span_mm": 24000,
-        "grid_x": null,
-        "grid_y": "C",
-        "z_mm": 3500
-      },
-      {
-        "id": "B2",
-        "type": "primary",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 0,
-          "y": 0
-        },
-        "end_point_mm": {
-          "x": 24000,
-          "y": 0
-        },
-        "span_mm": 24000,
-        "grid_x": null,
-        "grid_y": "D",
-        "z_mm": 3500
-      },
-      {
-        "id": "B3",
-        "type": "tie",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 0,
-          "y": 0
-        },
-        "end_point_mm": {
-          "x": 0,
-          "y": 8000
-        },
-        "span_mm": 8000,
-        "grid_x": "1",
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B4",
-        "type": "tie",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 8000,
-          "y": 0
-        },
-        "end_point_mm": {
-          "x": 8000,
-          "y": 8000
-        },
-        "span_mm": 8000,
-        "grid_x": "2",
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B5",
-        "type": "tie",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 16000,
-          "y": 0
-        },
-        "end_point_mm": {
-          "x": 16000,
-          "y": 8000
-        },
-        "span_mm": 8000,
-        "grid_x": "3",
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B6",
-        "type": "tie",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 24000,
-          "y": 0
-        },
-        "end_point_mm": {
-          "x": 24000,
-          "y": 8000
-        },
-        "span_mm": 8000,
-        "grid_x": "4",
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B7",
-        "type": "transfer",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 8000,
-          "y": 5500
-        },
-        "end_point_mm": {
-          "x": 16000,
-          "y": 5500
-        },
-        "span_mm": 8000,
-        "grid_x": null,
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B8",
-        "type": "transfer",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 8000,
-          "y": 2500
-        },
-        "end_point_mm": {
-          "x": 16000,
-          "y": 2500
-        },
-        "span_mm": 8000,
-        "grid_x": null,
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B9",
-        "type": "transfer",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 8000,
-          "y": 2500
-        },
-        "end_point_mm": {
-          "x": 8000,
-          "y": 5500
-        },
-        "span_mm": 3000,
-        "grid_x": null,
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B10",
-        "type": "transfer",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 16000,
-          "y": 2500
-        },
-        "end_point_mm": {
-          "x": 16000,
-          "y": 5500
-        },
-        "span_mm": 3000,
-        "grid_x": null,
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B11",
-        "type": "secondary",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 16000,
-          "y": 4000
-        },
-        "end_point_mm": {
-          "x": 24000,
-          "y": 4000
-        },
-        "span_mm": 8000,
-        "grid_x": null,
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "id": "B12",
-        "type": "secondary",
-        "material": "concrete",
-        "section": "unknown",
-        "height_mm": "unknown",
-        "start_point_mm": {
-          "x": 0,
-          "y": 4000
-        },
-        "end_point_mm": {
-          "x": 8000,
-          "y": 4000
-        },
-        "span_mm": 8000,
-        "grid_x": null,
-        "grid_y": null,
-        "z_mm": 3500
-      },
-      {
-        "type": "beam",
-        "id": "BEAM-CH32a-Detail1",
-        "section": "CH32a",
+        "section": "PF25a",
+        "grade": "G350L",
         "span_mm": null,
-        "material": "Steel",
-        "end_connections": [
-          {
-            "to_member_id": "COL-CH40b-G2-Detail1",
-            "connection_type": "welded",
-            "details": "FPBW, shop welded stiffeners to create T-post"
-          }
-        ],
-        "z_mm": 3500
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "type": "beam",
-        "id": "BEAM-UB36c-Detail2",
-        "section": "UB36c",
-        "span_mm": null,
-        "material": "Steel",
-        "end_connections": [
-          {
-            "to_member_id": "COL-CH35a-G2-Detail2",
-            "connection_type": "welded",
-            "details": "shop welded stub to column"
-          }
-        ],
-        "z_mm": 3500
-      },
-      {
-        "type": "beam",
-        "id": "BEAM-CH13c-Detail2",
-        "section": "CH13c",
-        "span_mm": null,
-        "material": "Steel",
-        "end_connections": [
-          {
-            "to_member_id": "COL-CH35a-G2-Detail2",
-            "connection_type": "welded",
-            "details": "shop welded connection"
-          }
-        ],
-        "z_mm": 3500
-      },
-      {
-        "type": "beam",
-        "id": "BEAM-PF15a-Detail2",
+        "id": "PF15a",
         "section": "PF15a",
-        "span_mm": 1300,
-        "material": "Steel",
-        "end_connections": [
-          {
-            "to_member_id": "BEAM-SH15b-Detail2",
-            "connection_type": "bolted"
-          }
-        ],
-        "notes": "Max span",
-        "z_mm": 3500
+        "grade": "G350L",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "type": "beam",
-        "id": "BEAM-SH15b-Detail2",
+        "id": "CH13c",
+        "section": "CH13c",
+        "grade": "G350L",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB38c",
+        "section": "UB38c",
+        "grade": "G350L",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B1",
+        "start_grid_x": "1",
+        "start_grid_y": "B",
+        "end_grid_x": "2",
+        "end_grid_y": "B",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B2",
+        "start_grid_x": "2",
+        "start_grid_y": "B",
+        "end_grid_x": "3",
+        "end_grid_y": "B",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B3",
+        "start_grid_x": "3",
+        "start_grid_y": "B",
+        "end_grid_x": "4",
+        "end_grid_y": "B",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B4",
+        "start_grid_x": "1",
+        "start_grid_y": "C",
+        "end_grid_x": "2",
+        "end_grid_y": "C",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B5",
+        "start_grid_x": "2",
+        "start_grid_y": "C",
+        "end_grid_x": "3",
+        "end_grid_y": "C",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B6",
+        "start_grid_x": "3",
+        "start_grid_y": "C",
+        "end_grid_x": "4",
+        "end_grid_y": "C",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B7",
+        "start_grid_x": "1",
+        "start_grid_y": "D",
+        "end_grid_x": "2",
+        "end_grid_y": "D",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B8",
+        "start_grid_x": "2",
+        "start_grid_y": "D",
+        "end_grid_x": "3",
+        "end_grid_y": "D",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B9",
+        "start_grid_x": "3",
+        "start_grid_y": "D",
+        "end_grid_x": "4",
+        "end_grid_y": "D",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B10",
+        "start_grid_x": "1",
+        "start_grid_y": "B",
+        "end_grid_x": "1",
+        "end_grid_y": "C",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B11",
+        "start_grid_x": "1",
+        "start_grid_y": "C",
+        "end_grid_x": "1",
+        "end_grid_y": "D",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B12",
+        "start_grid_x": "2",
+        "start_grid_y": "B",
+        "end_grid_x": "2",
+        "end_grid_y": "C",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B13",
+        "start_grid_x": "2",
+        "start_grid_y": "C",
+        "end_grid_x": "2",
+        "end_grid_y": "D",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B14",
+        "start_grid_x": "3",
+        "start_grid_y": "B",
+        "end_grid_x": "3",
+        "end_grid_y": "C",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B15",
+        "start_grid_x": "3",
+        "start_grid_y": "C",
+        "end_grid_x": "3",
+        "end_grid_y": "D",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B16",
+        "start_grid_x": "4",
+        "start_grid_y": "B",
+        "end_grid_x": "4",
+        "end_grid_y": "C",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "primary_beam",
+        "id": "B17",
+        "start_grid_x": "4",
+        "start_grid_y": "C",
+        "end_grid_x": "4",
+        "end_grid_y": "D",
+        "span_mm": 8000,
+        "section": "not specified",
+        "material": "concrete",
+        "height_mm": "not specified",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH20a-1",
+        "section": "SH20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH20a-2",
+        "section": "SH20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH20a-3",
+        "section": "SH20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH20a-4",
+        "section": "SH20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH20a-5",
+        "section": "SH20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH20a-6",
+        "section": "SH20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH15b-U-1",
         "section": "SH15b",
-        "span_mm": null,
-        "material": "Steel",
-        "end_connections": [
-          {
-            "to_member_id": "BEAM-UB36c-Detail2",
-            "connection_type": "welded",
-            "details": "shop welded"
-          },
-          {
-            "to_member_id": "BEAM-PF25a-Detail2A",
-            "connection_type": "bolted",
-            "details": "provide counter sunk bolts"
-          }
-        ],
-        "z_mm": 3500
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "type": "beam",
-        "id": "BEAM-PF25a-Detail2A",
+        "id": "UB20d-1",
+        "section": "UB20d",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB20d-2",
+        "section": "UB20d",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB36c-1",
+        "section": "UB36c",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB36c-2",
+        "section": "UB36c",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF20a-1",
+        "section": "PF20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF20a-2",
+        "section": "PF20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF20a-3",
+        "section": "PF20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF20a-4",
+        "section": "PF20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF20a-5",
+        "section": "PF20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF20a-6",
+        "section": "PF20a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF25a-1",
         "section": "PF25a",
-        "span_mm": null,
-        "material": "Steel",
-        "end_connections": [
-          {
-            "to_member_id": "BEAM-SH15b-Detail2",
-            "connection_type": "bolted",
-            "details": "provide counter sunk bolts"
-          }
-        ],
-        "z_mm": 3500
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "type": "beam",
-        "id": "BEAM-PF25a-Detail3",
+        "id": "PF25a-2",
         "section": "PF25a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF25a-3",
+        "section": "PF25a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF25a-4",
+        "section": "PF25a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF25a-5",
+        "section": "PF25a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF25a-6",
+        "section": "PF25a",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z25d-1",
+        "section": "Z25d",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z25d-2",
+        "section": "Z25d",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z25d-3",
+        "section": "Z25d",
+        "grade": "G350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-1",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-2",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-3",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-4",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-5",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-6",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-7",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-8",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-9",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-10",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-11",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-12",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-13",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-14",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-15",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-16",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-17",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH13c-18",
+        "section": "CH13c",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH32a-1",
+        "section": "CH32a",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH32a-2",
+        "section": "CH32a",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH32a-3",
+        "section": "CH32a",
+        "grade": "C350",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Beam_Detail1",
+        "type": "beam",
+        "section": "CHS320",
+        "material": "C350L0",
         "span_mm": null,
-        "material": "Steel",
         "end_connections": [
           {
-            "to_member_id": "COL-CHS-G_D-Detail3",
-            "connection_type": "bolted"
+            "type": "continuous_through_column",
+            "connected_to_id": "Column_Detail1",
+            "connection_type": "FPBW_to_T_post_stiffeners"
           }
         ],
-        "z_mm": 3500
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "id": "Z10",
-        "section": "Z10",
-        "grade": "G450",
-        "z_mm": 3500
+        "id": "Beam_Detail2",
+        "type": "beam",
+        "section": "UB360",
+        "material": "C350L0",
+        "span_mm": null,
+        "end_connections": [
+          {
+            "type": "bolted_to_stub",
+            "connected_to_id": "Column_Detail2"
+          }
+        ],
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "id": "Z15",
-        "section": "Z15",
-        "grade": "G450",
-        "z_mm": 3500
+        "id": "Beam_Detail3",
+        "type": "beam",
+        "section": "CHS130",
+        "material": "C350L0",
+        "span_mm": null,
+        "end_connections": [
+          {
+            "type": "bolted_to_stub",
+            "connected_to_id": "Column_Detail2"
+          }
+        ],
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "id": "Z20",
-        "section": "Z20",
-        "grade": "G450",
-        "z_mm": 3500
+        "id": "Beam_Detail4",
+        "type": "beam",
+        "section": "SHS150",
+        "material": "C350L0",
+        "span_mm": null,
+        "end_connections": [
+          {
+            "type": "shop_welded_to_stub",
+            "connected_to_id": "Column_Detail2"
+          }
+        ],
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "id": "Z25",
-        "section": "Z25",
-        "grade": "G450",
-        "z_mm": 3500
+        "id": "Beam_Detail5",
+        "type": "beam",
+        "section": "Rectangular Section (unspecified)",
+        "material": "C350L0",
+        "span_mm": null,
+        "end_connections": [
+          {
+            "type": "bolted_connection",
+            "connected_to_id": "Column_Detail3"
+          }
+        ],
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "id": "Z30",
-        "section": "Z30",
-        "grade": "G450",
-        "z_mm": 3500
+        "id": "Beam_Detail6",
+        "type": "beam",
+        "section": "Rectangular Section (unspecified)",
+        "material": "C350L0",
+        "span_mm": null,
+        "end_connections": [
+          {
+            "type": "bolted_connection",
+            "connected_to_id": "Column_Detail3"
+          }
+        ],
+        "z_mm": 3500,
+        "_confidence": 0.5
       },
       {
-        "id": "Z35",
-        "section": "Z35",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "C10",
-        "section": "C10",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "C15",
-        "section": "C15",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "C20",
-        "section": "C20",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "C25",
-        "section": "C25",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "C30",
-        "section": "C30",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "C35",
-        "section": "C35",
-        "grade": "G450",
-        "z_mm": 3500
-      },
-      {
-        "id": "CB1",
-        "section": "750x600",
+        "id": "UB36b-1",
+        "section": "UB*36b",
         "grade": null,
         "span_mm": null,
         "from_col": null,
         "to_col": null,
-        "longitudinal_reinf": "5N28 TOP & BOTTOM",
-        "ties_reinf": "N12-300",
-        "side_face_reinf": "N16-300",
-        "z_mm": 3500
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB36b-2",
+        "section": "UB*36b",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB36b-3",
+        "section": "UB*36b",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB36b-4",
+        "section": "UB*36b",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH38d-1",
+        "section": "SH*38d",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH38d-2",
+        "section": "SH*38d",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH08d-1",
+        "section": "SH*08d",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH08d-2",
+        "section": "SH*08d",
+        "grade": null,
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z10-Z10010",
+        "section": "Z10010",
+        "grade": "G550",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z10-Z10012",
+        "section": "Z10012",
+        "grade": "G500",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z10-Z10015",
+        "section": "Z10015",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z10-Z10019",
+        "section": "Z10019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z15-Z15012",
+        "section": "Z15012",
+        "grade": "G500",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z15-Z15015",
+        "section": "Z15015",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z15-Z15019",
+        "section": "Z15019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z15-Z15024",
+        "section": "Z15024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z20-Z20015",
+        "section": "Z20015",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z20-Z20019",
+        "section": "Z20019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z20-Z20024",
+        "section": "Z20024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z25-Z25019",
+        "section": "Z25019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z25-Z25024",
+        "section": "Z25024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z30-Z30024",
+        "section": "Z30024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z30-Z30030",
+        "section": "Z30030",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "Z35-Z35030",
+        "section": "Z35030",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C10-C10010",
+        "section": "C10010",
+        "grade": "G550",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C10-C10012",
+        "section": "C10012",
+        "grade": "G500",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C10-C10015",
+        "section": "C10015",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C10-C10019",
+        "section": "C10019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C15-C15012",
+        "section": "C15012",
+        "grade": "G500",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C15-C15015",
+        "section": "C15015",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C15-C15019",
+        "section": "C15019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C15-C15024",
+        "section": "C15024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C20-C20015",
+        "section": "C20015",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C20-C20019",
+        "section": "C20019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C20-C20024",
+        "section": "C20024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C25-C25019",
+        "section": "C25019",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C25-C25024",
+        "section": "C25024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C30-C30024",
+        "section": "C30024",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C30-C30030",
+        "section": "C30030",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "C35-C35030",
+        "section": "C35030",
+        "grade": "G450",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH15b",
+        "section": "SH15b",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH10a",
+        "section": "SH10a",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH10d",
+        "section": "SH10d",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH10f",
+        "section": "SH10f",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH15a",
+        "section": "SH15a",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "RB20a",
+        "section": "RB20a",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF25b",
+        "section": "PF25b",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH30b",
+        "section": "SH30b",
+        "grade": "G350",
+        "span_mm": null,
+        "from_col": null,
+        "to_col": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "RH25b",
+        "section": "RH25b",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "EA15a",
+        "section": "EA15a",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH10e",
+        "section": "SH10e",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UB20a",
+        "section": "UB20a",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "SH20a",
+        "section": "SH20a",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "PF20a",
+        "section": "PF20a",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CH32a",
+        "section": "CH32a",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "UA15a",
+        "section": "UA15a",
+        "grade": "G350L",
+        "span_mm": null,
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_A_1-4",
+        "start_grid_x": "1",
+        "start_grid_y": "A",
+        "end_grid_x": "4",
+        "end_grid_y": "A",
+        "start_x_mm": 0,
+        "start_y_mm": 9000,
+        "end_x_mm": 9000,
+        "end_y_mm": 9000,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_B_1-4",
+        "start_grid_x": "1",
+        "start_grid_y": "B",
+        "end_grid_x": "4",
+        "end_grid_y": "B",
+        "start_x_mm": 0,
+        "start_y_mm": 6000,
+        "end_x_mm": 9000,
+        "end_y_mm": 6000,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_C_1-4",
+        "start_grid_x": "1",
+        "start_grid_y": "C",
+        "end_grid_x": "4",
+        "end_grid_y": "C",
+        "start_x_mm": 0,
+        "start_y_mm": 3000,
+        "end_x_mm": 9000,
+        "end_y_mm": 3000,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_D_1-4",
+        "start_grid_x": "1",
+        "start_grid_y": "D",
+        "end_grid_x": "4",
+        "end_grid_y": "D",
+        "start_x_mm": 0,
+        "start_y_mm": 0,
+        "end_x_mm": 9000,
+        "end_y_mm": 0,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_1_A-D",
+        "start_grid_x": "1",
+        "start_grid_y": "A",
+        "end_grid_x": "1",
+        "end_grid_y": "D",
+        "start_x_mm": 0,
+        "start_y_mm": 9000,
+        "end_x_mm": 0,
+        "end_y_mm": 0,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_2_A-D",
+        "start_grid_x": "2",
+        "start_grid_y": "A",
+        "end_grid_x": "2",
+        "end_grid_y": "D",
+        "start_x_mm": 3000,
+        "start_y_mm": 9000,
+        "end_x_mm": 3000,
+        "end_y_mm": 0,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_3_A-D",
+        "start_grid_x": "3",
+        "start_grid_y": "A",
+        "end_grid_x": "3",
+        "end_grid_y": "D",
+        "start_x_mm": 6000,
+        "start_y_mm": 9000,
+        "end_x_mm": 6000,
+        "end_y_mm": 0,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "type": "beam",
+        "id": "B_4_A-D",
+        "start_grid_x": "4",
+        "start_grid_y": "A",
+        "end_grid_x": "4",
+        "end_grid_y": "D",
+        "start_x_mm": 9000,
+        "start_y_mm": 9000,
+        "end_x_mm": 9000,
+        "end_y_mm": 0,
+        "span_mm": 9000,
+        "section": "Concrete Wall/Beam",
+        "material": "Concrete",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB1",
+        "section": "Reinforcement: Top: 6N20, Bottom: 6N20, Ligs: 2N12-175, Side Reo: N12-150 E.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB2",
+        "section": "Reinforcement: Top: 4N20, Bottom: 4N20, Ligs: 2N12-175, Side Reo: N12-150 E.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB3",
+        "section": "Reinforcement: Top: 8N24, Bottom: 8N24, Ligs: 4N12-250, Side Reo: N12-150 E.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB4",
+        "section": "Reinforcement: Top: 8N20, Bottom: 8N20, Ligs: 4N12-200, Side Reo: N12-150 F.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB5",
+        "section": "Reinforcement: Top: 8N20, Bottom: 8N20, Ligs: 2N12-150, Side Reo: N12-150 E.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB6",
+        "section": "Reinforcement: Top: 8N28, Bottom: 8N28, Ligs: 4N12-250, Side Reo: N12-150 E.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB7",
+        "section": "Reinforcement: Top: 8N20, Bottom: 8N20, Ligs: 2N12-150, Side Reo: N12-150 E.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "HB8",
+        "section": "Reinforcement: Top: 2N16, Bottom: 2N16, Ligs: 2N12-175, Side Reo: N12-150 E.F.",
+        "grade": "N50",
+        "z_mm": 3500,
+        "_confidence": 0.5
+      },
+      {
+        "id": "CB1",
+        "section": "750x600",
+        "z_mm": 3500,
+        "_confidence": 0.5
       }
     ],
     "footings": [
@@ -1544,7 +3043,8 @@
         "depth_mm": 750,
         "height_mm": 600,
         "z_top_mm": -1000,
-        "z_base_mm": -1600
+        "z_base_mm": -1600,
+        "_confidence": 0.8
       },
       {
         "id": "P2",
@@ -1553,7 +3053,8 @@
         "depth_mm": 750,
         "height_mm": 3000,
         "z_top_mm": -1000,
-        "z_base_mm": -3000
+        "z_base_mm": -3000,
+        "_confidence": 0.8
       },
       {
         "id": "P3",
@@ -1562,7 +3063,8 @@
         "depth_mm": 600,
         "height_mm": 300,
         "z_top_mm": -1000,
-        "z_base_mm": -1300
+        "z_base_mm": -1300,
+        "_confidence": 0.8
       },
       {
         "id": "P4",
@@ -1571,7 +3073,8 @@
         "depth_mm": 750,
         "height_mm": 7000,
         "z_top_mm": -1000,
-        "z_base_mm": -3000
+        "z_base_mm": -3000,
+        "_confidence": 0.8
       },
       {
         "id": "P5",
@@ -1580,258 +3083,1663 @@
         "depth_mm": 750,
         "height_mm": 19000,
         "z_top_mm": -1000,
-        "z_base_mm": -3000
+        "z_base_mm": -3000,
+        "_confidence": 0.8
       },
       {
         "id": "RF1",
         "type": "raft",
-        "width_mm": 5600,
-        "depth_mm": 6500,
+        "width_mm": 6500,
+        "depth_mm": 5600,
         "height_mm": 1000,
-        "long_reinf_long_dir": "N24-200 TOP & BTM. + 10N32",
-        "long_reinf_short_dir": "N24-200 TOP & BTM. + 10N32",
-        "ties_reinf": "N16-200",
-        "side_face_reinf": "N16-300",
         "z_top_mm": -1000,
-        "z_base_mm": -2000
+        "z_base_mm": -2000,
+        "_confidence": 0.8
       }
     ],
     "bracing": [
       {
-        "id": "RB16a",
-        "section": "16mm Round Bar",
+        "id": "SH07g",
+        "section": "SH07g",
         "grade": "G350",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07g",
+        "section": "SH07g",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH08d",
+        "section": "SH08d",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07f",
+        "section": "SH07f",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "SH07i",
+        "section": "SH07i",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a",
+        "section": "RB16a",
+        "grade": "G350L",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-1",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-2",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-3",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-4",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-5",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-6",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-7",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-8",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-9",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-10",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-11",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-12",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-13",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-14",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-15",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-16",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-17",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-18",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-19",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-20",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-21",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-22",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-23",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-24",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-25",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-26",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-27",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-28",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-29",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-30",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-31",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-32",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-33",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-34",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-35",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "RB16a-36",
+        "section": "RB16a",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "P80HS",
+        "section": "P80HS",
+        "grade": "G350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
       },
       {
         "id": "FB",
-        "section": "Flat Bar",
-        "grade": "G350",
+        "section": "FB",
+        "grade": "G350L",
         "z_base_mm": 0,
-        "z_top_mm": 3500
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.5_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.5_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.5_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.5_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.0_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.0_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.0_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H6.0_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.5_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.5_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.5_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.5_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.0_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.0_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.0_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H5.0_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.5_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.5_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.5_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.5_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.0_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.0_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.0_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H4.0_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.5_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.5_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.5_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.5_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.0_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.0_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.0_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H3.0_120MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H2.6_NOFRL",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H2.6_60MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H2.6_90MIN",
+        "section": "100x50x6RHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS1_H2.6_120MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H6.0_180_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H5.5_180_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H5.0_180_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H4.5_180_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H4.0_180_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H3.5_180_240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H3.0_180_240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS3_H2.6_180_240MIN",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H7.0_NOFRL",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H7.0_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H7.0_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H7.0_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H7.0_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.5_NOFRL",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.5_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.5_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.5_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.5_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.0_NOFRL",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.0_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.0_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.0_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H6.0_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.5_NOFRL",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.5_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.5_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.5_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.5_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.0_NOFRL",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.0_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.0_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.0_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H5.0_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.5_NOFRL",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.5_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.5_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.5_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.5_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.0_NOFRL",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.0_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.0_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.0_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H4.0_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.5_NOFRL",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.5_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.5_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.5_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.5_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.0_NOFRL",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.0_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.0_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.0_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H3.0_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H2.6_NOFRL",
+        "section": "89x89x5SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H2.6_UPTO90MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H2.6_120MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H2.6_180MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
+      },
+      {
+        "id": "WS2_H2.6_240MIN",
+        "section": "100x100x9SHS",
+        "grade": "C350",
+        "z_base_mm": 0,
+        "z_top_mm": 3500,
+        "_confidence": 0.8
       }
     ],
     "slabs": [
       {
-        "id": "S_AUTO_Ground Level",
-        "level_id": "Ground Level",
+        "id": "S_AUTO_GL",
+        "level_id": "GL",
         "elevation_mm": 0,
         "thickness_mm": 200,
         "boundary": [
           [
-            4000,
-            2500
+            3000,
+            3000
           ],
           [
-            22000,
-            2500
+            9000,
+            3000
           ],
           [
-            22000,
-            15000
+            9000,
+            9000
           ],
           [
-            4000,
-            15000
+            3000,
+            9000
           ]
         ],
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "auto_generated": true,
+        "_confidence": 0.8
       },
       {
-        "id": "S_AUTO_Level 01",
-        "level_id": "Level 01",
+        "id": "S_AUTO_LEVEL 01",
+        "level_id": "LEVEL 01",
         "elevation_mm": 0,
         "thickness_mm": 200,
         "boundary": [
           [
-            4000,
-            2500
+            3000,
+            3000
           ],
           [
-            22000,
-            2500
+            9000,
+            3000
           ],
           [
-            22000,
-            15000
+            9000,
+            9000
           ],
           [
-            4000,
-            15000
+            3000,
+            9000
           ]
         ],
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "auto_generated": true,
+        "_confidence": 0.8
       },
       {
-        "id": "S_AUTO_Level 02",
-        "level_id": "Level 02",
+        "id": "S_AUTO_LEVEL 02",
+        "level_id": "LEVEL 02",
         "elevation_mm": 0,
         "thickness_mm": 200,
         "boundary": [
           [
-            4000,
-            2500
+            3000,
+            3000
           ],
           [
-            22000,
-            2500
+            9000,
+            3000
           ],
           [
-            22000,
-            15000
+            9000,
+            9000
           ],
           [
-            4000,
-            15000
+            3000,
+            9000
           ]
         ],
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "auto_generated": true,
+        "_confidence": 0.8
       },
       {
-        "id": "S_AUTO_Level 03",
-        "level_id": "Level 03",
+        "id": "S_AUTO_LEVEL 03",
+        "level_id": "LEVEL 03",
         "elevation_mm": 3500,
         "thickness_mm": 200,
         "boundary": [
           [
-            4000,
-            2500
+            3000,
+            3000
           ],
           [
-            22000,
-            2500
+            9000,
+            3000
           ],
           [
-            22000,
-            15000
+            9000,
+            9000
           ],
           [
-            4000,
-            15000
+            3000,
+            9000
           ]
         ],
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "auto_generated": true,
+        "_confidence": 0.8
       },
       {
-        "id": "S_AUTO_Level 04",
-        "level_id": "Level 04",
+        "id": "S_AUTO_LEVEL 04",
+        "level_id": "LEVEL 04",
         "elevation_mm": 0,
         "thickness_mm": 200,
         "boundary": [
           [
-            4000,
-            2500
+            3000,
+            3000
           ],
           [
-            22000,
-            2500
+            9000,
+            3000
           ],
           [
-            22000,
-            15000
+            9000,
+            9000
           ],
           [
-            4000,
-            15000
+            3000,
+            9000
           ]
         ],
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "auto_generated": true,
+        "_confidence": 0.8
       },
       {
-        "id": "S_AUTO_Level 05",
-        "level_id": "Level 05",
+        "id": "S_AUTO_LEVEL 05",
+        "level_id": "LEVEL 05",
         "elevation_mm": 0,
         "thickness_mm": 200,
         "boundary": [
           [
-            4000,
-            2500
+            3000,
+            3000
           ],
           [
-            22000,
-            2500
+            9000,
+            3000
           ],
           [
-            22000,
-            15000
+            9000,
+            9000
           ],
           [
-            4000,
-            15000
+            3000,
+            9000
           ]
         ],
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "auto_generated": true,
+        "_confidence": 0.8
       },
       {
-        "id": "S_AUTO_Lower Roof",
-        "level_id": "Lower Roof",
+        "id": "S_AUTO_ROOF",
+        "level_id": "ROOF",
         "elevation_mm": 0,
         "thickness_mm": 200,
         "boundary": [
           [
-            4000,
-            2500
+            3000,
+            3000
           ],
           [
-            22000,
-            2500
+            9000,
+            3000
           ],
           [
-            22000,
-            15000
+            9000,
+            9000
           ],
           [
-            4000,
-            15000
+            3000,
+            9000
           ]
         ],
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "auto_generated": true,
+        "_confidence": 0.8
+      }
+    ],
+    "walls": [
+      {
+        "id": "W1",
+        "type": "concrete_wall",
+        "thickness_mm": 200,
+        "height_mm": 3500,
+        "z_base_mm": 3500,
+        "z_top_mm": 7000,
+        "level": "LEVEL 03",
+        "material": "reinforced_concrete",
+        "grade": "N32",
+        "x1": 0,
+        "y1": 24000,
+        "x2": 24000,
+        "y2": 24000,
+        "_confidence": 0.8
       },
       {
-        "id": "S_AUTO_Upper Roof",
-        "level_id": "Upper Roof",
-        "elevation_mm": 0,
+        "id": "W2",
+        "type": "concrete_wall",
         "thickness_mm": 200,
-        "boundary": [
-          [
-            4000,
-            2500
-          ],
-          [
-            22000,
-            2500
-          ],
-          [
-            22000,
-            15000
-          ],
-          [
-            4000,
-            15000
-          ]
-        ],
+        "height_mm": 3500,
+        "z_base_mm": 3500,
+        "z_top_mm": 7000,
+        "level": "LEVEL 03",
         "material": "reinforced_concrete",
-        "auto_generated": true
+        "grade": "N32",
+        "x1": 0,
+        "y1": 0,
+        "x2": 24000,
+        "y2": 0,
+        "_confidence": 0.8
+      },
+      {
+        "id": "W3",
+        "type": "concrete_wall",
+        "thickness_mm": 200,
+        "height_mm": 3500,
+        "z_base_mm": 3500,
+        "z_top_mm": 7000,
+        "level": "LEVEL 03",
+        "material": "reinforced_concrete",
+        "grade": "N32",
+        "x1": 0,
+        "y1": 0,
+        "x2": 0,
+        "y2": 24000,
+        "_confidence": 0.8
+      },
+      {
+        "id": "W4",
+        "type": "concrete_wall",
+        "thickness_mm": 200,
+        "height_mm": 3500,
+        "z_base_mm": 3500,
+        "z_top_mm": 7000,
+        "level": "LEVEL 03",
+        "material": "reinforced_concrete",
+        "grade": "N32",
+        "x1": 24000,
+        "y1": 0,
+        "x2": 24000,
+        "y2": 24000,
+        "_confidence": 0.8
       }
     ]
   },
   "summary": {
-    "total_columns": 66,
-    "total_beams": 36,
-    "total_slabs": 8,
+    "total_columns": 99,
+    "total_beams": 154,
+    "total_slabs": 7,
     "total_walls": 0,
     "total_footings": 6,
-    "total_bracing": 2,
+    "total_bracing": 167,
     "num_levels": 1
   },
   "synthesis_method": "llm",
-  "elapsed_s": 75.9
+  "elapsed_s": 82.6,
+  "project": {
+    "project_name": "THE UNIVERSITY OF NEW ENGLAND TAMWORTH CENTRAL CAMPUS",
+    "project_number": "221823",
+    "revision": "B",
+    "standard": null,
+    "engineer": "TTW",
+    "date": "2024-09",
+    "building_type": null,
+    "floor_count": null,
+    "material": "steel"
+  },
+  "detail_specs": {
+    "1/70201": {
+      "connection_type": "beam_to_column",
+      "member_ref": "CH40b",
+      "stiffeners": true,
+      "confidence": 0.7
+    },
+    "2/70201": {
+      "connection_type": "beam_to_column",
+      "member_ref": "CH35a",
+      "end_plate": {
+        "width_mm": 270,
+        "depth_mm": 255,
+        "bolt_count": 3
+      },
+      "stiffeners": true,
+      "confidence": 0.6
+    },
+    "3/70202": {
+      "connection_type": "beam_to_column",
+      "member_ref": "I-section Column",
+      "end_plate": {
+        "bolt_count": 4
+      },
+      "confidence": 0.5
+    }
+  }
 }

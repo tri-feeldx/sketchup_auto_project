@@ -197,6 +197,8 @@ def call_llm(
     images: list | None = None,
     # System prompt (used by ScannerV6, SynthesizerV7 etc.)
     system: str | None = None,
+    # Skip cache READ (still writes) — use on retry passes to break cache trap
+    force_fresh: bool = False,
 ) -> str:
     # Normalize: "images" kwarg is an alias for "image_parts"
     if images is not None and image_parts is None:
@@ -206,11 +208,12 @@ def call_llm(
 
     if LLM_CACHE_ENABLED:
         cache_key = _compute_cache_key(prompt, image_parts)
-        cached = _cache_load(cache_key)
-        if cached is not None:
-            _cache_hits += 1
-            rprint(f"  [green]Cache HIT[/] [{cache_key[:8]}]")
-            return cached
+        if not force_fresh:
+            cached = _cache_load(cache_key)
+            if cached is not None:
+                _cache_hits += 1
+                rprint(f"  [green]Cache HIT[/] [{cache_key[:8]}]")
+                return cached
     else:
         cache_key = None
 

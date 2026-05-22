@@ -689,7 +689,7 @@ class RubyGeneratorV5:
             f"  p_{i} = Geom::Vector3d.new(-d_{i}.y, d_{i}.x, 0)",
             f"  s_{i} = Geom::Point3d.new(ox+{x1}, oy+{y1}, {zb})",
             f"  e_{i} = Geom::Point3d.new(ox+{x2}, oy+{y2}, {zb})",
-            f"  ht = {t} / 2.0",
+            f"  ht = {t // 2}",
             f"  pts_{i} = [s_{i}+p_{i}*ht, e_{i}+p_{i}*ht, e_{i}-p_{i}*ht, s_{i}-p_{i}*ht]",
             f"  f_{i} = ents.add_face(pts_{i})",
             f"  f_{i}.material = {mat} if f_{i}",

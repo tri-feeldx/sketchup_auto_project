@@ -152,11 +152,12 @@ class SynthesizerV7:
         all_shafts = []
 
         for pr in page_results:
-            # Columns — deduplicate by ID
+            # Columns — deduplicate by normalized ID (handles "C-1" vs "C1")
             for col in pr.get("columns", []):
                 col_id = col.get("id", col.get("mark", ""))
-                if col_id and col_id not in all_columns:
-                    all_columns[col_id] = col
+                norm_key = self._norm_id(col_id)
+                if norm_key and norm_key not in all_columns:
+                    all_columns[norm_key] = col
 
             all_beams.extend(pr.get("beams", []))
             all_slabs.extend(pr.get("slabs", []))
@@ -166,12 +167,38 @@ class SynthesizerV7:
             all_stairs.extend(pr.get("stairs", []))
             all_shafts.extend(pr.get("shafts", []))
 
+        # Deduplicate beams by normalized ID; fallback key = (grids, section)
+        seen_beam: set = set()
+        deduped_beams = []
+        for b in all_beams:
+            bid = self._norm_id(b.get("id") or b.get("mark") or "")
+            key = bid if bid else (
+                b.get("start_grid_x", ""), b.get("start_grid_y", ""),
+                b.get("end_grid_x", ""), b.get("end_grid_y", ""),
+                b.get("section", ""),
+            )
+            if key not in seen_beam:
+                seen_beam.add(key)
+                deduped_beams.append(b)
+
+        # Deduplicate bracing by normalized ID
+        seen_brace: set = set()
+        deduped_bracing = []
+        for b in all_bracing:
+            bid = self._norm_id(b.get("id") or b.get("mark") or "")
+            if bid:
+                if bid not in seen_brace:
+                    seen_brace.add(bid)
+                    deduped_bracing.append(b)
+            else:
+                deduped_bracing.append(b)
+
         model["members"]["columns"] = list(all_columns.values())
-        model["members"]["beams"] = all_beams
+        model["members"]["beams"] = deduped_beams
         model["members"]["slabs"] = all_slabs
         model["members"]["walls"] = all_walls
         model["members"]["footings"] = all_footings
-        model["members"]["bracing"] = all_bracing
+        model["members"]["bracing"] = deduped_bracing
         model["members"]["stairs"] = all_stairs
         model["members"]["shafts"] = all_shafts
 
@@ -344,11 +371,11 @@ class SynthesizerV7:
         det_lvls = det.get("levels") or []
         llm_elev_count = sum(
             1 for lv in llm_lvls
-            if lv.get("elevation_mm") or lv.get("height_from_datum_mm")
+            if lv.get("elevation_mm") is not None or lv.get("height_from_datum_mm") is not None
         )
         det_elev_count = sum(
             1 for lv in det_lvls
-            if lv.get("elevation_mm") or lv.get("height_from_datum_mm")
+            if lv.get("elevation_mm") is not None or lv.get("height_from_datum_mm") is not None
         )
         if det_elev_count > llm_elev_count:
             llm_model["levels"] = det_lvls
@@ -617,10 +644,9 @@ class SynthesizerV7:
                             })
                             seen_ids.add(lvl_id)
 
-        # If only 1 non-datum level found (likely a floor-to-floor spacing, not absolute levels)
-        # treat as incomplete and fall through to default 4-level template
-        if len(levels) == 1 and levels[0].get("elevation_mm", 0) > 100:
-            print(f"  [Z] Only 1 non-datum level ({levels[0].get('elevation_mm')}mm) — using default 4-level template")
+        # 1 level is never enough to build a multi-floor model — fall through to default
+        if len(levels) == 1:
+            print(f"  [Z] Only 1 level found ({levels[0].get('elevation_mm')}mm) — using default 4-level template")
             levels = []
 
         if not levels:

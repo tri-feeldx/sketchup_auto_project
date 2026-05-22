@@ -93,10 +93,11 @@ class MultiPassExtractor:
                 pages_to_scan = list(dict.fromkeys(pages_to_scan))[:5]  # max 5 pages
 
                 new_elements = []
+                force_fresh = pass_num > 1  # bypass cache on retry passes to break cache trap
                 for page_idx in pages_to_scan:
                     pt = page_texts.get(str(page_idx)) or page_texts.get(page_idx) or ""
                     elements = self._targeted_scan(
-                        etype, page_idx, pt, deficit, forensic
+                        etype, page_idx, pt, deficit, forensic, force_fresh=force_fresh
                     )
                     new_elements.extend(elements)
 
@@ -130,6 +131,7 @@ class MultiPassExtractor:
         page_text: str,
         deficit: int,
         forensic: dict,
+        force_fresh: bool = False,
     ) -> List[dict]:
         """Run a targeted LLM scan for a specific element type on a page."""
         region = forensic.get("region", "au")
@@ -147,7 +149,8 @@ class MultiPassExtractor:
             pass
 
         try:
-            response = call_llm(user, system=system, images=images or None)
+            response = call_llm(user, system=system, images=images or None,
+                                 force_fresh=force_fresh)
             data = self._parse_json(response)
             if not data:
                 return []

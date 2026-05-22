@@ -127,9 +127,11 @@ class ScannerV6:
         print(f"  [OK] V6 Complete: {len(page_results)} pages scanned in {elapsed:.1f}s")
         return output
 
-    def _scan_page(self, rp, skip_vision: bool = False, _renderer=None) -> Optional[dict]:
+    def _scan_page(self, rp, skip_vision: bool = False, _renderer=None,
+                   _escalated: bool = False) -> Optional[dict]:
         """Scan a single page — text-only or vision-assisted.
         _renderer: per-thread VisionRenderer for parallel mode (overrides self.renderer).
+        _escalated: when True, appends stronger extraction instructions to break cache trap.
         """
         page_idx = rp.page_idx
         ptype = rp.page_type
@@ -156,6 +158,14 @@ class ScannerV6:
             page_type=ptype.lower(),
             profile=self.forensic_result,
         )
+        if _escalated:
+            user_prompt += (
+                f"\n\nIMPORTANT — ESCALATED RETRY: Your previous attempt returned 0 structural "
+                f"elements on this {ptype} page. That is very unlikely. Look VERY carefully at "
+                f"the image. Identify and return EVERY column mark, beam label, bracing diagonal, "
+                f"or footing symbol visible — even faint or partially obscured ones. Do not return "
+                f"an empty list."
+            )
 
         # Get image if vision enabled — use _renderer (parallel) or self.renderer (sequential)
         images = []
@@ -206,8 +216,12 @@ class ScannerV6:
             }
 
         # ── Post-scan: specialised extractors ───────────────
-        if ptype == "ELEVATION" and page_text:
-            result_data["level_elevations"] = self._extract_elevations(page_idx, page_text)
+        if ptype == "ELEVATION":
+            # Pass vision image too — ELEVATION pages are often graphical with minimal text
+            page_img = images[0] if images else None
+            result_data["level_elevations"] = self._extract_elevations(
+                page_idx, page_text, page_img
+            )
 
         if ptype in ("PLAN", "SECTION") and page_text:
             grid = self._extract_grid_coords(page_idx, page_text, ptype)
@@ -224,12 +238,16 @@ class ScannerV6:
 
         return result_data
 
-    def _extract_elevations(self, page_idx: int, page_text: str) -> list:
-        """Call elevation extractor LLM to get RL/FFL/storey heights from a page."""
+    def _extract_elevations(self, page_idx: int, page_text: str,
+                             page_image: bytes = None) -> list:
+        """Call elevation extractor LLM to get RL/FFL/storey heights from a page.
+        Uses vision when page_image provided (graphical elevation drawings have minimal text).
+        """
         try:
             sys_p = self.prompt_factory.system_prompt_elevation_extractor()
             usr_p = self.prompt_factory.user_prompt_extract_elevations(page_text, "elevation")
-            resp = call_llm(usr_p, system=sys_p)
+            images = [page_image] if page_image else None
+            resp = call_llm(usr_p, system=sys_p, images=images)
             data, _ = self._parse_json(resp)
             if isinstance(data, list) and data:
                 print(f"    [ELEV] Page {page_idx}: extracted {len(data)} level elevations")
@@ -271,9 +289,14 @@ class ScannerV6:
             if result and result.get("_retry_recommended") and not skip_vision:
                 print(f"  [SCANNER] Page {rp.page_idx+1}: conf={result.get('_scan_confidence',0):.2f} — retrying +50 DPI")
                 retry_renderer = None
+                # Use escalated prompt when page returned 0 members (breaks cache trap)
+                _zero_members = sum(
+                    len(result.get(k, []) or []) for k in ("columns", "beams", "footings", "bracing")
+                ) == 0
                 try:
                     retry_renderer = VisionRenderer(str(self.pdf_path), dpi=self.dpi + 50)
-                    r2 = self._scan_page(rp, skip_vision=False, _renderer=retry_renderer)
+                    r2 = self._scan_page(rp, skip_vision=False, _renderer=retry_renderer,
+                                         _escalated=_zero_members)
                     if r2 and r2.get("_scan_confidence", 0) > result.get("_scan_confidence", 0):
                         result = r2
                         print(f"  [SCANNER] Page {rp.page_idx+1}: retry improved → {result['_scan_confidence']:.2f}")

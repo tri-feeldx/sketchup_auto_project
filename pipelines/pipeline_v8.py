@@ -39,6 +39,24 @@ from metrics.accuracy_evaluator import AccuracyEvaluator
 ARR_ACCURACY_THRESHOLD = 95.0
 ARR_MAX_RETRIES = 3
 
+import re as _re
+_ANSI_RE = _re.compile(r'\x1b\[[0-9;]*m')  # strip ANSI color codes for log file
+
+
+class _TeeStream:
+    """Tees writes to both the original stream and a log file (ANSI-stripped)."""
+    def __init__(self, real, log_fh):
+        self._real = real
+        self._fh   = log_fh
+    def write(self, s):
+        self._real.write(s)
+        self._fh.write(_ANSI_RE.sub('', s))
+    def flush(self):
+        self._real.flush()
+        self._fh.flush()
+    def __getattr__(self, attr):
+        return getattr(self._real, attr)
+
 
 @dataclass
 class PipelineV8Result:
@@ -49,6 +67,7 @@ class PipelineV8Result:
     # Stage outputs
     scanner_output: dict = field(default_factory=dict)
     plan_positions: dict = field(default_factory=dict)
+    ground_truth: dict = field(default_factory=dict)
     structural_model: dict = field(default_factory=dict)
     verification: Optional[dict] = None
     validation: Optional[dict] = None
@@ -60,6 +79,7 @@ class PipelineV8Result:
     output_rb_path: str = ""
     output_json_path: str = ""
     output_ifc_path: str = ""
+    log_path: str = ""
 
     errors: List[str] = field(default_factory=list)
 
@@ -150,6 +170,15 @@ class PipelineV8:
         result = PipelineV8Result(pdf_path=pdf_path)
         t0 = time.time()
 
+        # ── Auto-log: tee stdout+stderr to file ──────────────────────────────
+        os.makedirs(output_dir, exist_ok=True)
+        _pdf_base = os.path.splitext(os.path.basename(pdf_path))[0]
+        _log_path = os.path.join(output_dir, f"{_pdf_base}_run.log")
+        _log_fh = open(_log_path, "w", encoding="utf-8", buffering=1)
+        _orig_out, _orig_err = sys.stdout, sys.stderr
+        sys.stdout = _TeeStream(sys.stdout, _log_fh)
+        sys.stderr = _TeeStream(sys.stderr, _log_fh)
+
         try:
             os.makedirs(output_dir, exist_ok=True)
             base_name = os.path.splitext(os.path.basename(pdf_path))[0]
@@ -173,7 +202,7 @@ class PipelineV8:
                 _arr_ctx = _arr_principal.build_context(scanner_output)
                 _gate_scan = _arr_principal.gate_post_scan(scanner_output, _arr_ctx)
                 ARRPrincipal._print_gate("POST-SCAN", _gate_scan)
-                if _gate_scan.status != "FAIL":
+                if _gate_scan.passed:
                     break
                 if _scan_retry < 2:
                     _scan_dpi += 50
@@ -254,9 +283,26 @@ class PipelineV8:
                 print(f"  [DETAIL-EXT] WARN: {_dex_err} — skipping")
                 detail_specs = {}
 
+            # ── STAGE 0.6: Ground Truth Builder ──────────────
+            print("[V8 STAGE 0.6] GroundTruthBuilder: Establishing locked ProjectFacts...")
+            ground_truth: dict = {}
+            try:
+                from agents.ground_truth_builder import GroundTruthBuilder
+                _gtb = GroundTruthBuilder(
+                    str(pdf_path), region=self.region, language=self.language
+                )
+                ground_truth = _gtb.build(scanner_output)
+                result.ground_truth = ground_truth
+            except Exception as _gtb_err:
+                print(f"  [GTB] WARN: GroundTruthBuilder failed ({_gtb_err}) — skipping")
+
             # ── STAGE 3: Synthesize ───────────────────────────
             print("[V8 STAGE 3] SynthesizerV7: Building structural model...")
-            model = self.synthesizer.synthesize(scanner_output, plan_positions=plan_positions)
+            model = self.synthesizer.synthesize(
+                scanner_output,
+                plan_positions=plan_positions,
+                ground_truth=ground_truth,
+            )
             result.structural_model = model
 
             # ── GATE: POST-SYNTHESIZE ─────────────────────────
@@ -367,18 +413,24 @@ class PipelineV8:
             # Check 3D positions — run ArchitectReviewer if accuracy < threshold OR 3D issues
             arch_reviewer = ArchitectReviewer(pdf_path=pdf_path, region=self.region, dpi=self.dpi)
             z_issues = arch_reviewer._verify_3d_positions(model)
-            needs_arr = (accuracy_score < ARR_ACCURACY_THRESHOLD) or bool(z_issues)
+            needs_arr = (accuracy_score < ARR_ACCURACY_THRESHOLD) or bool(z_issues) \
+                        or not _gate_gen.passed
 
             if needs_arr:
-                reason = (f"accuracy={accuracy_score}% < {ARR_ACCURACY_THRESHOLD}%"
-                          if accuracy_score < ARR_ACCURACY_THRESHOLD
-                          else f"{len(z_issues)} 3D position issue(s) found")
+                if not _gate_gen.passed:
+                    reason = f"gate POST-GENERATE FAIL: {'; '.join(_gate_gen.warnings)}"
+                elif accuracy_score < ARR_ACCURACY_THRESHOLD:
+                    reason = f"accuracy={accuracy_score}% < {ARR_ACCURACY_THRESHOLD}%"
+                else:
+                    reason = f"{len(z_issues)} 3D position issue(s) found"
                 print(f"[V8 STAGE 9.5] ARR: {reason} — running ArchitectReviewer...")
 
                 for arr_pass in range(1, ARR_MAX_RETRIES + 1):
                     print(f"  [ARR Pass {arr_pass}/{ARR_MAX_RETRIES}]")
 
-                    arr_result = arch_reviewer.review(scanner_output, model)
+                    arr_result = arch_reviewer.review(
+                        scanner_output, model, ground_truth=ground_truth
+                    )
 
                     if arr_result["verdict"] == "ISSUES_FOUND":
                         corrections = arr_result.get("all_corrections", {})
@@ -460,13 +512,19 @@ class PipelineV8:
             result.errors.append(f"Pipeline error: {str(e)}")
             import traceback
             traceback.print_exc()
+        finally:
+            result.duration_sec = time.time() - t0
+            status = "SUCCESS" if result.success else "FAILED"
+            acc_score = (result.accuracy or {}).get("overall_score", "N/A")
+            print(f"\n{'='*60}")
+            print(f"PIPELINE V8 {status} in {result.duration_sec:.1f}s | Accuracy: {acc_score}%")
+            print(f"{'='*60}")
+            result.log_path = _log_path
+            print(f"\n[LOG] Run log saved → {_log_path}")
+            sys.stdout = _orig_out
+            sys.stderr = _orig_err
+            _log_fh.close()
 
-        result.duration_sec = time.time() - t0
-        status = "SUCCESS" if result.success else "FAILED"
-        acc_score = (result.accuracy or {}).get("overall_score", "N/A")
-        print(f"\n{'='*60}")
-        print(f"PIPELINE V8 {status} in {result.duration_sec:.1f}s | Accuracy: {acc_score}%")
-        print(f"{'='*60}")
         return result
 
 
