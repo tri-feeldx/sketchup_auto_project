@@ -15,6 +15,8 @@ AllCops:
   NewCops: enable
 
   TargetRubyVersion: 3.2       # SketchUp 2024+ ships Ruby 3.2
+
+SketchUp:
   TargetSketchUpVersion: 2024  # Our minimum supported version
 
   # Exclude everything except generated Ruby output
@@ -35,10 +37,16 @@ SketchupPerformance:
   Enabled: true   # Catch slow patterns (e.g. model.entities.each in tight loops)
 
 SketchupRequirements:
-  Enabled: true   # Extension Warehouse requirements (required for distribution)
+  Enabled: true   # Extension Warehouse requirements
 
 SketchupSuggestions:
   Enabled: true   # Best-practice suggestions
 
 SketchupBugs:
   Enabled: true   # Known SketchUp Ruby API bugs to avoid
+
+# ── Per-cop overrides ─────────────────────────────────────────────────────────
+# Our scripts are standalone run-scripts, NOT packaged Extensions.
+# FileStructure requires an extension directory layout — not applicable here.
+SketchupRequirements/FileStructure:
+  Enabled: false

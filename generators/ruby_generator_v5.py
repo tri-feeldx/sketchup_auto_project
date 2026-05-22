@@ -97,7 +97,7 @@ class RubyGeneratorV5:
             f"model.set_attribute('project','revision',{json.dumps(proj_rev)})",
             f"model.set_attribute('project','standard',{json.dumps(proj_std)})",
             "ents = model.active_entities",
-            "model.start_operation('Structural_Import', true)",
+            "model.start_operation('Structural Import', true)",
             "defn = model.definitions",
             "",
             "# ── Layers ──",
