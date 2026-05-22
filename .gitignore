@@ -46,6 +46,9 @@ data/**/*.ifc
 *.tmp.*
 *.tmp
 
+# CodeGraph local index (rebuild on new machine: npx @colbymchenry/codegraph init && npx @colbymchenry/codegraph index)
+.codegraph/
+
 # Ruby tools
 .rubocop_cache/
 .bundle/
