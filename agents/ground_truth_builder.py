@@ -87,6 +87,31 @@ Output JSON only:
 }
 """
 
+_GRID_COUNT_HINT_PROMPT = """\
+You are a senior structural engineer with 20+ years of BIM experience.
+
+This structural PLAN drawing contains MORE grid lines than previously identified.
+
+TASK: Extract ALL structural grid axes — including secondary and intermediate axes.
+
+CRITICAL: The building has more columns than can fit in the previously extracted grid.
+You MUST find and report ALL labeled grid lines — do not stop at the first few obvious ones.
+
+Look for:
+- All sequentially numbered axes (1, 2, 3, 4, 5, 6, 7... — may go well beyond 4)
+- All lettered axes (A, B, C, D, E, F... — may go beyond D)
+- Any intermediate axes with alphanumeric labels (1A, 2A, etc.)
+
+Output JSON only:
+{
+  "grid_x": {"1": 0, "2": 6000, "3": 12000, "4": 18000, "5": 24000, "6": 30000},
+  "grid_y": {"A": 0, "B": 6000, "C": 12000, "D": 18000, "E": 24000, "F": 30000},
+  "footprint_x_mm": 30000,
+  "footprint_y_mm": 30000,
+  "confidence": 0.85
+}
+"""
+
 _ELEVATION_SYSTEM_PROMPT = """\
 You are a senior structural engineer reading a structural elevation or steelwork elevation drawing.
 
@@ -281,6 +306,9 @@ class GroundTruthBuilder:
             if schedule_pages:
                 self._extract_column_count(renderer, schedule_pages, facts)
 
+            # 5. Grid sufficiency check — retry if grid has too few intersections for col_count
+            self._check_grid_sufficiency(renderer, plan_pages, facts)
+
         finally:
             try:
                 renderer.close()
@@ -431,6 +459,67 @@ class GroundTruthBuilder:
 
         except Exception as e:
             print(f"  [GTB] WARN: grid retry failed: {e}")
+
+    def _check_grid_sufficiency(self, renderer: VisionRenderer,
+                                plan_pages: List[int], facts: dict) -> None:
+        """After col_count is known, verify grid has enough intersections.
+        If not, retry grid extraction with an explicit count hint to the LLM."""
+        gx = facts.get("grid_x_mm") or {}
+        gy = facts.get("grid_y_mm") or {}
+        col_expected = facts.get("col_count_expected") or 0
+        grid_intersections = len(gx) * len(gy)
+
+        if col_expected <= 0 or not plan_pages:
+            return
+        if grid_intersections >= col_expected * 0.75:
+            return  # Grid is adequate
+
+        print(f"  [GTB] WARN: Grid too sparse — {len(gx)}×{len(gy)}={grid_intersections} "
+              f"intersections for {col_expected} columns (need ≥{int(col_expected * 0.75)}) "
+              f"— retrying with count hint")
+        self._retry_grid_with_col_hint(renderer, plan_pages[0], facts, col_expected)
+
+    def _retry_grid_with_col_hint(self, renderer: VisionRenderer, page_idx: int,
+                                   facts: dict, col_count: int) -> None:
+        """Retry grid extraction telling the LLM how many columns the building has."""
+        try:
+            img = renderer.render_page_as_bytes(page_idx - 1, format="PNG")
+            nx = len(facts.get("grid_x_mm") or {})
+            ny = len(facts.get("grid_y_mm") or {})
+            resp = call_llm(
+                f"Plan page {page_idx}. "
+                f"CRITICAL: This building has {col_count} structural columns. "
+                f"Previous extraction only found {nx}×{ny}={nx*ny} grid intersections "
+                f"which cannot accommodate {col_count} columns. "
+                f"You MUST extract more grid lines — look for ALL axes beyond the first {nx} X-axes "
+                f"and {ny} Y-axes. Output valid JSON only.",
+                system=_GRID_COUNT_HINT_PROMPT,
+                images=[img]
+            )
+            data = _parse_json(resp)
+            if not data:
+                print(f"  [GTB] WARN: grid count-hint retry parse failed")
+                return
+
+            gx = data.get("grid_x") or {}
+            gy = data.get("grid_y") or {}
+            new_intersections = len(gx) * len(gy)
+            old_intersections = (len(facts.get("grid_x_mm") or {})
+                                 * len(facts.get("grid_y_mm") or {}))
+
+            if (new_intersections > old_intersections
+                    and _is_valid_structural_grid(gx)
+                    and _is_valid_structural_grid(gy)):
+                facts["grid_x_mm"] = _int_values(gx)
+                facts["grid_y_mm"] = _int_values(gy)
+                facts["source_pages"]["grid"] = page_idx
+                print(f"  [GTB] Grid count-hint retry: {len(gx)}×{len(gy)}={new_intersections} "
+                      f"intersections ✓ (was {old_intersections})")
+            else:
+                print(f"  [GTB] Grid count-hint retry: {len(gx)}×{len(gy)}={new_intersections} "
+                      f"— not better than {old_intersections}, keeping original")
+        except Exception as e:
+            print(f"  [GTB] WARN: grid count-hint retry failed: {e}")
 
     def _extract_elevations(self, renderer: VisionRenderer, page_idx: int, facts: dict):
         print(f"  [GTB] Extracting floor heights from elevation page {page_idx}...")

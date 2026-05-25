@@ -504,14 +504,17 @@ class PipelineV8:
                 if isinstance(v, dict) and v.get("page_type") == "PLAN"
             ])
             if _plan_page_indices_vs:
+                print(f"  [VISUAL-SIM] Comparing model plan view against "
+                      f"{len(_plan_page_indices_vs)} PLAN page(s): {_plan_page_indices_vs}")
                 try:
                     visual_sim = AccuracyEvaluator.compute_visual_similarity(
                         model, str(pdf_path), _plan_page_indices_vs
                     )
                     if visual_sim.get("similarity_score") is not None:
-                        print(f"  [VISUAL-SIM] Coversheet similarity: "
+                        print(f"  [VISUAL-SIM] Plan similarity: "
                               f"{visual_sim['similarity_score']:.1%} "
-                              f"(Grade {visual_sim['grade']})")
+                              f"(Grade {visual_sim['grade']}) "
+                              f"[top-down model vs PDF plan pages]")
                     result.accuracy["visual_similarity"] = visual_sim
                 except Exception as _vs_err:
                     print(f"  [VISUAL-SIM] WARN: {_vs_err}")
