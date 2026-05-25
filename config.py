@@ -16,7 +16,9 @@ _env_file = _base / ".env" if (_base / ".env").exists() else _base / ".env.examp
 load_dotenv(_env_file)
 
 # ---- MODEL LOCK ----
-GEMINI_MODEL = "gemini-2.5-flash"  # DO NOT DOWNGRADE OR CHANGE MODEL VERSION
+GEMINI_MODEL     = "gemini-2.5-flash"       # Default: fast + cheap for all text tasks
+GEMINI_MODEL_PRO = "gemini-3-flash-preview" # High-accuracy vision: GTB grid/elevation, schedule pages
+# If gemini-3-flash-preview is unavailable on Vertex AI, change to "gemini-2.5-pro"
 
 # ---- VERTEX AI AUTH ----
 import os as _os

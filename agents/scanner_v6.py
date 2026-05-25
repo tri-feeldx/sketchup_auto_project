@@ -30,6 +30,7 @@ _DEDUP_THUMB_SIZE = 16   # resize to 16×16 before hashing
 _DEDUP_TYPES = {"SCHEDULE"}  # only dedup schedule pages (18 pages → ~5-6 unique)
 
 from core.llm_wrapper import call_llm
+from config import GEMINI_MODEL_PRO as _SCANNER_MODEL_PRO
 from core.vision_renderer import VisionRenderer
 from core.pdf_utils import get_page_count, region_normaliser
 
@@ -236,7 +237,8 @@ class ScannerV6:
             except Exception as e:
                 print(f"    [WARN] Render page {page_idx} failed: {e}")
 
-        # Call LLM
+        # Call LLM — use PRO model for visually complex page types
+        _llm_model = _SCANNER_MODEL_PRO if ptype in ("SCHEDULE", "PLAN") else None
         parse_strategy = 99
         result_data = None
         try:
@@ -244,6 +246,7 @@ class ScannerV6:
                 user_prompt,
                 system=system_prompt,
                 images=images if images else None,
+                model=_llm_model,
             )
             data, parse_strategy = self._parse_json(response)
             if data is not None:
@@ -442,7 +445,7 @@ class ScannerV6:
                 pt, null_ids[:25]
             )
             try:
-                resp = call_llm(usr_p, system=sys_p)
+                resp = call_llm(usr_p, system=sys_p, model=_SCANNER_MODEL_PRO)
                 data, _ = self._parse_json(resp)
                 if not data or not isinstance(data, dict):
                     continue

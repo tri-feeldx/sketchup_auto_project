@@ -18,6 +18,7 @@ import re
 from typing import List, Optional
 
 from core.llm_wrapper import call_llm
+from config import GEMINI_MODEL_PRO as _GTB_MODEL
 from core.vision_renderer import VisionRenderer
 
 
@@ -375,7 +376,8 @@ class GroundTruthBuilder:
                 f"Plan page {page_idx}. Extract the structural grid system precisely. "
                 "Output valid JSON only.",
                 system=_GRID_SYSTEM_PROMPT,
-                images=[img]
+                images=[img],
+                model=_GTB_MODEL,
             )
             data = _parse_json(resp)
             if not data:
@@ -434,6 +436,7 @@ class GroundTruthBuilder:
                 "(numbered/lettered lines, NOT individual column positions). "
                 "Output valid JSON only.",
                 system=_GRID_RETRY_PROMPT,
+                model=_GTB_MODEL,
                 images=[img]
             )
             data = _parse_json(resp)
@@ -494,7 +497,8 @@ class GroundTruthBuilder:
                 f"You MUST extract more grid lines — look for ALL axes beyond the first {nx} X-axes "
                 f"and {ny} Y-axes. Output valid JSON only.",
                 system=_GRID_COUNT_HINT_PROMPT,
-                images=[img]
+                images=[img],
+                model=_GTB_MODEL,
             )
             data = _parse_json(resp)
             if not data:
@@ -529,7 +533,8 @@ class GroundTruthBuilder:
                 f"Elevation page {page_idx}. Extract all floor level heights. "
                 "Output valid JSON only.",
                 system=_ELEVATION_SYSTEM_PROMPT,
-                images=[img]
+                images=[img],
+                model=_GTB_MODEL,
             )
             data = _parse_json(resp)
             if not data:

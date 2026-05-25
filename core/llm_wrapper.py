@@ -16,7 +16,7 @@ from google import genai
 from rich import print as rprint
 
 from config import (
-    GEMINI_MODEL, VERTEX_PROJECT, VERTEX_LOCATION,
+    GEMINI_MODEL, GEMINI_MODEL_PRO, VERTEX_PROJECT, VERTEX_LOCATION,
     GENERATION_CONFIG,
     LLM_CACHE_ENABLED, LLM_CACHE_DIR,
 )
@@ -199,10 +199,14 @@ def call_llm(
     system: str | None = None,
     # Skip cache READ (still writes) — use on retry passes to break cache trap
     force_fresh: bool = False,
+    # Override model for this call (None = use GEMINI_MODEL default)
+    model: str | None = None,
 ) -> str:
     # Normalize: "images" kwarg is an alias for "image_parts"
     if images is not None and image_parts is None:
         image_parts = images
+
+    _model = model or GEMINI_MODEL
 
     global _last_call_at, _cache_hits, _cache_misses
 
@@ -225,7 +229,7 @@ def call_llm(
     last_error = None
     for attempt in range(retries):
         try:
-            rprint(f"  [dim]LLM call -> Vertex AI (attempt {attempt+1}/{retries})[/]")
+            rprint(f"  [dim]LLM call -> Vertex AI [{_model}] (attempt {attempt+1}/{retries})[/]")
             cfg = genai.types.GenerateContentConfig(
                 temperature=GENERATION_CONFIG["temperature"],
                 top_p=GENERATION_CONFIG["top_p"],
@@ -235,7 +239,7 @@ def call_llm(
             if system:
                 cfg.system_instruction = system
             response = _client.models.generate_content(
-                model=GEMINI_MODEL,
+                model=_model,
                 contents=_build_contents(prompt, image_parts),
                 config=cfg,
             )
@@ -244,7 +248,7 @@ def call_llm(
                 _last_call_at = time.monotonic()
             if LLM_CACHE_ENABLED and cache_key:
                 _cache_misses += 1
-                _cache_save(cache_key, GEMINI_MODEL, text, _call_type)
+                _cache_save(cache_key, _model, text, _call_type)
                 rprint(f"  [dim]Cache MISS -> saved [{cache_key[:8]}][/]")
             return text
 
