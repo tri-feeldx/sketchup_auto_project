@@ -54,7 +54,7 @@ class SynthesizerV7:
         self.prompt_factory = PromptFactory(region=region, language=language)
 
     def synthesize(self, scanner_output: dict, plan_positions: dict = None,
-                   ground_truth: dict = None) -> dict:
+                   ground_truth: dict = None, cad_data: dict = None) -> dict:
         """
         Build unified structural model from scanner results.
 
@@ -63,6 +63,9 @@ class SynthesizerV7:
             plan_positions:  Optional dict from PlanPageColumnExtractor
             ground_truth:    Optional ProjectFacts from GroundTruthBuilder —
                              grid + floors are LOCKED and override LLM output
+            cad_data:        Optional output from CADVectorExtractor (Stage 1.5) —
+                             exact column XY positions from PDF vector paths,
+                             applied first with confidence=1.0 before LLM positions
 
         Returns:
             Unified building structural model dict
@@ -99,8 +102,11 @@ class SynthesizerV7:
             model = self._parse_json(response)
             if model:
                 model = self._merge_members(model, valid_results, forensic)
+                model = self._merge_column_continuity(model)
+                model = self._enrich_from_cad(model, cad_data)
                 model = self._enrich_from_plan(model, plan_positions)
                 model = self._apply_ground_truth_lock(model, ground_truth)
+                model = self._dedup_beams(model)
                 model = self._ensure_walls(model)
                 model["members"] = self._assign_confidence(model["members"])
                 model["synthesis_method"] = "llm"
@@ -112,8 +118,11 @@ class SynthesizerV7:
         # Fallback: deterministic merge
         print("[SYNTH] Using deterministic merge fallback")
         model = self._deterministic_merge(valid_results, forensic)
+        model = self._merge_column_continuity(model)
+        model = self._enrich_from_cad(model, cad_data)
         model = self._enrich_from_plan(model, plan_positions)
         model = self._apply_ground_truth_lock(model, ground_truth)
+        model = self._dedup_beams(model)
         model = self._ensure_walls(model)
         model["synthesis_method"] = "deterministic"
         model["elapsed_s"] = round(time.time() - t0, 1)
@@ -666,6 +675,99 @@ class SynthesizerV7:
         """Normalize mark/ID: strip hyphens, spaces, underscores → uppercase alphanumeric."""
         return re.sub(r'[-_\s]+', '', str(s or '')).upper()
 
+    def _merge_column_continuity(self, model: dict) -> dict:
+        """
+        Merge column segments with the same mark across levels into one continuous member.
+        C1 @ z=0-3500 + C1 @ z=3500-7000 → single C1 @ z=0-7000 with splice_z_mm=[3500].
+        """
+        cols = model.get("members", {}).get("columns", [])
+        if not cols:
+            return model
+
+        by_mark: dict = {}
+        unmarked: list = []
+        for col in cols:
+            mark = self._norm_id(col.get("mark") or col.get("id") or "")
+            if not mark:
+                unmarked.append(col)
+                continue
+            by_mark.setdefault(mark, []).append(col)
+
+        merged = list(unmarked)
+        splice_total = 0
+        for mark, segs in by_mark.items():
+            if len(segs) == 1:
+                merged.append(segs[0])
+                continue
+            segs.sort(key=lambda c: float(c.get("z_base_mm") or c.get("z_base") or 0))
+            base = segs[0].copy()
+            top_seg = segs[-1]
+            z_top = (top_seg.get("z_top_mm") or top_seg.get("z_top")
+                     or (float(top_seg.get("z_base_mm") or top_seg.get("z_base") or 0)
+                         + float(top_seg.get("height_mm") or 3500)))
+            base["z_top_mm"] = int(float(z_top))
+            base["z_top"] = base["z_top_mm"]
+            base["height_mm"] = base["z_top_mm"] - int(float(
+                base.get("z_base_mm") or base.get("z_base") or 0))
+            splice_zs = [
+                int(float(s.get("z_base_mm") or s.get("z_base") or 0))
+                for s in segs[1:]
+            ]
+            if splice_zs:
+                base["splice_z_mm"] = splice_zs
+                splice_total += len(splice_zs)
+            merged.append(base)
+
+        model["members"]["columns"] = merged
+        if len(cols) != len(merged):
+            print(f"  [CONTINUITY] {len(cols)} column segments → "
+                  f"{len(merged)} continuous columns "
+                  f"({splice_total} splices recorded)")
+        return model
+
+    def _enrich_from_cad(self, model: dict, cad_data: dict) -> dict:
+        """
+        Apply exact column XY positions from CAD vector extraction (Stage 1.5).
+
+        Called BEFORE _enrich_from_plan so CAD-derived coords (confidence=1.0)
+        take priority over LLM-vision coords (confidence=0.95).
+        """
+        if not cad_data:
+            return model
+        cad_positions = cad_data.get("column_positions") or {}
+        if not cad_positions:
+            return model
+
+        # Normalize CAD keys for matching (same logic as _norm_id)
+        cad_norm = {self._norm_id(k): v for k, v in cad_positions.items()}
+
+        enriched = 0
+        for col in model.get("members", {}).get("columns", []):
+            mark = self._norm_id(col.get("mark") or col.get("id") or "")
+            if mark in cad_norm:
+                pos = cad_norm[mark]
+                col["x_mm"] = int(pos["x_mm"])
+                col["y_mm"] = int(pos["y_mm"])
+                col["x"] = col["x_mm"]
+                col["y"] = col["y_mm"]
+                col["_confidence"] = 1.0
+                col["_xy_source"] = "cad_vector"
+                enriched += 1
+
+        # Also push CAD grid coords into grid_system so the generator uses them
+        gs = model.setdefault("grid_system", {})
+        cad_gx = cad_data.get("grid_x_mm") or {}
+        cad_gy = cad_data.get("grid_y_mm") or {}
+        if cad_gx:
+            gs.setdefault("x_coords", {}).update({str(k): int(v) for k, v in cad_gx.items()})
+        if cad_gy:
+            gs.setdefault("y_coords", {}).update({str(k): int(v) for k, v in cad_gy.items()})
+
+        if enriched:
+            total = len(model.get("members", {}).get("columns", []))
+            print(f"  [CAD-ENRICH] {enriched}/{total} columns got exact XY from CAD vectors")
+        return model
+
     def _enrich_from_plan(self, model: dict, plan_positions: dict) -> dict:
         """Enrich column XY positions from PlanPageColumnExtractor results."""
         if not plan_positions:
@@ -763,19 +865,44 @@ class SynthesizerV7:
         if gx_mm and gy_mm:
             gx_lookup = {str(k): int(v) for k, v in gx_mm.items()}
             gy_lookup = {str(k): int(v) for k, v in gy_mm.items()}
-            snapped = 0
+            gx_vals = sorted(gx_lookup.values())
+            gy_vals = sorted(gy_lookup.values())
+            snap_tol = 2500  # mm — proximity snap for unlabelled columns
+            snapped = label_snapped = proximity_snapped = 0
+
             for col in model.get("members", {}).get("columns", []):
                 gx = str(col.get("grid_x") or "")
                 gy = str(col.get("grid_y") or "")
-                if gx in gx_lookup and (col.get("x_mm") is None and col.get("x") is None):
+
+                # Pass 1: label-based snap — always overrides LLM XY with ground truth
+                if gx in gx_lookup:
                     col["x_mm"] = gx_lookup[gx]
                     col["x"] = gx_lookup[gx]
-                    snapped += 1
-                if gy in gy_lookup and (col.get("y_mm") is None and col.get("y") is None):
+                    label_snapped += 1
+                if gy in gy_lookup:
                     col["y_mm"] = gy_lookup[gy]
                     col["y"] = gy_lookup[gy]
+
+                # Pass 2: proximity snap — columns near a grid line but no label
+                cur_x = col.get("x_mm") or col.get("x") or 0
+                cur_y = col.get("y_mm") or col.get("y") or 0
+                if gx not in gx_lookup and gx_vals:
+                    nearest_x = min(gx_vals, key=lambda v: abs(v - cur_x))
+                    if abs(nearest_x - cur_x) <= snap_tol:
+                        col["x_mm"] = nearest_x
+                        col["x"] = nearest_x
+                        proximity_snapped += 1
+                if gy not in gy_lookup and gy_vals:
+                    nearest_y = min(gy_vals, key=lambda v: abs(v - cur_y))
+                    if abs(nearest_y - cur_y) <= snap_tol:
+                        col["y_mm"] = nearest_y
+                        col["y"] = nearest_y
+
+                snapped = label_snapped + proximity_snapped
+
             if snapped:
-                print(f"  [GRID-LOCK] Snapped {snapped} column coords to locked grid")
+                print(f"  [GRID-LOCK] Snapped {snapped} column coords "
+                      f"({label_snapped} label, {proximity_snapped} proximity)")
 
         return model
 
@@ -789,6 +916,10 @@ class SynthesizerV7:
         existing_walls = model.get("members", {}).get("walls", [])
         if existing_walls:
             return model  # PDF-extracted walls take priority
+
+        if self._is_steel_frame(model):
+            print("  [WALL-SYNTH] Steel frame detected — skipping wall synthesis")
+            return model
 
         gs = model.get("grid_system", {})
         x_coords = gs.get("x_coords") or {}
@@ -859,6 +990,66 @@ class SynthesizerV7:
         model["members"]["walls"] = synth_walls
         print(f"  [WALL-SYNTH] No PDF walls found — synthesized {len(synth_walls)} perimeter walls "
               f"from grid ({len(x_vals)}x{len(y_vals)}) × {len(levels)} levels")
+        return model
+
+    def _is_steel_frame(self, model: dict) -> bool:
+        steel_pfx = ("UC", "UB", "CHS", "RHS", "SHS", "PFC", "EA", "PF", "CH", "SH")
+        members = model.get("members", {})
+        # Signal 1: column section designations
+        cols = members.get("columns", [])
+        if cols:
+            steel_cols = sum(
+                1 for c in cols
+                if any(str(c.get("section") or "").upper().startswith(p) for p in steel_pfx)
+            )
+            if steel_cols / len(cols) > 0.5:
+                return True
+        # Signal 2: beam section designations (e.g., "360UB", "200UB")
+        beams = members.get("beams", [])
+        if beams:
+            steel_beams = sum(
+                1 for b in beams
+                if any(p in str(b.get("section") or "").upper()
+                       for p in ("UB", "UC", "CHS", "RHS", "SHS", "PFC"))
+            )
+            if steel_beams / len(beams) > 0.3:
+                return True
+        # Signal 3: beam IDs start with steel section code (e.g., "UB20d", "CH13c")
+        if beams:
+            steel_ids = sum(
+                1 for b in beams
+                if any(str(b.get("id") or b.get("mark") or "").upper().startswith(p)
+                       for p in steel_pfx)
+            )
+            if steel_ids / len(beams) > 0.3:
+                return True
+        return False
+
+    def _dedup_beams(self, model: dict) -> dict:
+        import re as _re
+        beams = model.get("members", {}).get("beams", [])
+        if not beams:
+            return model
+        seen: set = set()
+        unique = []
+        for b in beams:
+            fc = _re.sub(r'[-_\s]+', '', str(b.get("from_col") or b.get("start_col") or "")).upper()
+            tc = _re.sub(r'[-_\s]+', '', str(b.get("to_col") or b.get("end_col") or "")).upper()
+            lv = str(b.get("level") or b.get("level_id") or "")
+            if fc and tc:
+                key = (min(fc, tc), max(fc, tc), lv)
+            else:
+                bid = _re.sub(r'[-_\s]+', '', str(b.get("id") or b.get("mark") or "")).upper()
+                key = ("__id__", bid, lv) if bid else None
+            if key is not None:
+                if key in seen:
+                    continue
+                seen.add(key)
+            unique.append(b)
+        before = len(beams)
+        if len(unique) < before:
+            print(f"  [DEDUP-BEAM] {before} → {len(unique)} beams (removed {before - len(unique)} duplicates)")
+        model["members"]["beams"] = unique
         return model
 
     def _assign_confidence(self, members: dict) -> dict:

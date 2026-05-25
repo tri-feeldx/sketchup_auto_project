@@ -276,6 +276,35 @@ class PipelineV8:
                 project_meta = {"project_name": "Structural Model", "revision": "A",
                                 "standard": "AS/NZS"}
 
+            # ── STAGE 1.5: CAD Vector Extraction ─────────────
+            print("[V8 STAGE 1.5] CADVectorExtractor: Reading vector grid + column XY from PDF...")
+            cad_data: dict = {}
+            try:
+                from core.cad_vector_extractor import CADVectorExtractor
+                _page_types_map = scanner_output.get("page_results", {})
+                _plan_page_indices = sorted([
+                    int(k) for k, v in _page_types_map.items()
+                    if isinstance(v, dict) and v.get("page_type") == "PLAN"
+                ])
+                if _plan_page_indices:
+                    _cve = CADVectorExtractor()
+                    cad_data = _cve.extract_plan_data(str(pdf_path), _plan_page_indices)
+                    _cve_conf = cad_data.get("confidence", 0)
+                    _cve_cols = len(cad_data.get("column_positions", {}))
+                    _cve_gx = len(cad_data.get("grid_x_mm", {}))
+                    _cve_gy = len(cad_data.get("grid_y_mm", {}))
+                    print(f"  -> grid {_cve_gx}×{_cve_gy} lines | "
+                          f"{_cve_cols} column symbols | conf={_cve_conf:.2f}")
+                    if _cve_conf < 0.3:
+                        print("  -> Low confidence — scanned PDF or non-standard CAD. "
+                              "Falling back to LLM vision for all geometry.")
+                        cad_data = {}
+                else:
+                    print("  -> No PLAN pages found yet — skipping")
+            except Exception as _cve_err:
+                print(f"  [CAD-VEC] WARN: vector extraction failed ({_cve_err}) — skipping")
+                cad_data = {}
+
             # ── STAGE 2.5: Plan Page Column Extractor ────────
             print("[V8 STAGE 2.5] PlanPageExtractor: Reading plan pages for column XY...")
             try:
@@ -285,7 +314,7 @@ class PipelineV8:
                     region=self.region,
                     language=self.language,
                 )
-                plan_positions = _pex.run(scanner_output)
+                plan_positions = _pex.run(scanner_output, cad_data=cad_data)
             except Exception as _pex_err:
                 print(f"  [PLAN-EXTRACT] WARN: extractor failed ({_pex_err}) — skipping")
                 plan_positions = {}
@@ -309,7 +338,7 @@ class PipelineV8:
                 _gtb = GroundTruthBuilder(
                     str(pdf_path), region=self.region, language=self.language
                 )
-                ground_truth = _gtb.build(scanner_output)
+                ground_truth = _gtb.build(scanner_output, cad_data=cad_data)
                 result.ground_truth = ground_truth
             except Exception as _gtb_err:
                 print(f"  [GTB] WARN: GroundTruthBuilder failed ({_gtb_err}) — skipping")
@@ -320,6 +349,7 @@ class PipelineV8:
                 scanner_output,
                 plan_positions=plan_positions,
                 ground_truth=ground_truth,
+                cad_data=cad_data,
             )
             result.structural_model = model
 
@@ -335,6 +365,30 @@ class PipelineV8:
                   f"{len(m.get('walls',[]))}w "
                   f"{len(m.get('footings',[]))}f "
                   f"{len(m.get('bracing',[]))}br")
+
+            # ── STAGE 3.5: pdfplumber schedule table parse ────
+            _sch_page_indices = sorted([
+                int(k) for k, v in scanner_output.get("page_results", {}).items()
+                if isinstance(v, dict) and v.get("page_type") == "SCHEDULE"
+            ])
+            _pdfplumber_counts: dict = {}
+            if _sch_page_indices:
+                try:
+                    from core.schedule_table_parser import ScheduleTableParser
+                    _stp = ScheduleTableParser()
+                    _sch_data = _stp.parse_schedule_pages(str(pdf_path), _sch_page_indices)
+                    if _sch_data.get("confidence", 0) > 0.5:
+                        _pdfplumber_counts = {
+                            "columns": _sch_data.get("column_count"),
+                            "beams": _sch_data.get("beam_count"),
+                        }
+                        print(f"  [SCHED-TABLE] pdfplumber: "
+                              f"{_pdfplumber_counts.get('columns')}c "
+                              f"{_pdfplumber_counts.get('beams')}b "
+                              f"(conf=0.9, pages={_sch_page_indices})")
+                        result.accuracy["schedule_table_counts"] = _pdfplumber_counts
+                except Exception as _stp_err:
+                    print(f"  [SCHED-TABLE] WARN: {_stp_err}")
 
             # ── STAGE 4: Schedule Verification (NEW) ─────────
             print("[V8 STAGE 4] ScheduleVerifier: Cross-checking against schedules...")
@@ -375,6 +429,29 @@ class PipelineV8:
             else:
                 print("[V8 STAGE 5] MultiPassExtractor: Skipped (all recalls ≥ 70%)")
 
+            # ── COUNT CONSISTENCY GATE ────────────────────────
+            if _pdfplumber_counts:
+                _model_cols = len(model.get("members", {}).get("columns", []))
+                _sched_cols = _pdfplumber_counts.get("columns") or 0
+                if _sched_cols > 0 and _model_cols < _sched_cols * 0.85:
+                    _deficit = _sched_cols - _model_cols
+                    print(f"  [COUNT-GATE] Column deficit: "
+                          f"model={_model_cols}, schedule={_sched_cols}, "
+                          f"missing={_deficit} — forcing MultiPass")
+                    if not self.skip_multipass:
+                        if "extractor" not in dir():
+                            extractor = MultiPassExtractor(pdf_path, dpi=self.dpi)
+                        model = extractor.run(
+                            model,
+                            [{"type": "columns", "deficit": _deficit}],
+                            scanner_output,
+                        )
+                        result.structural_model = model
+                        _model_cols_after = len(
+                            model.get("members", {}).get("columns", []))
+                        print(f"  [COUNT-GATE] After re-scan: {_model_cols_after}c "
+                              f"({_model_cols_after - _model_cols:+d})")
+
             # ── STAGE 6: Validate Model ───────────────────────
             print("[V8 STAGE 6] ValidatorV7: Checking model geometry...")
             val = self.validator.validate(model)
@@ -405,12 +482,37 @@ class PipelineV8:
             # ── STAGE 9: Accuracy Score (NEW) ─────────────────
             print("[V8 STAGE 9] AccuracyEvaluator: Computing recall-based score...")
             schedule_counts = verification.get("schedule_counts", {})
+            # Prefer pdfplumber counts (more reliable) when available
+            if _pdfplumber_counts.get("columns"):
+                schedule_counts = schedule_counts or {}
+                schedule_counts.setdefault("columns", _pdfplumber_counts["columns"])
+            if _pdfplumber_counts.get("beams"):
+                schedule_counts = schedule_counts or {}
+                schedule_counts.setdefault("beams", _pdfplumber_counts["beams"])
             accuracy = self.accuracy_eval.evaluate(model, schedule_counts or None)
             result.accuracy = accuracy
             print(f"  -> Accuracy: {accuracy['overall_score']}% "
                   f"(Grade {accuracy['grade']}) "
                   f"{'✅ TARGET MET' if accuracy['target_met'] else '❌ Below 90%'}")
             print(AccuracyEvaluator.format_report(accuracy))
+
+            # ── STAGE 9.1: Visual Similarity ──────────────────
+            _plan_page_indices_vs = sorted([
+                int(k) for k, v in scanner_output.get("page_results", {}).items()
+                if isinstance(v, dict) and v.get("page_type") == "PLAN"
+            ])
+            if _plan_page_indices_vs:
+                try:
+                    visual_sim = AccuracyEvaluator.compute_visual_similarity(
+                        model, str(pdf_path), _plan_page_indices_vs
+                    )
+                    if visual_sim.get("similarity_score") is not None:
+                        print(f"  [VISUAL-SIM] Coversheet similarity: "
+                              f"{visual_sim['similarity_score']:.1%} "
+                              f"(Grade {visual_sim['grade']})")
+                    result.accuracy["visual_similarity"] = visual_sim
+                except Exception as _vs_err:
+                    print(f"  [VISUAL-SIM] WARN: {_vs_err}")
 
             # ── STAGE 9.5: ARR — Architect Review & Refine ───
             accuracy_score = (result.accuracy or {}).get("overall_score", 0) or 0

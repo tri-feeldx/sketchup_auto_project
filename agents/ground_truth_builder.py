@@ -162,7 +162,7 @@ class GroundTruthBuilder:
         self.language = language
         self.debug = debug
 
-    def build(self, scanner_output: dict) -> dict:
+    def build(self, scanner_output: dict, cad_data: dict = None) -> dict:
         """
         Returns ProjectFacts dict (all values locked — downstream must not override):
         {
@@ -176,9 +176,14 @@ class GroundTruthBuilder:
             "confidence":         0.85,
             "source_pages":       {"grid": 4, "elevation": 7, "schedule": 24}
         }
+
+        Args:
+            scanner_output: output from ScannerV6.run()
+            cad_data:       optional output from CADVectorExtractor (Stage 1.5).
+                            When confidence ≥ 0.6 and ≥2 grid lines per axis,
+                            the CAD-derived grid overrides the LLM-extracted grid.
         """
         page_results = scanner_output.get("page_results", {})
-        routing = scanner_output.get("routing_summary", {})
 
         plan_pages = self._find_pages(page_results, "PLAN")
         elevation_pages = self._find_pages(page_results, "ELEVATION")
@@ -201,12 +206,15 @@ class GroundTruthBuilder:
 
         renderer = VisionRenderer(self.pdf_path, dpi=300)
         try:
-            # 1. Extract grid from first PLAN page
+            # 1. Extract grid from first PLAN page (LLM vision)
             if plan_pages:
                 page_idx = plan_pages[0]
                 self._extract_grid(renderer, page_idx, facts)
 
-            # 2. Extract floor heights from first ELEVATION page
+            # 2. Override LLM grid with exact CAD vectors when available
+            self._apply_cad_grid_override(facts, cad_data)
+
+            # 3. Extract floor heights from first ELEVATION page
             if elevation_pages:
                 page_idx = elevation_pages[0]
                 self._extract_elevations(renderer, page_idx, facts)
@@ -214,7 +222,7 @@ class GroundTruthBuilder:
                 # Some drawings embed elevations on second plan page
                 self._extract_elevations(renderer, plan_pages[1], facts)
 
-            # 3. Count columns from SCHEDULE pages
+            # 4. Count columns from SCHEDULE pages
             if schedule_pages:
                 self._extract_column_count(renderer, schedule_pages, facts)
 
@@ -229,6 +237,43 @@ class GroundTruthBuilder:
         return facts
 
     # ── Private helpers ──────────────────────────────────────────────────────
+
+    def _apply_cad_grid_override(self, facts: dict, cad_data: dict) -> None:
+        """
+        When CAD vector extraction found a reliable grid (conf ≥ 0.6 and ≥2
+        lines per axis), replace the LLM-derived grid with the CAD values.
+
+        CAD-derived grid is exact (vector coordinates, not pixel estimation),
+        so it has higher confidence than LLM vision output.
+        """
+        if not cad_data:
+            return
+        cad_conf = cad_data.get("confidence", 0.0)
+        if cad_conf < 0.6:
+            return
+
+        gx = cad_data.get("grid_x_mm") or {}
+        gy = cad_data.get("grid_y_mm") or {}
+
+        if len(gx) < 2 or len(gy) < 2:
+            return
+
+        # Only override when CAD grid is at least as complete as the LLM grid
+        llm_gx = facts.get("grid_x_mm") or {}
+        llm_gy = facts.get("grid_y_mm") or {}
+        if len(gx) < len(llm_gx) or len(gy) < len(llm_gy):
+            print(f"  [GTB] CAD grid sparser than LLM grid "
+                  f"({len(gx)}×{len(gy)} vs {len(llm_gx)}×{len(llm_gy)}) — keeping LLM")
+            return
+
+        facts["grid_x_mm"] = {str(k): int(v) for k, v in gx.items()}
+        facts["grid_y_mm"] = {str(k): int(v) for k, v in gy.items()}
+        facts["_grid_source"] = "cad_vector"
+        # Boost confidence: CAD grid is exact, not estimated
+        facts["confidence"] = min(1.0, facts.get("confidence", 0.0) + 0.2)
+        print(f"  [GTB] CAD grid override applied: "
+              f"{len(gx)}×{len(gy)} lines (conf boost → "
+              f"{facts['confidence']:.2f})")
 
     def _find_pages(self, page_results: dict, page_type: str) -> List[int]:
         return sorted([

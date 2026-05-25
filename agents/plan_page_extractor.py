@@ -8,10 +8,15 @@ output, reducing fallback XY from ~65% to <5%.
 =============================================================================
 """
 
+import concurrent.futures
 import json
 import re
 
 from core.llm_wrapper import call_llm
+from core.vision_renderer import VisionRenderer
+from pipelines.prompt_factory import PromptFactory
+
+PLAN_EXTRACT_WORKERS = 5
 
 
 def _norm_id(s) -> str:
@@ -19,8 +24,6 @@ def _norm_id(s) -> str:
     Handles: 'C-1' == 'C1', 'HB 1' == 'HB1', 'col_2' == 'COL2'
     """
     return re.sub(r'[-_\s]+', '', str(s or '')).upper()
-from core.vision_renderer import VisionRenderer
-from pipelines.prompt_factory import PromptFactory
 
 
 class PlanPageColumnExtractor:
@@ -30,17 +33,24 @@ class PlanPageColumnExtractor:
     """
 
     def __init__(self, pdf_path: str, region: str = "au", language: str = "en",
-                 debug: bool = False):
+                 debug: bool = False, max_workers: int = PLAN_EXTRACT_WORKERS):
         self.pdf_path = str(pdf_path)
         self.prompt_factory = PromptFactory(region=region, language=language)
         self.debug = debug
+        self.max_workers = max_workers
 
-    def run(self, scanner_output: dict) -> dict:
+    def run(self, scanner_output: dict, cad_data: dict = None) -> dict:
         """
         Extract column mark → grid position from all PLAN pages.
 
+        When cad_data (from Stage 1.5 CADVectorExtractor) is provided, columns
+        already found by vector extraction are pre-seeded with confidence=1.0
+        and the LLM vision pass is skipped for those marks.  LLM only runs for
+        columns NOT found in the CAD vector data.
+
         Args:
             scanner_output: output from ScannerV6.run() — needs page_results
+            cad_data:       optional output from CADVectorExtractor (Stage 1.5)
 
         Returns:
             dict mapping MARK (uppercase) → {grid_label_x, grid_label_y,
@@ -56,33 +66,77 @@ class PlanPageColumnExtractor:
             print("  [PLAN-EXTRACT] No PLAN pages found — skipping")
             return {}
 
-        system_prompt = self.prompt_factory.system_prompt_plan_extractor()
+        # ── Pre-seed from CAD vector positions (confidence = 1.0) ────────────
         positions: dict = {}
+        cad_col_positions = (cad_data or {}).get("column_positions", {})
+        if cad_col_positions:
+            for mark, pos in cad_col_positions.items():
+                norm = _norm_id(mark)
+                positions[norm] = {
+                    "grid_x_mm": pos["x_mm"],
+                    "grid_y_mm": pos["y_mm"],
+                    "_source": "cad_vector",
+                    "_confidence": 1.0,
+                }
+            print(f"  [PLAN-EXTRACT] Pre-seeded {len(positions)} columns from CAD vectors")
 
+        # ── LLM vision scan — pre-render pages then dispatch in parallel ────────
+        system_prompt = self.prompt_factory.system_prompt_plan_extractor()
+
+        # Step 1: render all pages to bytes sequentially (PyMuPDF not thread-safe)
+        page_images: dict = {}
         renderer = VisionRenderer(self.pdf_path, dpi=300)
         try:
             for page_idx in plan_pages:
-                print(f"  [PLAN-EXTRACT] Reading plan page {page_idx}...")
                 try:
-                    # VisionRenderer is 0-indexed internally
-                    img_bytes = renderer.render_page_as_bytes(page_idx - 1, format="PNG")
-                    user_prompt = self.prompt_factory.user_prompt_plan_extract(page_idx)
-                    response = call_llm(user_prompt, system=system_prompt, images=[img_bytes])
-                    parsed = self._parse(response, debug=self.debug)
-                    # Normalise keys: strip hyphens/spaces/underscores, uppercase
-                    parsed_upper = {_norm_id(k): v for k, v in parsed.items()
-                                    if isinstance(v, dict)}
-                    positions.update(parsed_upper)
-                    print(f"  [PLAN-EXTRACT] Page {page_idx}: {len(parsed_upper)} column positions")
+                    page_images[page_idx] = renderer.render_page_as_bytes(
+                        page_idx - 1, format="PNG")
                 except Exception as e:
-                    print(f"  [PLAN-EXTRACT] WARN page {page_idx}: {e}")
+                    print(f"  [PLAN-EXTRACT] WARN render page {page_idx}: {e}")
         finally:
             try:
                 renderer.close()
             except Exception:
                 pass
 
-        print(f"  [PLAN-EXTRACT] Total: {len(positions)} column grid positions extracted")
+        if not page_images:
+            return positions
+
+        # Step 2: parallel LLM calls (IO-bound — safe to thread)
+        debug = self.debug
+
+        def _llm_worker(page_idx: int):
+            img_bytes = page_images[page_idx]
+            print(f"  [PLAN-EXTRACT] Reading plan page {page_idx} (LLM)...")
+            user_prompt = self.prompt_factory.user_prompt_plan_extract(page_idx)
+            response = call_llm(user_prompt, system=system_prompt, images=[img_bytes])
+            parsed = self._parse(response, debug=debug)
+            return page_idx, {_norm_id(k): v for k, v in parsed.items()
+                               if isinstance(v, dict)}
+
+        n_workers = min(self.max_workers, len(page_images))
+        print(f"  [PLAN-EXTRACT] {len(page_images)} pages — {n_workers} parallel workers")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = {executor.submit(_llm_worker, p): p for p in page_images}
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    page_idx, parsed_upper = future.result()
+                    new_from_llm = 0
+                    for mark, pos in parsed_upper.items():
+                        if mark not in positions:
+                            positions[mark] = pos
+                            new_from_llm += 1
+                    print(f"  [PLAN-EXTRACT] Page {page_idx}: "
+                          f"{len(parsed_upper)} from LLM "
+                          f"({new_from_llm} new, "
+                          f"{len(parsed_upper) - new_from_llm} already from CAD)")
+                except Exception as e:
+                    print(f"  [PLAN-EXTRACT] WARN page {futures[future]}: {e}")
+
+        cad_count = sum(1 for v in positions.values()
+                        if isinstance(v, dict) and v.get("_source") == "cad_vector")
+        print(f"  [PLAN-EXTRACT] Total: {len(positions)} positions "
+              f"({cad_count} from CAD vectors, {len(positions) - cad_count} from LLM)")
         return positions
 
     def _parse(self, response: str, debug: bool = False) -> dict:

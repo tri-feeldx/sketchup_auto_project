@@ -10,6 +10,7 @@ Max 2 re-scan passes to avoid infinite loops.
 =============================================================================
 """
 
+import concurrent.futures
 import json
 import re
 import time
@@ -20,6 +21,7 @@ from core.llm_wrapper import call_llm
 from core.vision_renderer import VisionRenderer
 
 MAX_PASSES = 2
+MULTIPASS_WORKERS = 5
 
 # Which page types to re-scan for each element type
 ELEMENT_PAGE_MAP = {
@@ -94,12 +96,25 @@ class MultiPassExtractor:
 
                 new_elements = []
                 force_fresh = pass_num > 1  # bypass cache on retry passes to break cache trap
-                for page_idx in pages_to_scan:
-                    pt = page_texts.get(str(page_idx)) or page_texts.get(page_idx) or ""
-                    elements = self._targeted_scan(
-                        etype, page_idx, pt, deficit, forensic, force_fresh=force_fresh
-                    )
-                    new_elements.extend(elements)
+                n_w = min(MULTIPASS_WORKERS, len(pages_to_scan)) if pages_to_scan else 1
+                with concurrent.futures.ThreadPoolExecutor(max_workers=n_w) as ex:
+                    futs = {
+                        ex.submit(
+                            self._targeted_scan,
+                            etype,
+                            p,
+                            page_texts.get(str(p)) or page_texts.get(p) or "",
+                            deficit,
+                            forensic,
+                            force_fresh,
+                        ): p
+                        for p in pages_to_scan
+                    }
+                    for fut in concurrent.futures.as_completed(futs):
+                        try:
+                            new_elements.extend(fut.result())
+                        except Exception as e:
+                            print(f"    [WARN] MultiPass worker p{futs[fut]}: {e}")
 
                 if new_elements:
                     schedule_cap = int(disc.get("expected", 0) * 1.1) or None

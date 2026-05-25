@@ -105,8 +105,32 @@ if run_btn and uploaded_file:
         if lr.exists():
             nr = sum(1 for r in lr.glob("*.rb") if (r.unlink(missing_ok=True) or True))
             if nr > 0: cleared.append(f"{nr} legacy .rb files")
+        _v8_lock = Path(_PROJ_ROOT) / "output" / "v8" / ".pipeline_v8.lock"
+        if _v8_lock.exists():
+            _v8_lock.unlink(missing_ok=True)
+            cleared.append("V8 pipeline lock")
         s = ", ".join(cleared) if cleared else "nothing to clear"
         with tab_dash: status_slot.markdown(f'<div class="sb sbw">🔄 <b>Force Fresh:</b> Cleared {s}</div>', unsafe_allow_html=True)
+
+    # Always clear stale lock (process may have been killed mid-run)
+    _v8_lock = Path(_PROJ_ROOT) / "output" / "v8" / ".pipeline_v8.lock"
+    if _v8_lock.exists():
+        _v8_lock.unlink(missing_ok=True)
+
+    # Auto-clear LLM cache when a different PDF is uploaded
+    import hashlib as _hashlib
+    _pdf_hash = _hashlib.sha256(uploaded_file.getvalue()).hexdigest()
+    _pdf_hash_file = Path(_PROJ_ROOT) / "data" / ".last_pdf_hash"
+    _stored_hash = _pdf_hash_file.read_text().strip() if _pdf_hash_file.exists() else ""
+    if _pdf_hash != _stored_hash:
+        n_cleared = clear_cache()
+        _pdf_hash_file.parent.mkdir(parents=True, exist_ok=True)
+        _pdf_hash_file.write_text(_pdf_hash)
+        with tab_dash:
+            status_slot.markdown(
+                f'<div class="sb sbw">New PDF detected — cleared {n_cleared} cached responses. Running fresh.</div>',
+                unsafe_allow_html=True
+            )
 
     Path(INPUT_PDF_DIR).mkdir(parents=True, exist_ok=True)
     save_path = Path(INPUT_PDF_DIR) / uploaded_file.name

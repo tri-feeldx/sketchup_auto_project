@@ -149,6 +149,71 @@ class AccuracyEvaluator:
         return self.evaluate(structural_model, schedule_counts=None)
 
     @staticmethod
+    def compute_visual_similarity(model: dict, pdf_path: str,
+                                   plan_page_indices: list) -> dict:
+        """
+        Renders model plan view and compares to PDF plan pages using OpenCV
+        normalized cross-correlation.
+        Returns {"similarity_score": 0.0-1.0, "per_page_scores": [...], "grade": "A/B/C"}.
+        Falls back gracefully if opencv or PIL is missing.
+        """
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            return {"similarity_score": None, "note": "opencv-python not installed"}
+
+        try:
+            from core.model_renderer import ModelPlanRenderer
+            from core.vision_renderer import VisionRenderer
+        except ImportError as e:
+            return {"similarity_score": None, "note": str(e)}
+
+        renderer = ModelPlanRenderer()
+        model_png = renderer.render_plan(model)
+        if not model_png:
+            return {"similarity_score": None, "note": "no columns in model"}
+
+        model_arr = cv2.imdecode(
+            np.frombuffer(model_png, np.uint8), cv2.IMREAD_GRAYSCALE)
+        model_thresh = cv2.threshold(
+            model_arr, 200, 255, cv2.THRESH_BINARY_INV)[1].astype(np.float32)
+
+        scores = []
+        vis = VisionRenderer(pdf_path, dpi=150)
+        try:
+            for page_idx in plan_page_indices[:2]:
+                try:
+                    page_bytes = vis.render_page_as_bytes(page_idx - 1, "PNG")
+                    page_arr = cv2.imdecode(
+                        np.frombuffer(page_bytes, np.uint8), cv2.IMREAD_GRAYSCALE)
+                    page_thresh = cv2.threshold(
+                        page_arr, 200, 255, cv2.THRESH_BINARY_INV)[1].astype(np.float32)
+                    model_r = cv2.resize(model_thresh,
+                                          (page_arr.shape[1], page_arr.shape[0]))
+                    result_mat = cv2.matchTemplate(
+                        page_thresh, model_r, cv2.TM_CCORR_NORMED)
+                    scores.append(float(result_mat.max()))
+                except Exception:
+                    pass
+        finally:
+            try:
+                vis.close()
+            except Exception:
+                pass
+
+        if not scores:
+            return {"similarity_score": None, "note": "no plan pages rendered"}
+
+        avg = sum(scores) / len(scores)
+        grade = "A" if avg > 0.80 else ("B" if avg > 0.65 else "C")
+        return {
+            "similarity_score": round(avg, 3),
+            "per_page_scores": [round(s, 3) for s in scores],
+            "grade": grade,
+        }
+
+    @staticmethod
     def format_report(result: dict) -> str:
         """Format accuracy result as human-readable string."""
         spatial = result.get("spatial_score")

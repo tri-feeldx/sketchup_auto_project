@@ -5,6 +5,7 @@ LOD300/350: uses exact cross-section profiles (I-beam, CHS, SHS/RHS, solid rect)
 """
 
 import json
+import math
 import re
 from typing import List, Optional
 from pipelines.prompt_factory import PromptFactory
@@ -349,6 +350,54 @@ class RubyGeneratorV5:
         except Exception:
             return None
 
+    def _col_flange_width(self, section_name: str) -> float:
+        """
+        Return the flange width (bf) of a column section in mm.
+        Used to offset beam endpoints to the face of the column flange.
+        Defaults to 300mm when section is unknown (conservative).
+        """
+        if not section_name:
+            return 300.0
+        try:
+            from generators.section_library_asnzs import lookup_section, parse_section_from_string
+            sec = lookup_section(section_name, self.region) or \
+                  parse_section_from_string(section_name, self.region)
+            if sec:
+                return float(sec.bf or sec.d or 300)
+        except Exception:
+            pass
+        return 300.0
+
+    def _beam_endpoints(self, c1: dict, c2: dict,
+                        col1_section: str = "", col2_section: str = "") -> tuple:
+        """
+        Return (x1, y1, x2, y2) with both endpoints offset inward by BF/2
+        of the respective column, so beams terminate at the column face.
+
+        Without this fix beams run column-centre to column-centre, which is
+        wrong for LOD300 — the beam face should sit flush with the column flange.
+        """
+        x1 = float(c1.get("x_mm") or c1.get("x") or 0)
+        y1 = float(c1.get("y_mm") or c1.get("y") or 0)
+        x2 = float(c2.get("x_mm") or c2.get("x") or 0)
+        y2 = float(c2.get("y_mm") or c2.get("y") or 0)
+
+        dx, dy = x2 - x1, y2 - y1
+        length = math.hypot(dx, dy)
+        if length < 1.0:
+            return x1, y1, x2, y2
+
+        ux, uy = dx / length, dy / length
+        bf1 = self._col_flange_width(col1_section) / 2
+        bf2 = self._col_flange_width(col2_section) / 2
+
+        return (
+            x1 + ux * bf1,
+            y1 + uy * bf1,
+            x2 - ux * bf2,
+            y2 - uy * bf2,
+        )
+
     def _ibeam_col_ruby(self, col: dict, pos: dict, i: int,
                          mat_vars: dict, sec) -> List[str]:
         """Column with exact I-profile (UB/UC). Extrudes vertically along Z."""
@@ -414,8 +463,11 @@ class RubyGeneratorV5:
         tid = beam.get("to_col") or beam.get("to", "")
         c1 = col_map.get(fid, {"x": 0, "y": 0, "z_top": 3500})
         c2 = col_map.get(tid, {"x": 6000, "y": 0, "z_top": 3500})
-        x1, y1 = int(c1["x"]), int(c1["y"])
-        x2, y2 = int(c2["x"]), int(c2["y"])
+        _s1 = c1.get("section") or c1.get("section_name") or ""
+        _s2 = c2.get("section") or c2.get("section_name") or ""
+        ox1, oy1, ox2, oy2 = self._beam_endpoints(c1, c2, _s1, _s2)
+        x1, y1 = int(ox1), int(oy1)
+        x2, y2 = int(ox2), int(oy2)
         z = int(beam.get("z_mm") or beam.get("z") or c1.get("z_top", 3500))
         d = int(sec.d); bf = int(sec.bf); tf = int(sec.tf); tw = int(sec.tw)
         mat = self._get_mat(beam, mat_vars)
@@ -536,8 +588,11 @@ class RubyGeneratorV5:
             else:
                 c1 = {"x": 0, "y": 0}
                 c2 = {"x": sx, "y": 0}
-        x1, y1 = c1.get("x", 0), c1.get("y", 0)
-        x2, y2 = c2.get("x", 0), c2.get("y", 0)
+        _s1 = c1.get("section") or c1.get("section_name") or ""
+        _s2 = c2.get("section") or c2.get("section_name") or ""
+        ox1, oy1, ox2, oy2 = self._beam_endpoints(c1, c2, _s1, _s2)
+        x1, y1 = int(ox1), int(oy1)
+        x2, y2 = int(ox2), int(oy2)
         z = beam.get("z_mm") or beam.get("z") or c1.get("z_top", 3500)
         if sec:  # SHS/RHS — use exact outer dims
             w, d = int(sec.bf), int(sec.d)
@@ -689,8 +744,9 @@ class RubyGeneratorV5:
             f"  p_{i} = Geom::Vector3d.new(-d_{i}.y, d_{i}.x, 0)",
             f"  s_{i} = Geom::Point3d.new(ox+{x1}, oy+{y1}, {zb})",
             f"  e_{i} = Geom::Point3d.new(ox+{x2}, oy+{y2}, {zb})",
-            f"  ht = {t // 2}",
-            f"  pts_{i} = [s_{i}+p_{i}*ht, e_{i}+p_{i}*ht, e_{i}-p_{i}*ht, s_{i}-p_{i}*ht]",
+            f"  ht = {t // 2}.0",
+            f"  ph_{i} = Geom::Vector3d.new(p_{i}.x*ht, p_{i}.y*ht, 0.0)",
+            f"  pts_{i} = [s_{i}+ph_{i}, e_{i}+ph_{i}, e_{i}-ph_{i}, s_{i}-ph_{i}]",
             f"  f_{i} = ents.add_face(pts_{i})",
             f"  f_{i}.material = {mat} if f_{i}",
             f"  f_{i}.layer = layers['walls'] if f_{i}",
@@ -868,10 +924,14 @@ class RubyGeneratorV5:
                 pt = self._n(bp.get("thickness_mm"), pt)
 
         lines = [f"# LOD350 base+cap plates: col {i+1}"]
-        for plate_name, pz, push_dir in [
+        splice_heights = col.get("splice_z_mm", [])
+        plate_defs = [
             (f"bplate_{i}", zb - pt, pt),
             (f"cplate_{i}", zt, pt),
-        ]:
+        ]
+        for si, sz in enumerate(splice_heights):
+            plate_defs.append((f"splice_{i}_{si}", int(sz) - pt // 2, pt))
+        for plate_name, pz, push_dir in plate_defs:
             lines += [
                 f"begin",
                 f"  {plate_name}_pts = [",
@@ -888,7 +948,54 @@ class RubyGeneratorV5:
                 f"  end",
                 f"rescue; end",
             ]
+
+        # Anchor bolts (base plate only, from detail_specs)
+        bolt_count = 0
+        bolt_dia = 20
+        if detail_specs:
+            mark = str(col.get("id") or col.get("mark", "")).upper()
+            for spec in detail_specs.values():
+                if not isinstance(spec, dict):
+                    continue
+                ref = str(spec.get("member_ref", "")).strip().upper()
+                if (ref == mark or not ref) and spec.get("connection_type") == "column_base":
+                    bp = spec.get("base_plate", {})
+                    bolt_count = int(bp.get("bolt_count") or 0)
+                    bolt_dia = float(bp.get("bolt_dia_mm") or 20)
+                    break
+        if bolt_count >= 4:
+            bolt_r = bolt_dia / 2
+            gauge = max((pw - 80) / 2, 40)
+            offsets = self._bolt_pattern(bolt_count, gauge, gauge)
+            for bi, (bx_off, by_off) in enumerate(offsets):
+                bx = x + int(bx_off)
+                by_ = y + int(by_off)
+                lines += [
+                    f"begin",
+                    f"  bc_{i}_{bi} = ents.add_circle(",
+                    f"    Geom::Point3d.new(ox+{bx}, oy+{by_}, {zb - 300}),",
+                    f"    Geom::Vector3d.new(0,0,1), {bolt_r:.1f}, 16)",
+                    f"  bf_{i}_{bi} = bc_{i}_{bi}.first.faces.first if bc_{i}_{bi}",
+                    f"  if bf_{i}_{bi}",
+                    f"    bf_{i}_{bi}.material = mat_steel_plate",
+                    f"    bf_{i}_{bi}.layer = layers['conns']",
+                    f"    bf_{i}_{bi}.pushpull(320)",
+                    f"  end",
+                    f"rescue; end",
+                ]
         return lines
+
+    @staticmethod
+    def _bolt_pattern(count: int, gx: float, gy: float) -> list:
+        """Return (x_offset, y_offset) pairs for anchor bolt layout."""
+        if count <= 4:
+            return [(-gx, -gy), (gx, -gy), (gx, gy), (-gx, gy)]
+        if count <= 6:
+            return [(-gx, -gy), (0, -gy), (gx, -gy),
+                    (-gx,  gy), (0,  gy), (gx,  gy)]
+        # 8-bolt: 2×4
+        return [(-gx, -gy), (0, -gy), (gx, -gy), (gx, 0),
+                ( gx,  gy), (0,  gy), (-gx, gy), (-gx, 0)]
 
     def _lod350_beam_endplate(self, beam: dict, col_map: dict, i: int) -> List[str]:
         """Generate end plates at both ends of a beam (LOD350)."""
