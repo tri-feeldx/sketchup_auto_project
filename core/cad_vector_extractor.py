@@ -277,15 +277,21 @@ class CADVectorExtractor:
         v_cands: list = []  # x-centres of vertical line candidates (pts)
 
         for path in paths:
-            # Skip filled shapes — column solids, slab outlines, hatch fills
-            if path.get("fill") is not None:
-                continue
-
             r = path.get("rect")
             if r is None or r.is_empty:
                 continue
 
             w, hv = r.width, r.height
+
+            # Skip obviously filled solid shapes (column symbols, slab fills, hatching):
+            # square-ish aspect ratio OR both dimensions too small to be a grid line.
+            # Grid lines are always very elongated so they pass through regardless of fill.
+            if path.get("fill") is not None:
+                min_dim = min(w, hv)
+                max_dim = max(w, hv)
+                aspect = max_dim / max(min_dim, 0.01)
+                if aspect < 5 or (w < min_len_pt and hv < min_len_pt):
+                    continue
 
             # Horizontal line: much wider than tall
             if w >= min_len_pt and (hv < 4.0 or w / max(hv, 0.01) > 20):
@@ -295,6 +301,7 @@ class CADVectorExtractor:
             elif hv >= min_len_pt and (w < 4.0 or hv / max(w, 0.01) > 20):
                 v_cands.append((r.x0 + r.x1) / 2)
 
+        print(f"  [CAD-VEC-DBG] {len(paths)} paths → {len(h_cands)} H-cands, {len(v_cands)} V-cands")
         v_cl = self._cluster(v_cands, self.GRID_CLUSTER_PT)
         h_cl = self._cluster(h_cands, self.GRID_CLUSTER_PT)
 
