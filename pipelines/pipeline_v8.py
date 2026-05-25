@@ -531,16 +531,21 @@ class PipelineV8:
                       f"(no auto-fix available)")
 
             # Check 3D positions — run ArchitectReviewer if accuracy < threshold OR 3D issues
+            # OR visual similarity too low (model looks wrong even if counts are right)
             arch_reviewer = ArchitectReviewer(pdf_path=pdf_path, region=self.region, dpi=self.dpi)
             z_issues = arch_reviewer._verify_3d_positions(model)
+            visual_sim_score = (result.accuracy or {}).get("visual_similarity") or 0
+            _low_visual = isinstance(visual_sim_score, (int, float)) and visual_sim_score < 25
             needs_arr = (accuracy_score < ARR_ACCURACY_THRESHOLD) or bool(z_issues) \
-                        or not _gate_gen.passed
+                        or not _gate_gen.passed or _low_visual
 
             if needs_arr:
                 if not _gate_gen.passed:
                     reason = f"gate POST-GENERATE FAIL: {'; '.join(_gate_gen.warnings)}"
                 elif accuracy_score < ARR_ACCURACY_THRESHOLD:
                     reason = f"accuracy={accuracy_score}% < {ARR_ACCURACY_THRESHOLD}%"
+                elif _low_visual:
+                    reason = f"visual_similarity={visual_sim_score:.1f}% < 25% — model looks wrong"
                 else:
                     reason = f"{len(z_issues)} 3D position issue(s) found"
                 print(f"[V8 STAGE 9.5] ARR: {reason} — running ArchitectReviewer...")

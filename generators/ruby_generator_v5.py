@@ -32,6 +32,8 @@ class RubyGeneratorV5:
         if total > self.WARNING_ENTITIES:
             print(f"[GEN] {total} entities, may be slow")
 
+        self._compute_model_quality(model)
+
         # Deterministic first (reliable for large models with many members)
         ruby = None
         try:
@@ -51,6 +53,42 @@ class RubyGeneratorV5:
         return self._wrap_script(ruby, model)
 
     # ── DETERMINISTIC ───────────────────────────────────
+
+    def _compute_model_quality(self, model: dict) -> None:
+        """Print a quality breakdown so the user knows what fraction of data is real vs guessed."""
+        members = model.get("members", {})
+        cols  = members.get("columns", [])
+        beams = members.get("beams", [])
+        levels = model.get("levels", [])
+
+        _SECTION_PFXS = ('CHS','SHS','RHS','UB','UC','PFC','FB','WB','WC','TFB','EA','UA')
+        def _has_library_section(m):
+            sec = str(m.get("section") or "").strip().upper()
+            return bool(sec) and any(sec.startswith(p) or any(c.isdigit() for c in sec[:4]) for p in _SECTION_PFXS)
+
+        def _has_real_xy(col):
+            src = str(col.get("_source") or "").lower()
+            return "force" not in src and (
+                col.get("x_mm") is not None or col.get("x") is not None
+            ) and not col.get("_force_assigned")
+
+        col_sec  = sum(1 for c in cols  if _has_library_section(c)) if cols  else 0
+        beam_sec = sum(1 for b in beams if _has_library_section(b)) if beams else 0
+        col_xy   = sum(1 for c in cols  if _has_real_xy(c))          if cols  else 0
+        lvl_real = sum(1 for l in levels if not str(l.get("id","")).startswith(("GROUND","LEVEL_","ROOF","Z"))) if levels else 0
+
+        pct = lambda n, d: int(100*n/d) if d else 0
+        cs = pct(col_sec,  len(cols))
+        bs = pct(beam_sec, len(beams))
+        cx = pct(col_xy,   len(cols))
+        lr = pct(lvl_real, len(levels))
+
+        scores = [cs, bs, cx]
+        overall = sum(scores) // len(scores) if scores else 0
+        grade = "GOOD" if overall >= 70 else ("FAIR" if overall >= 40 else "POOR")
+        print(f"  [QUALITY] col_section={cs}% beam_section={bs}% col_xy={cx}% level_real={lr}% | {grade}")
+        if overall < 40:
+            print(f"  [QUALITY] WARNING: {100-overall}% of model is guessed/defaulted — spatial accuracy likely low")
 
     def _deterministic_script(self, model: dict) -> str:
         # Resolve grid → coordinate snapping
@@ -347,6 +385,24 @@ class RubyGeneratorV5:
             w, d = default_w, default_d
         return w, d
 
+    # ── Span / height based structural defaults (AU/NZ) ─────
+    @staticmethod
+    def _default_beam_section_by_span(span_mm: int) -> tuple:
+        """AS/NZS span-to-UB defaults (flange_w, depth). Used when section can't be resolved."""
+        if span_mm <= 3000:  return 100, 150
+        if span_mm <= 5000:  return 110, 180
+        if span_mm <= 7000:  return 146, 256
+        if span_mm <= 9000:  return 165, 310
+        if span_mm <= 12000: return 171, 360
+        return 179, 410
+
+    @staticmethod
+    def _default_col_section_by_height(height_mm: int) -> tuple:
+        """AS/NZS storey-height-to-UC defaults (w, d). Used when section can't be resolved."""
+        if height_mm <= 4000:  return 200, 200
+        if height_mm <= 6000:  return 250, 250
+        return 310, 310
+
     # ── Section library lookup (LOD300) ─────────────────────
     def _lookup_section_dims(self, member: dict):
         """Return SectionDimensions from library, or None if not found."""
@@ -534,17 +590,12 @@ class RubyGeneratorV5:
             w, d = int(sec.bf), int(sec.d)
             from_library = True
         else:
-            w, d = self._resolve_section(col, 400, 400)
+            w, d = self._resolve_section(col, 0, 0)
             from_library = False
-        # Guard: degenerate face — only clamp regex-fallback dims, not library dims
-        MIN_COL = 50
-        if not from_library:
-            if w < MIN_COL:
-                print(f"[GEN] WARN: col {col.get('id','')} width={w} < {MIN_COL}mm, using {MIN_COL}")
-                w = MIN_COL
-            if d < MIN_COL:
-                print(f"[GEN] WARN: col {col.get('id','')} depth={d} < {MIN_COL}mm, using {MIN_COL}")
-                d = MIN_COL
+        # When regex fallback gives tiny/zero dims, use span-based structural default
+        if not from_library and (w < 50 or d < 50):
+            h_eff = max(h, 100)
+            w, d = self._default_col_section_by_height(h_eff)
         h = max(h, 100)
         mat = self._get_mat(col, mat_vars)
         return [
@@ -613,16 +664,12 @@ class RubyGeneratorV5:
             w, d = int(sec.bf), int(sec.d)
             from_library = True
         else:
-            w, d = self._resolve_section(beam, 200, 300)
+            w, d = self._resolve_section(beam, 0, 0)
             from_library = False
-        MIN_BEAM = 50
-        if not from_library:
-            if w < MIN_BEAM:
-                print(f"[GEN] WARN: beam {beam.get('id','')} width={w} < {MIN_BEAM}mm, using {MIN_BEAM}")
-                w = MIN_BEAM
-            if d < MIN_BEAM:
-                print(f"[GEN] WARN: beam {beam.get('id','')} depth={d} < {MIN_BEAM}mm, using {MIN_BEAM}")
-                d = MIN_BEAM
+        # When regex fallback gives tiny/zero dims, use span-based structural default
+        if not from_library and (w < 50 or d < 50):
+            span_mm = int(math.hypot(x2 - x1, y2 - y1))
+            w, d = self._default_beam_section_by_span(span_mm)
         mat = self._get_mat(beam, mat_vars)
         return [
             f"# Beam {i+1}: {beam.get('id','')} {fid}→{tid}",

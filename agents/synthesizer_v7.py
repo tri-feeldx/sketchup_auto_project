@@ -106,6 +106,7 @@ class SynthesizerV7:
                 model = self._enrich_from_cad(model, cad_data)
                 model = self._enrich_from_plan(model, plan_positions)
                 model = self._apply_ground_truth_lock(model, ground_truth)
+                model = self._fix_mark_in_section_fields(model)
                 model = self._dedup_beams(model)
                 model = self._ensure_walls(model)
                 model["members"] = self._assign_confidence(model["members"])
@@ -122,6 +123,7 @@ class SynthesizerV7:
         model = self._enrich_from_cad(model, cad_data)
         model = self._enrich_from_plan(model, plan_positions)
         model = self._apply_ground_truth_lock(model, ground_truth)
+        model = self._fix_mark_in_section_fields(model)
         model = self._dedup_beams(model)
         model = self._ensure_walls(model)
         model["synthesis_method"] = "deterministic"
@@ -1121,6 +1123,44 @@ class SynthesizerV7:
             if steel_col_marks >= 2:
                 return True
         return False
+
+    def _fix_mark_in_section_fields(self, model: dict) -> dict:
+        """Clear section fields that contain mark names or lone tiny numbers.
+        These are LLM hallucinations where the mark ID was placed in the section field.
+        Clearing them lets RubyGeneratorV5 use span-based structural defaults instead.
+        """
+        _MARK_PAT = re.compile(r'^[A-Z]{1,4}\d{1,3}[A-Z]?$')
+        _SECTION_PFXS = ('CHS', 'SHS', 'RHS', 'UB', 'UC', 'PFC', 'FB',
+                         'WB', 'WC', 'TFB', 'EA', 'UA', 'LW', 'WL')
+        cleared = 0
+        for mtype in ("beams", "columns", "bracing", "slabs"):
+            for m in model.get("members", {}).get(mtype, []):
+                sec = str(m.get("section") or "").strip()
+                if not sec:
+                    continue
+                su = sec.upper()
+                mid = str(m.get("id") or m.get("mark") or "").strip().upper()
+                # Case 1: section == mark (LLM literally copied mark into section field)
+                if su == mid.upper():
+                    m["section"] = None
+                    cleared += 1
+                    continue
+                # Case 2: section looks like a mark (not a real section designation)
+                if _MARK_PAT.match(su) and not any(su.startswith(p) for p in _SECTION_PFXS):
+                    m["section"] = None
+                    cleared += 1
+                    continue
+                # Case 3: section is a bare tiny number < 50 (not a real section dimension)
+                try:
+                    val = float(sec)
+                    if val < 50:
+                        m["section"] = None
+                        cleared += 1
+                except ValueError:
+                    pass
+        if cleared:
+            print(f"  [SECTION-FIX] Cleared {cleared} mark-in-section fields → span-based defaults will apply")
+        return model
 
     def _dedup_beams(self, model: dict) -> dict:
         import re as _re

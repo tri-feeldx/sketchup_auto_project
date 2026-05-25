@@ -273,6 +273,10 @@ class GroundTruthBuilder:
                 # Some drawings embed elevations on second plan page
                 self._extract_elevations(renderer, plan_pages[1], facts)
 
+            # 3b. Forensic text fallback for floor heights when LLM elevation extraction failed
+            if not facts.get("floor_heights_mm"):
+                self._extract_heights_from_text(scanner_output, facts)
+
             # 4. Count columns from SCHEDULE pages
             if schedule_pages:
                 self._extract_column_count(renderer, schedule_pages, facts)
@@ -459,6 +463,51 @@ class GroundTruthBuilder:
 
         except Exception as e:
             print(f"  [GTB] WARN: elevation extraction failed: {e}")
+
+    def _extract_heights_from_text(self, scanner_output: dict, facts: dict) -> None:
+        """Scan all forensic page texts for floor height patterns when LLM elevation fails."""
+        import re as _re_h
+        _HEIGHT_PATS = [
+            (_re_h.compile(r'RL\s*\+?\s*([\d]{1,2}\.[\d]{1,3})', _re_h.I), "metres"),
+            (_re_h.compile(r'(?:FFL|AFFL|AFL|FFH)\s*[=:]?\s*([\d.]+)', _re_h.I), "auto"),
+            (_re_h.compile(r'\+\s*([\d]{1,2}\.\d{3})'), "metres"),
+            (_re_h.compile(r'(?:LEVEL|LVL|FL)\s*\d+\s*[=:]\s*\+?\s*([\d.]+)', _re_h.I), "auto"),
+            (_re_h.compile(r'(?:GL|GF|GROUND)\s*[=:+]?\s*([\d.]+)', _re_h.I), "auto"),
+        ]
+        found_mm: set = set()
+        page_texts = scanner_output.get("forensic", {}).get("page_texts", {})
+        for pr in scanner_output.get("page_results", {}).values():
+            raw = str(pr.get("raw_text") or pr.get("llm_response") or "")
+            for pat, mode in _HEIGHT_PATS:
+                for m in pat.finditer(raw):
+                    try:
+                        val = float(m.group(1))
+                        mm = int(val * 1000) if (mode == "metres" or (mode == "auto" and val < 100)) else int(val)
+                        if 0 <= mm <= 50000:
+                            found_mm.add(mm)
+                    except (ValueError, IndexError):
+                        pass
+        # Also scan raw forensic text
+        for txt in page_texts.values():
+            for pat, mode in _HEIGHT_PATS:
+                for m in pat.finditer(str(txt)):
+                    try:
+                        val = float(m.group(1))
+                        mm = int(val * 1000) if (mode == "metres" or (mode == "auto" and val < 100)) else int(val)
+                        if 0 <= mm <= 50000:
+                            found_mm.add(mm)
+                    except (ValueError, IndexError):
+                        pass
+        if len(found_mm) >= 2:
+            sorted_mm = sorted(found_mm)
+            base = sorted_mm[0]
+            heights = {}
+            for i, mm in enumerate(sorted_mm):
+                rel = mm - base
+                heights[f"L{i+1}"] = rel
+            facts["floor_heights_mm"] = heights
+            facts["_floor_source"] = "forensic_text"
+            print(f"  [GTB] Floor heights from forensic text: {len(heights)} levels — {heights}")
 
     def _extract_column_count(self, renderer: VisionRenderer, schedule_pages: List[int],
                                facts: dict):

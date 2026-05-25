@@ -137,12 +137,43 @@ class AccuracyEvaluator:
         }
 
     def _spatial_accuracy(self, members: dict) -> float:
-        """Proxy spatial accuracy: ratio of columns with confident XY position (_confidence >= 0.7)."""
-        cols = members.get("columns", [])
-        if not cols:
-            return 1.0
-        good = sum(1 for c in cols if c.get("_confidence", 0) >= 0.7)
-        return good / len(cols)
+        """
+        Geometry-aware spatial accuracy — 3 sub-scores averaged:
+        1. Column XY confidence (from _source / _force_assigned flag)
+        2. Section realism (members with real non-default section > 100mm)
+        3. Beam connectivity (beams that have valid column references)
+        """
+        cols  = members.get("columns", [])
+        beams = members.get("beams", [])
+        scores = []
+
+        # Sub-score 1: column XY quality
+        if cols:
+            good_xy = sum(
+                1 for c in cols
+                if not c.get("_force_assigned") and c.get("_confidence", 0) >= 0.7
+            )
+            scores.append(good_xy / len(cols))
+
+        # Sub-score 2: section realism (at least 100mm from a real designation)
+        _SECTION_PFXS = ('CHS','SHS','RHS','UB','UC','PFC','FB','WB','WC','TFB','EA','UA')
+        all_members = cols + beams + members.get("bracing", [])
+        if all_members:
+            real_sec = sum(
+                1 for m in all_members
+                if any(str(m.get("section") or "").upper().startswith(p) for p in _SECTION_PFXS)
+            )
+            scores.append(real_sec / len(all_members))
+
+        # Sub-score 3: beam connectivity (has from_col / to_col references)
+        if beams:
+            connected = sum(
+                1 for b in beams
+                if (b.get("from_col") or b.get("from")) and (b.get("to_col") or b.get("to"))
+            )
+            scores.append(connected / len(beams))
+
+        return sum(scores) / len(scores) if scores else 1.0
 
     def evaluate_from_model(self, structural_model: dict) -> dict:
         """Shortcut: evaluate using only the structural model (no external schedule)."""
@@ -219,9 +250,9 @@ class AccuracyEvaluator:
         spatial = result.get("spatial_score")
         spatial_str = f"{spatial}%" if spatial is not None else "N/A"
         lines = [
-            f"Accuracy Score: {result['overall_score']}% (Grade {result['grade']})",
-            f"Spatial Score:  {spatial_str} (column XY confidence proxy)",
-            f"Target ≥90%: {'✅ MET' if result['target_met'] else '❌ NOT MET'}",
+            f"Recall Score:   {result['overall_score']}% (Grade {result['grade']}) — element count vs schedule",
+            f"Spatial Score:  {spatial_str} — XY quality + section realism + beam connectivity",
+            f"Recall ≥90%: {'✅ MET' if result['target_met'] else '❌ NOT MET'}",
             "",
             "Per-type Recall:",
         ]
