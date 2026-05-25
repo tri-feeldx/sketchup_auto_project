@@ -612,6 +612,8 @@ class SynthesizerV7:
               f"level_elevations: {[ep.get('level_elevations') for ep in elev_pages]}")
         for pr in page_results:
             for le in pr.get("level_elevations", []):
+                if not isinstance(le, dict):
+                    continue
                 lvl_id = le.get("id") or le.get("label", "")
                 if lvl_id and lvl_id not in seen_ids:
                     rl = le.get("rl_mm") or le.get("ffl_mm") or 0
@@ -628,6 +630,8 @@ class SynthesizerV7:
         # Second: levels from page result "levels" key
         for pr in page_results:
             for lvl in pr.get("levels", []):
+                if not isinstance(lvl, dict):
+                    continue
                 lvl_id = lvl.get("id") or lvl.get("name", "")
                 if lvl_id and lvl_id not in seen_ids:
                     levels.append(lvl)
