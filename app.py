@@ -199,6 +199,13 @@ if run_btn and uploaded_file:
                 _log_fn(f"[STAGE 9] AccuracyEval -> {acc_score}% Grade {acc_grade} {'✅' if acc_met else '❌'}")
                 _log_fn(f"[COMPLETE] Pipeline V8 in {presult.duration_sec:.1f}s")
                 total_members = nc + nb + ns + nw + nf + nbr
+                _pipeline_errors = presult.errors or []
+                _rb_missing = not presult.output_rb_path or not Path(presult.output_rb_path).exists()
+                _err_msg = None
+                if _rb_missing:
+                    _err_detail = "; ".join(_pipeline_errors) if _pipeline_errors else "Unknown error"
+                    _err_msg = f"Pipeline completed but .rb file was not generated. Errors: {_err_detail}"
+                    _log_fn(f"[ERROR] {_err_msg}")
                 res = {
                     "ruby_path": presult.output_rb_path,
                     "ifc_path": presult.output_ifc_path,
@@ -214,7 +221,7 @@ if run_btn and uploaded_file:
                     "accuracy_grade": acc_grade,
                     "accuracy_target_met": acc_met,
                     "log_path": presult.log_path,
-                    "error": None,
+                    "error": _err_msg,
                 }
             elif use_v7:
                 from pipelines.pipeline_v7 import PipelineV7
