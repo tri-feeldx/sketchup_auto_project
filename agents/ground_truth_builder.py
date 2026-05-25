@@ -24,7 +24,13 @@ from core.vision_renderer import VisionRenderer
 _GRID_SYSTEM_PROMPT = """\
 You are a senior structural detailer with 20+ years reading Australian structural drawings.
 
-Read this structural PLAN drawing. Extract the PRIMARY GRID SYSTEM precisely.
+Read this structural PLAN drawing. Extract the PRIMARY STRUCTURAL GRID SYSTEM precisely.
+
+IMPORTANT DISTINCTION:
+- STRUCTURAL GRID LINES = the reference lines labeled with numbers (1,2,3...) or letters (A,B,C...)
+  that form the building grid layout. Typically 3-15 lines per direction, evenly spaced 4000-15000mm.
+- Do NOT confuse with individual column/pile positions (there can be 20-100+ columns).
+- Grid lines are the NAMED REFERENCE LINES, not the positions of every structural member.
 
 Output JSON only — no markdown, no explanation:
 {
@@ -54,6 +60,31 @@ Rules:
 - If uncertain about a value, use null rather than guessing
 - footprint_x_mm = distance from first to last X grid line
 - footprint_y_mm = distance from first to last Y grid line
+- Typical structural grid: 3-15 lines per axis, spacing 4000-15000mm
+"""
+
+_GRID_RETRY_PROMPT = """\
+You are a senior structural engineer with 20+ years of BIM experience.
+
+This is a structural PLAN drawing. I need ONLY the PRIMARY STRUCTURAL GRID LINES.
+
+STRUCTURAL GRID LINES are:
+- Labeled with sequential numbers (1, 2, 3, 4...) or letters (A, B, C, D...)
+- Drawn as long dashed or dash-dot lines spanning the full building footprint
+- Typically 3-15 per direction, with spacing of 4000mm to 15000mm
+- Shown with circle bubbles containing the label at the ends
+
+DO NOT return column positions, pile locations, or member centrelines.
+A structural grid for a building rarely has more than 15 lines per direction.
+
+Output JSON only:
+{
+  "grid_x": {"1": 0, "2": 8000, "3": 16000},
+  "grid_y": {"A": 0, "B": 8000, "C": 16000},
+  "footprint_x_mm": 16000,
+  "footprint_y_mm": 16000,
+  "confidence": 0.85
+}
 """
 
 _ELEVATION_SYSTEM_PROMPT = """\
@@ -101,6 +132,26 @@ Rules:
 - If multiple schedule pages, report count from this page only
 - beam_count: total structural beams if visible
 """
+
+
+_MAX_STRUCTURAL_GRID_LINES = 20   # more than this = column positions, not grid
+_MIN_STRUCTURAL_GRID_SPACING = 1500  # mm — grid spacing is always ≥1.5m
+
+
+def _is_valid_structural_grid(grid: dict) -> bool:
+    """Return True if dict looks like a structural grid (not column position list)."""
+    if not grid or len(grid) < 2:
+        return True  # 0-1 lines — accept (may be partial)
+    if len(grid) > _MAX_STRUCTURAL_GRID_LINES:
+        return False
+    try:
+        vals = sorted(int(float(v)) for v in grid.values() if v is not None)
+    except (ValueError, TypeError):
+        return False
+    spacings = [vals[i + 1] - vals[i] for i in range(len(vals) - 1)]
+    if any(s < _MIN_STRUCTURAL_GRID_SPACING for s in spacings):
+        return False
+    return True
 
 
 def _parse_json(response: str) -> Optional[dict]:
@@ -240,11 +291,9 @@ class GroundTruthBuilder:
 
     def _apply_cad_grid_override(self, facts: dict, cad_data: dict) -> None:
         """
-        When CAD vector extraction found a reliable grid (conf ≥ 0.6 and ≥2
-        lines per axis), replace the LLM-derived grid with the CAD values.
-
-        CAD-derived grid is exact (vector coordinates, not pixel estimation),
-        so it has higher confidence than LLM vision output.
+        When CAD vector extraction found a reliable structural grid (conf ≥ 0.6,
+        ≥2 lines per axis, and passes structural grid validation), replace the
+        LLM-derived grid with the CAD values.
         """
         if not cad_data:
             return
@@ -258,6 +307,12 @@ class GroundTruthBuilder:
         if len(gx) < 2 or len(gy) < 2:
             return
 
+        # Validate: reject CAD grids that are actually column position lists
+        if not _is_valid_structural_grid(gx) or not _is_valid_structural_grid(gy):
+            print(f"  [GTB] CAD grid INVALID ({len(gx)}×{len(gy)} lines, "
+                  f"likely column positions not grid lines) — skipping CAD override")
+            return
+
         # Only override when CAD grid is at least as complete as the LLM grid
         llm_gx = facts.get("grid_x_mm") or {}
         llm_gy = facts.get("grid_y_mm") or {}
@@ -269,7 +324,6 @@ class GroundTruthBuilder:
         facts["grid_x_mm"] = {str(k): int(v) for k, v in gx.items()}
         facts["grid_y_mm"] = {str(k): int(v) for k, v in gy.items()}
         facts["_grid_source"] = "cad_vector"
-        # Boost confidence: CAD grid is exact, not estimated
         facts["confidence"] = min(1.0, facts.get("confidence", 0.0) + 0.2)
         print(f"  [GTB] CAD grid override applied: "
               f"{len(gx)}×{len(gy)} lines (conf boost → "
@@ -301,6 +355,21 @@ class GroundTruthBuilder:
             gx = data.get("grid_x") or {}
             gy = data.get("grid_y") or {}
 
+            # Validate: if LLM returned column positions instead of grid lines, retry
+            gx_valid = _is_valid_structural_grid(gx) if gx else True
+            gy_valid = _is_valid_structural_grid(gy) if gy else True
+
+            if not gx_valid or not gy_valid:
+                bad_axis = []
+                if not gx_valid:
+                    bad_axis.append(f"X={len(gx)} lines")
+                if not gy_valid:
+                    bad_axis.append(f"Y={len(gy)} lines")
+                print(f"  [GTB] WARN: invalid grid ({', '.join(bad_axis)}) — "
+                      f"looks like column positions. Retrying with stricter prompt...")
+                self._extract_grid_retry(renderer, page_idx, facts)
+                return
+
             if gx and isinstance(gx, dict):
                 facts["grid_x_mm"] = _int_values(gx)
                 facts["source_pages"]["grid"] = page_idx
@@ -323,6 +392,41 @@ class GroundTruthBuilder:
 
         except Exception as e:
             print(f"  [GTB] WARN: grid extraction failed: {e}")
+
+    def _extract_grid_retry(self, renderer: VisionRenderer, page_idx: int, facts: dict):
+        """Retry grid extraction with stricter prompt when first pass returned column positions."""
+        try:
+            img = renderer.render_page_as_bytes(page_idx - 1, format="PNG")
+            resp = call_llm(
+                f"Plan page {page_idx}. Extract ONLY the structural reference GRID LINES "
+                "(numbered/lettered lines, NOT individual column positions). "
+                "Output valid JSON only.",
+                system=_GRID_RETRY_PROMPT,
+                images=[img]
+            )
+            data = _parse_json(resp)
+            if not data:
+                print(f"  [GTB] WARN: grid retry parse failed — no grid extracted")
+                return
+
+            gx = data.get("grid_x") or {}
+            gy = data.get("grid_y") or {}
+
+            if gx and isinstance(gx, dict) and _is_valid_structural_grid(gx):
+                facts["grid_x_mm"] = _int_values(gx)
+                facts["source_pages"]["grid"] = page_idx
+                print(f"  [GTB] Grid X (retry): {len(gx)} lines — {facts['grid_x_mm']}")
+            elif gx:
+                print(f"  [GTB] WARN: retry still returned invalid X grid ({len(gx)} lines) — discarding")
+
+            if gy and isinstance(gy, dict) and _is_valid_structural_grid(gy):
+                facts["grid_y_mm"] = _int_values(gy)
+                print(f"  [GTB] Grid Y (retry): {len(gy)} lines — {facts['grid_y_mm']}")
+            elif gy:
+                print(f"  [GTB] WARN: retry still returned invalid Y grid ({len(gy)} lines) — discarding")
+
+        except Exception as e:
+            print(f"  [GTB] WARN: grid retry failed: {e}")
 
     def _extract_elevations(self, renderer: VisionRenderer, page_idx: int, facts: dict):
         print(f"  [GTB] Extracting floor heights from elevation page {page_idx}...")

@@ -657,6 +657,45 @@ class SynthesizerV7:
                             })
                             seen_ids.add(lvl_id)
 
+        # Fourth: scan ALL page texts for height patterns if still empty
+        # Catches "FFL 3600", "Level 1 = 3.6m", "RL +3.600", "3600 AFFL", "+3600"
+        if not levels:
+            _HEIGHT_PATTERNS = [
+                r'(?:FFL|AFFL|FFH|AFL)\s*[=:+]?\s*([\d.]+)\s*(?:m|mm)?',
+                r'(?:RL|RL\.)\s*\+?\s*([\d.]+)',
+                r'(?:Level|Lvl|FL|FLOOR)\s*(\d+)\s*[=:]\s*\+?([\d.]+)\s*(?:m|mm)?',
+                r'\+\s*([\d]{1,2}\.[\d]{3})',   # +3.600 style
+                r'(?:GL|GROUND)\s*[=:+]?\s*([\d.]+)',
+            ]
+            found_mm: set = set()
+            for pr in page_results:
+                raw = pr.get("raw_text") or str(pr.get("llm_response") or "")
+                for pat in _HEIGHT_PATTERNS:
+                    for m in re.finditer(pat, raw, re.IGNORECASE):
+                        try:
+                            val_str = m.group(2) if m.lastindex and m.lastindex >= 2 else m.group(1)
+                            val = float(val_str)
+                            # Determine mm: if value < 100 treat as metres
+                            mm = int(val * 1000) if val < 100 else int(val)
+                            found_mm.add(mm)
+                        except (ValueError, IndexError):
+                            pass
+            if len(found_mm) >= 2:
+                # Sort and normalise so lowest = 0 (relative elevations)
+                sorted_mm = sorted(found_mm)
+                base_mm = sorted_mm[0]
+                for mm in sorted_mm:
+                    rel = mm - base_mm
+                    lvl_id = f"Z{rel}"
+                    if lvl_id not in seen_ids:
+                        levels.append({
+                            "id": lvl_id, "name": f"Level {rel}mm",
+                            "height_from_datum_mm": rel, "elevation_mm": rel,
+                            "floor_to_floor_mm": None, "confidence": 0.6,
+                        })
+                        seen_ids.add(lvl_id)
+                print(f"  [Z] Forensic height scan found {len(levels)} levels from text patterns")
+
         # 1 level is never enough to build a multi-floor model — fall through to default
         if len(levels) == 1:
             print(f"  [Z] Only 1 level found ({levels[0].get('elevation_mm')}mm) — using default 4-level template")
@@ -871,8 +910,12 @@ class SynthesizerV7:
             gy_lookup = {str(k): int(v) for k, v in gy_mm.items()}
             gx_vals = sorted(gx_lookup.values())
             gy_vals = sorted(gy_lookup.values())
+            # Build all grid intersections for fallback assignment
+            grid_intersections = [(x, y) for y in gy_vals for x in gx_vals]
             snap_tol = 2500  # mm — proximity snap for unlabelled columns
-            snapped = label_snapped = proximity_snapped = 0
+            snapped = label_snapped = proximity_snapped = force_snapped = 0
+
+            cols_no_pos = []  # columns with no x/y at all — assign after the loop
 
             for col in model.get("members", {}).get("columns", []):
                 gx = str(col.get("grid_x") or "")
@@ -888,25 +931,44 @@ class SynthesizerV7:
                     col["y"] = gy_lookup[gy]
 
                 # Pass 2: proximity snap — columns near a grid line but no label
-                cur_x = col.get("x_mm") or col.get("x") or 0
-                cur_y = col.get("y_mm") or col.get("y") or 0
-                if gx not in gx_lookup and gx_vals:
+                cur_x = col.get("x_mm") or col.get("x") or None
+                cur_y = col.get("y_mm") or col.get("y") or None
+                if gx not in gx_lookup and cur_x is not None and gx_vals:
                     nearest_x = min(gx_vals, key=lambda v: abs(v - cur_x))
                     if abs(nearest_x - cur_x) <= snap_tol:
                         col["x_mm"] = nearest_x
                         col["x"] = nearest_x
                         proximity_snapped += 1
-                if gy not in gy_lookup and gy_vals:
+                if gy not in gy_lookup and cur_y is not None and gy_vals:
                     nearest_y = min(gy_vals, key=lambda v: abs(v - cur_y))
                     if abs(nearest_y - cur_y) <= snap_tol:
                         col["y_mm"] = nearest_y
                         col["y"] = nearest_y
 
-                snapped = label_snapped + proximity_snapped
+                # Track columns still missing position (schedule-only, no plan XY)
+                if (col.get("x_mm") is None and col.get("x") is None
+                        and gx not in gx_lookup):
+                    cols_no_pos.append(col)
+
+            # Pass 3: force-assign columns with no position to grid intersections
+            # (columns from schedule pages have no XY; distribute across grid)
+            if cols_no_pos and grid_intersections:
+                already_used: dict = {}
+                for i, col in enumerate(cols_no_pos):
+                    # Cycle through grid intersections — prefer unused ones first
+                    inter = grid_intersections[i % len(grid_intersections)]
+                    col["x_mm"] = inter[0]
+                    col["x"] = inter[0]
+                    col["y_mm"] = inter[1]
+                    col["y"] = inter[1]
+                    force_snapped += 1
+
+            snapped = label_snapped + proximity_snapped + force_snapped
 
             if snapped:
                 print(f"  [GRID-LOCK] Snapped {snapped} column coords "
-                      f"({label_snapped} label, {proximity_snapped} proximity)")
+                      f"({label_snapped} label, {proximity_snapped} proximity, "
+                      f"{force_snapped} force-assigned to grid)")
 
         return model
 

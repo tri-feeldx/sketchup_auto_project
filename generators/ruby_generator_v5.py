@@ -319,6 +319,13 @@ class RubyGeneratorV5:
                 depth = int(zm.group(1))   # 100, 150, 200, 250, 300
                 flange = max(int(depth * 0.55), 50)  # typical Z/C flange ratio
                 return flange, depth
+            # Guard: mark names like B1, B2, C1, G1 look like sections but aren't
+            # Real sections: CHS219, UB360, SHS150x150  Mark names: B1, B2, C1, COL1
+            _SECTION_PREFIXES = ('CHS', 'SHS', 'RHS', 'UB', 'UC', 'PFC', 'FB',
+                                  'WB', 'WC', 'TFB', 'EA', 'UA', 'LW', 'WL', 'BT')
+            if re.match(r'^[A-Z]{1,4}\d{1,3}$', s.upper()) and not any(
+                    s.upper().startswith(p) for p in _SECTION_PREFIXES):
+                return default_w, default_d
             # UB / UC / PFC: try extract number
             nums = re.findall(r'(\d+)', s)
             if nums:
@@ -518,18 +525,21 @@ class RubyGeneratorV5:
         x = self._n(pos["x"]); y = self._n(pos["y"])
         zb = self._n(pos["z_base"]); zt = self._n(pos["z_top"])
         h = zt - zb
-        if sec:  # SHS/RHS — use exact outer dims from library
+        if sec:  # SHS/RHS — use exact outer dims from library (legitimate small dims OK)
             w, d = int(sec.bf), int(sec.d)
+            from_library = True
         else:
             w, d = self._resolve_section(col, 400, 400)
-        # Guard: degenerate face → fallback to minimum dimensions
-        MIN_COL = 100
-        if w < MIN_COL:
-            print(f"[GEN] WARN: col {col.get('id','')} width={w} < {MIN_COL}mm, using {MIN_COL}")
-            w = MIN_COL
-        if d < MIN_COL:
-            print(f"[GEN] WARN: col {col.get('id','')} depth={d} < {MIN_COL}mm, using {MIN_COL}")
-            d = MIN_COL
+            from_library = False
+        # Guard: degenerate face — only clamp regex-fallback dims, not library dims
+        MIN_COL = 50
+        if not from_library:
+            if w < MIN_COL:
+                print(f"[GEN] WARN: col {col.get('id','')} width={w} < {MIN_COL}mm, using {MIN_COL}")
+                w = MIN_COL
+            if d < MIN_COL:
+                print(f"[GEN] WARN: col {col.get('id','')} depth={d} < {MIN_COL}mm, using {MIN_COL}")
+                d = MIN_COL
         h = max(h, 100)
         mat = self._get_mat(col, mat_vars)
         return [
@@ -594,10 +604,20 @@ class RubyGeneratorV5:
         x1, y1 = int(ox1), int(oy1)
         x2, y2 = int(ox2), int(oy2)
         z = beam.get("z_mm") or beam.get("z") or c1.get("z_top", 3500)
-        if sec:  # SHS/RHS — use exact outer dims
+        if sec:  # SHS/RHS — use exact outer dims from library (legitimate small dims OK)
             w, d = int(sec.bf), int(sec.d)
+            from_library = True
         else:
             w, d = self._resolve_section(beam, 200, 300)
+            from_library = False
+        MIN_BEAM = 50
+        if not from_library:
+            if w < MIN_BEAM:
+                print(f"[GEN] WARN: beam {beam.get('id','')} width={w} < {MIN_BEAM}mm, using {MIN_BEAM}")
+                w = MIN_BEAM
+            if d < MIN_BEAM:
+                print(f"[GEN] WARN: beam {beam.get('id','')} depth={d} < {MIN_BEAM}mm, using {MIN_BEAM}")
+                d = MIN_BEAM
         mat = self._get_mat(beam, mat_vars)
         return [
             f"# Beam {i+1}: {beam.get('id','')} {fid}→{tid}",
