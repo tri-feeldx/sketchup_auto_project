@@ -301,6 +301,26 @@ class CADVectorExtractor:
             elif hv >= min_len_pt and (w < 4.0 or hv / max(w, 0.01) > 20):
                 v_cands.append((r.x0 + r.x1) / 2)
 
+        # Fallback: if rect-based pass didn't find enough candidates, scan raw line items.
+        # Handles PDFs where grid lines are stroked paths stored in path["items"] as
+        # ("l", p1, p2) tuples — same pattern used by _scale_from_dimensions().
+        if len(h_cands) < 2 or len(v_cands) < 2:
+            _SLANT = 2.0  # pts — tolerance for "nearly" horizontal/vertical
+            for path in paths:
+                for item in path.get("items", []):
+                    if item[0] != "l":
+                        continue
+                    try:
+                        p1, p2 = item[1], item[2]
+                        dx = abs(p2.x - p1.x)
+                        dy = abs(p2.y - p1.y)
+                    except (IndexError, AttributeError, TypeError):
+                        continue
+                    if dx >= min_len_pt and dy < _SLANT:
+                        h_cands.append((p1.y + p2.y) / 2)
+                    elif dy >= min_len_pt and dx < _SLANT:
+                        v_cands.append((p1.x + p2.x) / 2)
+
         print(f"  [CAD-VEC-DBG] {len(paths)} paths → {len(h_cands)} H-cands, {len(v_cands)} V-cands")
         v_cl = self._cluster(v_cands, self.GRID_CLUSTER_PT)
         h_cl = self._cluster(h_cands, self.GRID_CLUSTER_PT)

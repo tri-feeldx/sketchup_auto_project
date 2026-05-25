@@ -34,6 +34,7 @@ class ScheduleVerifier:
         self,
         scanner_output: dict,
         structural_model: dict,
+        ground_truth: dict = None,
     ) -> dict:
         """
         Run schedule cross-verification.
@@ -41,6 +42,8 @@ class ScheduleVerifier:
         Args:
             scanner_output: Output of ScannerV6.run() — has page_results + batches
             structural_model: Output of SynthesizerV7.synthesize()
+            ground_truth: Optional ProjectFacts from GroundTruthBuilder — used to
+                          override column count with the more reliable GTB value.
 
         Returns:
             {
@@ -56,6 +59,14 @@ class ScheduleVerifier:
 
         # Step 1: Extract expected counts from schedule pages
         schedule_counts = self._extract_schedule_counts(page_results, batches, scanner_output)
+
+        # Use GTB ground truth as authoritative column count — its LLM vision prompt
+        # explicitly filters hardware and counts structural columns per page, making it
+        # more reliable than the heuristic regex that can over-count mark instances.
+        if ground_truth:
+            gtb_cols = ground_truth.get("col_count_expected")
+            if gtb_cols and gtb_cols > 0:
+                schedule_counts["columns"] = gtb_cols
 
         # Also check if scanner already recorded schedule_counts in page results
         for pr in page_results.values():

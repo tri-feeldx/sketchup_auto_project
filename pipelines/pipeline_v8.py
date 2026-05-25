@@ -393,7 +393,7 @@ class PipelineV8:
             # ── STAGE 4: Schedule Verification (NEW) ─────────
             print("[V8 STAGE 4] ScheduleVerifier: Cross-checking against schedules...")
             verifier = ScheduleVerifier(region=self.region)
-            verification = verifier.verify(scanner_output, model)
+            verification = verifier.verify(scanner_output, model, ground_truth=ground_truth)
             result.verification = verification
             overall_recall = verification.get("overall_recall")
             if overall_recall is not None:
