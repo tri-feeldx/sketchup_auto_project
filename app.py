@@ -109,6 +109,10 @@ if run_btn and uploaded_file:
         if _v8_lock.exists():
             _v8_lock.unlink(missing_ok=True)
             cleared.append("V8 pipeline lock")
+        _pdf_hash_file = Path(_PROJ_ROOT) / "data" / ".last_pdf_hash"
+        if _pdf_hash_file.exists():
+            _pdf_hash_file.unlink(missing_ok=True)
+            cleared.append("PDF fingerprint")
         s = ", ".join(cleared) if cleared else "nothing to clear"
         with tab_dash: status_slot.markdown(f'<div class="sb sbw">🔄 <b>Force Fresh:</b> Cleared {s}</div>', unsafe_allow_html=True)
 
