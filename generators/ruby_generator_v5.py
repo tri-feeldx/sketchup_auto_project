@@ -319,12 +319,17 @@ class RubyGeneratorV5:
                 depth = int(zm.group(1))   # 100, 150, 200, 250, 300
                 flange = max(int(depth * 0.55), 50)  # typical Z/C flange ratio
                 return flange, depth
-            # Guard: mark names like B1, B2, C1, G1 look like sections but aren't
-            # Real sections: CHS219, UB360, SHS150x150  Mark names: B1, B2, C1, COL1
+            # Guard: mark names like B1, B2, C1, G1, PF20a, CH32a look like sections but aren't
+            # Real sections: CHS219, UB360, SHS150x150  Mark names: B1, C1, UB36b (b suffix = mark letter)
             _SECTION_PREFIXES = ('CHS', 'SHS', 'RHS', 'UB', 'UC', 'PFC', 'FB',
                                   'WB', 'WC', 'TFB', 'EA', 'UA', 'LW', 'WL', 'BT')
-            if re.match(r'^[A-Z]{1,4}\d{1,3}$', s.upper()) and not any(
-                    s.upper().startswith(p) for p in _SECTION_PREFIXES):
+            su = s.upper()
+            # Pattern 1: simple marks — letters + digits only (B1, C1, COL1, PF20a → wait PF20a has 'a')
+            if re.match(r'^[A-Z]{1,4}\d{1,3}[A-Z]?$', su) and not any(su.startswith(p) for p in _SECTION_PREFIXES):
+                return default_w, default_d
+            # Pattern 2: "UB36b", "CH32a", "PF20a" — valid prefix + short digits (≤2) + optional letter
+            # Real UB sections have 3+ digits (UB150, UB200, UB360); UB36b is a MARK
+            if re.match(r'^(UB|UC|PFC|CH|SH|PF)\d{1,2}[A-Z]?$', su):
                 return default_w, default_d
             # UB / UC / PFC: try extract number
             nums = re.findall(r'(\d+)', s)

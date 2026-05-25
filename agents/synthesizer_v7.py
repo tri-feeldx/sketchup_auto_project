@@ -313,6 +313,26 @@ class SynthesizerV7:
                   f"hardware items from columns ({len(filtered_cols)} structural remain)")
             llm_model["members"]["columns"] = filtered_cols
 
+        # Filter hardware items misidentified as structural beams
+        # HB = hold-down bolts, AB = anchor bolts, HD = holding-down bolts
+        _HW_BEAM_PFX = ("HB", "HDB", "AB", "HD", "ASB", "HDR")
+        def _is_structural_beam(beam: dict) -> bool:
+            mid = str(beam.get("id") or beam.get("mark") or "").strip().upper()
+            if re.match(r"^(" + "|".join(_HW_BEAM_PFX) + r")\d", mid):
+                return False
+            sec = str(beam.get("section") or "").strip().upper()
+            # Bolt designations like M12, M16, M20, M24, M30, M36
+            if re.match(r"^M\d{2}$", sec):
+                return False
+            return True
+
+        raw_beams = llm_model["members"].get("beams", [])
+        filtered_beams = [b for b in raw_beams if _is_structural_beam(b)]
+        if len(filtered_beams) < len(raw_beams):
+            print(f"  [FILTER] Removed {len(raw_beams) - len(filtered_beams)} "
+                  f"hardware items from beams ({len(filtered_beams)} structural remain)")
+            llm_model["members"]["beams"] = filtered_beams
+
         # Bug #4: Infer grid_x/grid_y from mark ID for columns with no position info
         # e.g. mark "C_1A_SH150U" → grid_x="1", grid_y="A"
         _grid_sys = llm_model.get("grid_system") or det.get("grid_system") or {}
@@ -1059,7 +1079,8 @@ class SynthesizerV7:
         return model
 
     def _is_steel_frame(self, model: dict) -> bool:
-        steel_pfx = ("UC", "UB", "CHS", "RHS", "SHS", "PFC", "EA", "PF", "CH", "SH")
+        import re as _re_sf
+        steel_pfx = ("UC", "UB", "CHS", "RHS", "SHS", "PFC", "EA", "PF", "CH", "SH", "FB", "WB", "WC")
         members = model.get("members", {})
         # Signal 1: column section designations
         cols = members.get("columns", [])
@@ -1068,7 +1089,7 @@ class SynthesizerV7:
                 1 for c in cols
                 if any(str(c.get("section") or "").upper().startswith(p) for p in steel_pfx)
             )
-            if steel_cols / len(cols) > 0.5:
+            if steel_cols / len(cols) > 0.3:
                 return True
         # Signal 2: beam section designations (e.g., "360UB", "200UB")
         beams = members.get("beams", [])
@@ -1078,16 +1099,26 @@ class SynthesizerV7:
                 if any(p in str(b.get("section") or "").upper()
                        for p in ("UB", "UC", "CHS", "RHS", "SHS", "PFC"))
             )
-            if steel_beams / len(beams) > 0.3:
+            if steel_beams / len(beams) > 0.2:
                 return True
-        # Signal 3: beam IDs start with steel section code (e.g., "UB20d", "CH13c")
+        # Signal 3: beam IDs / marks start with steel prefix (e.g., "UB36b", "CH32a", "PF20a", "SH08d")
         if beams:
             steel_ids = sum(
                 1 for b in beams
-                if any(str(b.get("id") or b.get("mark") or "").upper().startswith(p)
+                if any(_re_sf.match(r'^' + p + r'\d', str(b.get("id") or b.get("mark") or "").upper())
                        for p in steel_pfx)
             )
-            if steel_ids / len(beams) > 0.3:
+            # Even a handful of steel-coded marks = steel frame
+            if steel_ids >= 3 or (beams and steel_ids / len(beams) > 0.15):
+                return True
+        # Signal 4: column marks follow steel section code pattern (SH08c, UC15a, etc.)
+        if cols:
+            steel_col_marks = sum(
+                1 for c in cols
+                if any(_re_sf.match(r'^' + p + r'\d', str(c.get("id") or c.get("mark") or "").upper())
+                       for p in steel_pfx)
+            )
+            if steel_col_marks >= 2:
                 return True
         return False
 
