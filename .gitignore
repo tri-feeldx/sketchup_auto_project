@@ -21,10 +21,8 @@ river-bedrock-*.json
 data/output_json/
 data/llm_cache/
 
-# Output files (optional - remove if you want to sync outputs)
-output/*.json
-output/*.csv
-output/*.xlsx
+# Output files — generated artifacts, never commit
+output/
 
 # Data files (PDFs, large files)
 data/**/*.pdf
