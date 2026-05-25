@@ -135,13 +135,13 @@ Rules:
 
 
 _MAX_STRUCTURAL_GRID_LINES = 20   # more than this = column positions, not grid
-_MIN_STRUCTURAL_GRID_SPACING = 1500  # mm — grid spacing is always ≥1.5m
+_MIN_STRUCTURAL_GRID_SPACING = 1200  # mm — accounts for tight bays, mezzanines, dense construction
 
 
 def _is_valid_structural_grid(grid: dict) -> bool:
     """Return True if dict looks like a structural grid (not column position list)."""
-    if not grid or len(grid) < 2:
-        return True  # 0-1 lines — accept (may be partial)
+    if not grid or len(grid) < 1:
+        return False  # 0 lines = extraction failure, not partial data
     if len(grid) > _MAX_STRUCTURAL_GRID_LINES:
         return False
     try:

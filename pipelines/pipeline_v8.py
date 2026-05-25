@@ -386,6 +386,8 @@ class PipelineV8:
                               f"{_pdfplumber_counts.get('columns')}c "
                               f"{_pdfplumber_counts.get('beams')}b "
                               f"(conf=0.9, pages={_sch_page_indices})")
+                        if result.accuracy is None:
+                            result.accuracy = {}
                         result.accuracy["schedule_table_counts"] = _pdfplumber_counts
                 except Exception as _stp_err:
                     print(f"  [SCHED-TABLE] WARN: {_stp_err}")
@@ -534,8 +536,9 @@ class PipelineV8:
             # OR visual similarity too low (model looks wrong even if counts are right)
             arch_reviewer = ArchitectReviewer(pdf_path=pdf_path, region=self.region, dpi=self.dpi)
             z_issues = arch_reviewer._verify_3d_positions(model)
-            visual_sim_score = (result.accuracy or {}).get("visual_similarity") or 0
-            _low_visual = isinstance(visual_sim_score, (int, float)) and visual_sim_score < 25
+            _vsim = (result.accuracy or {}).get("visual_similarity") or {}
+            visual_sim_score = (_vsim.get("similarity_score") or 0) * 100 if isinstance(_vsim, dict) else 0
+            _low_visual = visual_sim_score < 25
             needs_arr = (accuracy_score < ARR_ACCURACY_THRESHOLD) or bool(z_issues) \
                         or not _gate_gen.passed or _low_visual
 

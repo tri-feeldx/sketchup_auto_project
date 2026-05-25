@@ -204,8 +204,14 @@ class SynthesizerV7:
             else:
                 deduped_bracing.append(b)
 
+        # Filter hardware items (hold-down bolts etc.) from deterministic beam list
+        structural_beams = [b for b in deduped_beams if self._is_structural_beam(b)]
+        if len(structural_beams) < len(deduped_beams):
+            print(f"  [FILTER] Removed {len(deduped_beams) - len(structural_beams)} "
+                  f"hardware items from beams ({len(structural_beams)} structural remain)")
+
         model["members"]["columns"] = list(all_columns.values())
-        model["members"]["beams"] = deduped_beams
+        model["members"]["beams"] = structural_beams
         model["members"]["slabs"] = all_slabs
         model["members"]["walls"] = all_walls
         model["members"]["footings"] = all_footings
@@ -316,20 +322,8 @@ class SynthesizerV7:
             llm_model["members"]["columns"] = filtered_cols
 
         # Filter hardware items misidentified as structural beams
-        # HB = hold-down bolts, AB = anchor bolts, HD = holding-down bolts
-        _HW_BEAM_PFX = ("HB", "HDB", "AB", "HD", "ASB", "HDR")
-        def _is_structural_beam(beam: dict) -> bool:
-            mid = str(beam.get("id") or beam.get("mark") or "").strip().upper()
-            if re.match(r"^(" + "|".join(_HW_BEAM_PFX) + r")\d", mid):
-                return False
-            sec = str(beam.get("section") or "").strip().upper()
-            # Bolt designations like M12, M16, M20, M24, M30, M36
-            if re.match(r"^M\d{2}$", sec):
-                return False
-            return True
-
         raw_beams = llm_model["members"].get("beams", [])
-        filtered_beams = [b for b in raw_beams if _is_structural_beam(b)]
+        filtered_beams = [b for b in raw_beams if self._is_structural_beam(b)]
         if len(filtered_beams) < len(raw_beams):
             print(f"  [FILTER] Removed {len(raw_beams) - len(filtered_beams)} "
                   f"hardware items from beams ({len(filtered_beams)} structural remain)")
@@ -740,6 +734,19 @@ class SynthesizerV7:
         """Normalize mark/ID: strip hyphens, spaces, underscores → uppercase alphanumeric."""
         return re.sub(r'[-_\s]+', '', str(s or '')).upper()
 
+    _HW_BEAM_PFX = ("HB", "HDB", "AB", "HD", "ASB", "HDR")
+
+    @staticmethod
+    def _is_structural_beam(beam: dict) -> bool:
+        """Return False for hardware items misidentified as structural beams."""
+        mid = str(beam.get("id") or beam.get("mark") or "").strip().upper()
+        if re.match(r"^(HB|HDB|AB|HD|ASB|HDR)\d", mid):
+            return False
+        sec = str(beam.get("section") or "").strip().upper()
+        if re.match(r"^M\d{2}$", sec):  # bolt designations M12, M16...
+            return False
+        return True
+
     def _merge_column_continuity(self, model: dict) -> dict:
         """
         Merge column segments with the same mark across levels into one continuous member.
@@ -1091,7 +1098,7 @@ class SynthesizerV7:
                 1 for c in cols
                 if any(str(c.get("section") or "").upper().startswith(p) for p in steel_pfx)
             )
-            if steel_cols / len(cols) > 0.3:
+            if steel_cols / len(cols) >= 0.3:
                 return True
         # Signal 2: beam section designations (e.g., "360UB", "200UB")
         beams = members.get("beams", [])
@@ -1101,7 +1108,7 @@ class SynthesizerV7:
                 if any(p in str(b.get("section") or "").upper()
                        for p in ("UB", "UC", "CHS", "RHS", "SHS", "PFC"))
             )
-            if steel_beams / len(beams) > 0.2:
+            if steel_beams / len(beams) >= 0.2:
                 return True
         # Signal 3: beam IDs / marks start with steel prefix (e.g., "UB36b", "CH32a", "PF20a", "SH08d")
         if beams:

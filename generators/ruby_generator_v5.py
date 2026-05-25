@@ -103,7 +103,7 @@ class RubyGeneratorV5:
 
         def grid_to_mm_x(gx_val):
             """Map grid label to X mm coordinate (PDFDimensionExtractor → index fallback)."""
-            s = str(gx_val).strip()
+            s = str(gx_val).strip().upper()
             if s in _x_coords:
                 return int(_x_coords[s])
             try:
