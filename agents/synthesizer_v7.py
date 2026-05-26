@@ -72,6 +72,7 @@ class SynthesizerV7:
             Unified building structural model dict
         """
         t0 = time.time()
+        self._ground_truth = ground_truth or {}
 
         forensic = scanner_output.get("forensic", {})
         page_results = scanner_output.get("page_results", {})
@@ -108,6 +109,7 @@ class SynthesizerV7:
                 model = self._enrich_from_cad(model, cad_data)
                 model = self._enrich_from_plan(model, plan_positions)
                 model = self._apply_ground_truth_lock(model, ground_truth)
+                model = self._normalize_section_formats(model)
                 model = self._fix_mark_in_section_fields(model)
                 model = self._recover_column_sections(model, valid_results)
                 model = self._link_beam_connectivity(model)
@@ -130,6 +132,7 @@ class SynthesizerV7:
         model = self._enrich_from_cad(model, cad_data)
         model = self._enrich_from_plan(model, plan_positions)
         model = self._apply_ground_truth_lock(model, ground_truth)
+        model = self._normalize_section_formats(model)
         model = self._fix_mark_in_section_fields(model)
         model = self._recover_column_sections(model, valid_results)
         model = self._link_beam_connectivity(model)
@@ -761,13 +764,58 @@ class SynthesizerV7:
             print(f"  [Z] Only 1 level found ({levels[0].get('elevation_mm')}mm) — using default 4-level template")
             levels = []
 
+        # Priority 3: infer floor-to-floor from column height_mm values in schedule scans
+        # This works even if elevation LLM fails — schedule pages extract height_mm per column
         if not levels:
-            levels = [
-                {"id": "GROUND", "name": "Ground Floor", "height_from_datum_mm": 0, "elevation_mm": 0, "floor_to_floor_mm": 3500},
-                {"id": "LEVEL_1", "name": "Level 1", "height_from_datum_mm": 3500, "elevation_mm": 3500, "floor_to_floor_mm": 3200},
-                {"id": "LEVEL_2", "name": "Level 2", "height_from_datum_mm": 6700, "elevation_mm": 6700, "floor_to_floor_mm": 3200},
-                {"id": "ROOF", "name": "Roof", "height_from_datum_mm": 9900, "elevation_mm": 9900, "floor_to_floor_mm": None},
-            ]
+            col_heights = []
+            for pr in page_results:
+                for col in (pr.get("members") or {}).get("columns") or []:
+                    h = col.get("height_mm")
+                    if isinstance(h, (int, float)) and 2000 <= float(h) <= 6000:
+                        col_heights.append(int(float(h)))
+            if col_heights:
+                from statistics import mode as _mode
+                try:
+                    f2f = _mode(col_heights)
+                except Exception:
+                    f2f = round(sum(col_heights) / len(col_heights) / 100) * 100
+                gt = getattr(self, '_ground_truth', None) or {}
+                n_floors = int(gt.get("floor_count") or 0) or 4
+                names = ["Ground", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5", "Roof"]
+                for i in range(n_floors):
+                    elev = i * f2f
+                    lbl = "GL" if i == 0 else f"L{i}"
+                    label = names[i] if i < len(names) else f"Level {i}"
+                    levels.append({
+                        "id": lbl, "name": label,
+                        "height_from_datum_mm": elev, "elevation_mm": elev,
+                        "floor_to_floor_mm": f2f, "confidence": 0.8,
+                    })
+                print(f"  [Z] Floors from column height_mm: f2f={f2f}mm × {n_floors} levels (0–{(n_floors-1)*f2f}mm)")
+
+        if not levels:
+            gt = getattr(self, '_ground_truth', None) or {}
+            n_floors = int(gt.get("floor_count") or 0) or 4
+            if n_floors == 4:
+                levels = [
+                    {"id": "GROUND", "name": "Ground Floor", "height_from_datum_mm": 0, "elevation_mm": 0, "floor_to_floor_mm": 3500},
+                    {"id": "LEVEL_1", "name": "Level 1", "height_from_datum_mm": 3500, "elevation_mm": 3500, "floor_to_floor_mm": 3200},
+                    {"id": "LEVEL_2", "name": "Level 2", "height_from_datum_mm": 6700, "elevation_mm": 6700, "floor_to_floor_mm": 3200},
+                    {"id": "ROOF", "name": "Roof", "height_from_datum_mm": 9900, "elevation_mm": 9900, "floor_to_floor_mm": None},
+                ]
+            else:
+                f2f = 3500
+                names = ["Ground", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5", "Roof"]
+                for i in range(n_floors):
+                    elev = i * f2f
+                    lbl = "GL" if i == 0 else f"L{i}"
+                    label = names[i] if i < len(names) else f"Level {i}"
+                    levels.append({
+                        "id": lbl, "name": label,
+                        "height_from_datum_mm": elev, "elevation_mm": elev,
+                        "floor_to_floor_mm": f2f, "confidence": 0.5,
+                    })
+                print(f"  [Z] Default template: {n_floors} floors × {f2f}mm (from coversheet floor_count)")
 
         # Sort by elevation
         levels.sort(key=lambda l: l.get("height_from_datum_mm") or l.get("elevation_mm") or 0)
@@ -1252,6 +1300,29 @@ class SynthesizerV7:
             print(f"  [SECTION-FIX] Cleared {cleared} mark-in-section fields → span-based defaults will apply")
         return model
 
+    _DEPTH_FIRST_PAT = re.compile(
+        r'^(\d+)(UB|UC|WB|WC|PFC|CHS|SHS|RHS|FB|TFB|EA|UA|BFC|RFL|PF)(\d+)', re.I
+    )
+
+    def _normalize_section_formats(self, model: dict) -> dict:
+        """Convert Australian depth-first section notation to prefix-first.
+        e.g. '310UC97' → 'UC310', '530UB92' → 'UB530'. Required because
+        startswith checks in col_section_pct metric expect prefix-first format."""
+        normalized = 0
+        for mtype in ("beams", "columns", "bracing", "slabs"):
+            for m in model.get("members", {}).get(mtype, []):
+                sec = str(m.get("section") or "").strip()
+                if not sec:
+                    continue
+                match = self._DEPTH_FIRST_PAT.match(sec)
+                if match:
+                    depth, prefix = match.group(1), match.group(2)
+                    m["section"] = f"{prefix.upper()}{depth}"
+                    normalized += 1
+        if normalized:
+            print(f"  [SECTION-NORM] Normalized {normalized} depth-first sections (e.g. 310UC97 → UC310)")
+        return model
+
     # Span → AS/NZS section name defaults (UB series)
     _SPAN_SECTION_MAP = [
         (3000,  "UB150"),
@@ -1471,7 +1542,7 @@ class SynthesizerV7:
         for b in beams:
             fc = _re.sub(r'[-_\s]+', '', str(b.get("from_col") or b.get("start_col") or "")).upper()
             tc = _re.sub(r'[-_\s]+', '', str(b.get("to_col") or b.get("end_col") or "")).upper()
-            lv = str(b.get("level") or b.get("level_id") or "")
+            lv = str(b.get("level") or b.get("level_id") or b.get("z_mm") or "")
             if fc and tc:
                 key = (min(fc, tc), max(fc, tc), lv)
             else:

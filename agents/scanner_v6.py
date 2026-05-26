@@ -311,6 +311,8 @@ class ScannerV6:
             images = [page_image] if page_image else None
             resp = call_llm(usr_p, system=sys_p, images=images)
             data, _ = self._parse_json(resp)
+            if isinstance(data, dict):
+                data = data.get("levels") or data.get("elevations") or data.get("floors") or []
             if isinstance(data, list) and data:
                 print(f"    [ELEV] Page {page_idx}: extracted {len(data)} level elevations")
                 return data
