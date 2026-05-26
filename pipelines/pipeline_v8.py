@@ -443,6 +443,22 @@ class PipelineV8:
                     model, _page_results_list, ground_truth
                 )
 
+                # Filter bracing/beam stubs that have no resolved endpoints —
+                # these are pre-seed marks from schedule text with no geometry.
+                # Without from_col/to_col they become floating elements in SketchUp.
+                _members = model.get("members", {})
+                for _etype in ("bracing", "beams"):
+                    _before = len(_members.get(_etype, []))
+                    _members[_etype] = [
+                        _m for _m in _members.get(_etype, [])
+                        if not (_m.get("_stub") and
+                                not _m.get("from_col") and
+                                not _m.get("to_col"))
+                    ]
+                    _removed = _before - len(_members[_etype])
+                    if _removed:
+                        print(f"  [STUB-FILTER] Removed {_removed} unresolved {_etype} stubs")
+
                 # Re-apply Z assignment to cover newly-added members from MultiPass
                 _lmap = self.synthesizer._resolve_level_elevations(
                     model.get("levels", []), _page_results_list

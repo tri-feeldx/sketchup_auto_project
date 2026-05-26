@@ -73,19 +73,17 @@ class MultiPassExtractor:
         print(f"[MULTIPASS] Starting targeted re-extraction for: "
               f"{[d['type'] for d in needs_repass]}")
 
-        # Pre-seed bracing from schedule text (zero-cost: no LLM, just regex on cached text)
+        # Pre-seed bracing: read schedule text to discover expected mark IDs.
+        # These stubs are stored as SCAN TARGETS only — NOT merged into the model.
+        # The LLM pass will extract full geometry; stubs without geometry are filtered
+        # by the pipeline's STUB-FILTER gate before Ruby generation.
+        _bracing_seed_marks: set = set()
         if any(d["type"] == "bracing" for d in needs_repass):
             seed_bracing = self._extract_bracing_from_schedule_text(scanner_output)
             if seed_bracing:
-                pre_count = len(structural_model.get("members", {}).get("bracing", []))
-                self._merge_elements(structural_model, "bracing", seed_bracing)
-                post_count = len(structural_model.get("members", {}).get("bracing", []))
-                if post_count > pre_count:
-                    print(f"  [MULTIPASS-SEED] Bracing from schedule text: "
-                          f"{pre_count} → {post_count} (+{post_count - pre_count})")
-                    for d in needs_repass:
-                        if d["type"] == "bracing":
-                            d["deficit"] = max(0, d["deficit"] - (post_count - pre_count))
+                _bracing_seed_marks = {s["mark"] for s in seed_bracing if s.get("mark")}
+                print(f"  [MULTIPASS-SEED] Found {len(_bracing_seed_marks)} bracing marks "
+                      f"in schedule text: {sorted(_bracing_seed_marks)[:10]}")
 
         for pass_num in range(1, MAX_PASSES + 1):
             print(f"[MULTIPASS] Pass {pass_num}/{MAX_PASSES}")

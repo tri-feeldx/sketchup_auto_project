@@ -910,10 +910,22 @@ class SynthesizerV7:
                   f"({splice_total} splices recorded)")
         return model
 
+    @staticmethod
+    def _col_richness(col: dict) -> int:
+        """Score a column by data quality — higher = more complete/trustworthy."""
+        _REAL_PFXS = ('UB', 'UC', 'CHS', 'SHS', 'RHS', 'PFC', 'WB', 'WC',
+                      'FB', 'TFB', 'EA', 'UA', 'BFC', 'H', 'I')
+        sec = str(col.get("section") or "").strip().upper()
+        score = 100 if any(sec.startswith(p) for p in _REAL_PFXS) else 0
+        score += 10 if col.get("grade") else 0
+        score += sum(1 for v in col.values() if v not in (None, "", "null", 0))
+        return score
+
     def _dedup_columns(self, model: dict, ground_truth: dict = None) -> dict:
         """Deduplicate columns accumulated from multiple schedule pages.
         Step 1: dedup by normalised mark (same mark = same column type).
-        Step 2: if still over col_count_expected × 1.5, dedup by grid position.
+        Step 2: if still over col_count_expected × 1.5, dedup by grid position,
+                keeping the RICHEST copy per position (not the first).
         """
         cols = model.get("members", {}).get("columns", [])
         if not cols:
@@ -930,7 +942,7 @@ class SynthesizerV7:
         before = len(cols)
         expected = (ground_truth or {}).get("col_count_expected") or 0
         if expected > 0 and len(unique) > expected * 1.5:
-            seen_grid: set = set()
+            grid_key_to_idx: dict = {}
             grid_unique: list = []
             for col in unique:
                 gxl = str(col.get("grid_x") or "")
@@ -938,9 +950,14 @@ class SynthesizerV7:
                 gx = round((col.get("x_mm") or col.get("x") or 0) / 1000)
                 gy = round((col.get("y_mm") or col.get("y") or 0) / 1000)
                 grid_key = (gxl, gyl) if (gxl and gyl) else (gx, gy)
-                if grid_key != ("", "") and grid_key != (0, 0) and grid_key in seen_grid:
-                    continue
-                seen_grid.add(grid_key)
+                if grid_key != ("", "") and grid_key != (0, 0):
+                    if grid_key in grid_key_to_idx:
+                        # Keep the richer copy — preserves section data from schedule pages
+                        existing_idx = grid_key_to_idx[grid_key]
+                        if self._col_richness(col) > self._col_richness(grid_unique[existing_idx]):
+                            grid_unique[existing_idx] = col
+                        continue
+                    grid_key_to_idx[grid_key] = len(grid_unique)
                 grid_unique.append(col)
             unique = grid_unique
         if len(unique) < before:
@@ -1423,6 +1440,20 @@ class SynthesizerV7:
         if not section_map:
             return model
 
+        def _fuzzy_lookup(key: str) -> str | None:
+            if key in section_map:
+                return section_map[key]
+            import re as _re2
+            # Strip wildcard/variant suffix: "CH*/35a" → "CH", "C12A" → try "C12"
+            clean = _re2.sub(r'[*/\d].*$', '', key).strip()
+            if clean and clean in section_map:
+                return section_map[clean]
+            # Prefix match: model ID starts with schedule mark or vice-versa
+            for k, v in section_map.items():
+                if (key.startswith(k) or k.startswith(key)) and len(k) >= 2:
+                    return v
+            return None
+
         recovered = 0
         for col in model.get("members", {}).get("columns", []):
             if col.get("section") and col["section"] not in (
@@ -1430,8 +1461,9 @@ class SynthesizerV7:
             ):
                 continue
             key = str(col.get("id") or col.get("mark") or "").strip().upper()
-            if key in section_map:
-                col["section"] = section_map[key]
+            found_sec = _fuzzy_lookup(key)
+            if found_sec:
+                col["section"] = found_sec
                 col["_section_source"] = "schedule_recovery"
                 recovered += 1
 
@@ -1553,12 +1585,23 @@ class SynthesizerV7:
             print(f"  [BEAM-CONNECT] Synthetic grid assignment: {assigned} beams → adjacent column pairs")
         return model
 
+    @staticmethod
+    def _beam_richness(beam: dict) -> int:
+        """Score a beam by data quality — higher = more complete/trustworthy."""
+        _REAL_PFXS = ('UB', 'UC', 'CHS', 'SHS', 'RHS', 'PFC', 'WB', 'WC', 'FB', 'TFB')
+        sec = str(beam.get("section") or "").strip().upper()
+        score = 100 if any(sec.startswith(p) for p in _REAL_PFXS) else 0
+        score += 10 if beam.get("grade") else 0
+        score += 5 if beam.get("span_mm") else 0
+        score += sum(1 for v in beam.values() if v not in (None, "", "null", 0))
+        return score
+
     def _dedup_beams(self, model: dict) -> dict:
         import re as _re
         beams = model.get("members", {}).get("beams", [])
         if not beams:
             return model
-        seen: set = set()
+        key_to_idx: dict = {}
         unique = []
         for b in beams:
             fc = _re.sub(r'[-_\s]+', '', str(b.get("from_col") or b.get("start_col") or "")).upper()
@@ -1570,9 +1613,13 @@ class SynthesizerV7:
                 bid = _re.sub(r'[-_\s]+', '', str(b.get("id") or b.get("mark") or "")).upper()
                 key = ("__id__", bid, lv) if bid else None
             if key is not None:
-                if key in seen:
+                if key in key_to_idx:
+                    # Keep richer copy — preserves section data from schedule pages
+                    existing_idx = key_to_idx[key]
+                    if self._beam_richness(b) > self._beam_richness(unique[existing_idx]):
+                        unique[existing_idx] = b
                     continue
-                seen.add(key)
+                key_to_idx[key] = len(unique)
             unique.append(b)
         before = len(beams)
         if len(unique) < before:

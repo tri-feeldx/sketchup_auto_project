@@ -358,6 +358,10 @@ class GroundTruthBuilder:
             if not facts.get("floor_heights_mm"):
                 self._extract_levels_from_schedule_heights(scanner_output, facts)
 
+            # 3d. Direct LLM query — last resort when all structural fallbacks fail
+            if not facts.get("floor_heights_mm"):
+                self._extract_levels_direct_llm(scanner_output, facts)
+
             # 4. Count columns from SCHEDULE pages
             if schedule_pages:
                 self._extract_column_count(renderer, schedule_pages, facts)
@@ -822,11 +826,14 @@ class GroundTruthBuilder:
         from collections import Counter
         heights = []
         for pr in scanner_output.get("page_results", {}).values():
-            for member in (pr.get("members") or []):
-                mtype = str(member.get("type") or "").lower()
-                if mtype not in ("column", "col"):
+            # Scanner V6 stores per-type keys ("columns") not generic "members"
+            col_list = list(pr.get("columns") or []) + list(pr.get("members") or [])
+            for member in col_list:
+                mtype = str(member.get("type") or "column").lower()
+                if mtype not in ("column", "col", ""):
                     continue
-                h = member.get("height_mm") or member.get("height")
+                h = (member.get("height_mm") or member.get("height")
+                     or member.get("length_mm"))
                 if h:
                     try:
                         val = float(h)
@@ -849,6 +856,43 @@ class GroundTruthBuilder:
         facts["_floor_source"] = "schedule_height_cluster"
         print(f"  [GTB] Levels from column height clustering: "
               f"{len(levels)} @ {f2f}mm f2f — {levels}")
+
+    def _extract_levels_direct_llm(self, scanner_output: dict, facts: dict) -> None:
+        """
+        Last-resort: ask LLM directly for floor count + f2f height from schedule text.
+        Fires only when all vision/regex/clustering fallbacks have failed.
+        Cost: 1 LLM text-only call.
+        """
+        page_texts = scanner_output.get("forensic", {}).get("page_texts", {})
+        schedule_idxs = scanner_output.get("batches", {}).get("SCHEDULE", [])
+        for pg_idx in schedule_idxs[:3]:
+            pt = page_texts.get(str(pg_idx)) or page_texts.get(pg_idx) or ""
+            if not pt or len(pt) < 100:
+                continue
+            system = "You are a structural engineer reading a building schedule. Answer ONLY in JSON."
+            user = (
+                f"From this structural schedule:\n{pt[:3000]}\n\n"
+                "How many floor levels does this building have? "
+                "What is the typical floor-to-floor height in mm?\n"
+                'Return JSON only: {"num_levels": 4, "floor_to_floor_mm": 3500}\n'
+                "Use 0 if you cannot determine the value."
+            )
+            try:
+                resp = call_llm(user, system=system)
+                data = self._parse_json(resp)
+                if not data:
+                    continue
+                n = int(data.get("num_levels") or 0)
+                f2f = int(data.get("floor_to_floor_mm") or 0)
+                if 2 <= n <= 12 and 2000 <= f2f <= 8000:
+                    levels = {f"Level {i + 1}": i * f2f for i in range(n)}
+                    facts["floor_heights_mm"] = levels
+                    facts["floor_to_floor_mm"] = f2f
+                    facts["_floor_source"] = "direct_llm_schedule"
+                    print(f"  [GTB] Levels from direct LLM query: {n} levels @ {f2f}mm f2f")
+                    return
+            except Exception as e:
+                print(f"  [GTB] WARN: _extract_levels_direct_llm page {pg_idx}: {e}")
 
     def _extract_column_count(self, renderer: VisionRenderer, schedule_pages: List[int],
                                facts: dict):
