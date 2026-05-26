@@ -192,6 +192,28 @@ _MAX_STRUCTURAL_GRID_LINES = 20   # more than this = column positions, not grid
 _MIN_STRUCTURAL_GRID_SPACING = 1200  # mm — accounts for tight bays, mezzanines, dense construction
 
 
+def _axis_labels_are_sensible(grid: dict) -> bool:
+    """
+    Structural grid axis labels must start from a sensible origin.
+    Numeric axes: must start at 1, 2, or 3 (not 7, 8, 9... — those are table row numbers).
+    Alpha axes: must start at A, B, or C (not E, F... — those are unlikely real axes).
+    """
+    if not grid:
+        return False
+    keys = [str(k) for k in grid.keys()]
+    numeric = [k for k in keys if k.isdigit()]
+    alpha   = [k for k in keys if k.isalpha()]
+    if numeric:
+        min_num = int(min(numeric, key=int))
+        if min_num > 3:
+            return False
+    if alpha:
+        min_alpha = min(alpha, key=lambda k: ord(k.upper()[0]))
+        if ord(min_alpha.upper()[0]) - ord('A') > 2:
+            return False
+    return True
+
+
 def _is_valid_structural_grid(grid: dict) -> bool:
     """Return True if dict looks like a structural grid (not column position list)."""
     if not grid or len(grid) < 1:
@@ -311,10 +333,11 @@ class GroundTruthBuilder:
 
         renderer = VisionRenderer(self.pdf_path, dpi=300)
         try:
-            # 1. Extract grid from first PLAN page (LLM vision)
-            if plan_pages:
-                page_idx = plan_pages[0]
-                self._extract_grid(renderer, page_idx, facts)
+            # 1. Extract grid from plan pages — try each until we get a valid grid
+            for _gp_idx in plan_pages[:3]:
+                self._extract_grid(renderer, _gp_idx, facts)
+                if len(facts.get("grid_x_mm") or {}) >= 3:
+                    break  # found a valid grid
 
             # 2. Override LLM grid with exact CAD vectors when available
             self._apply_cad_grid_override(facts, cad_data)
@@ -330,6 +353,10 @@ class GroundTruthBuilder:
             # 3b. Forensic text fallback for floor heights when LLM elevation extraction failed
             if not facts.get("floor_heights_mm"):
                 self._extract_heights_from_text(scanner_output, facts)
+
+            # 3c. Column height clustering — when all text-based fallbacks fail
+            if not facts.get("floor_heights_mm"):
+                self._extract_levels_from_schedule_heights(scanner_output, facts)
 
             # 4. Count columns from SCHEDULE pages
             if schedule_pages:
@@ -558,17 +585,24 @@ class GroundTruthBuilder:
             old_intersections = (len(facts.get("grid_x_mm") or {})
                                  * len(facts.get("grid_y_mm") or {}))
 
-            if (new_intersections > old_intersections
-                    and _is_valid_structural_grid(gx)
-                    and _is_valid_structural_grid(gy)):
+            gx_ok = (_is_valid_structural_grid(gx) and _axis_labels_are_sensible(gx))
+            gy_ok = (_is_valid_structural_grid(gy) and _axis_labels_are_sensible(gy))
+
+            if (new_intersections > old_intersections and gx_ok and gy_ok):
                 facts["grid_x_mm"] = _int_values(gx)
                 facts["grid_y_mm"] = _int_values(gy)
                 facts["source_pages"]["grid"] = page_idx
                 print(f"  [GTB] Grid count-hint retry: {len(gx)}×{len(gy)}={new_intersections} "
                       f"intersections ✓ (was {old_intersections})")
             else:
-                print(f"  [GTB] Grid count-hint retry: {len(gx)}×{len(gy)}={new_intersections} "
-                      f"— not better than {old_intersections}, keeping original")
+                reason = ""
+                if not gx_ok:
+                    reason += f" X-labels={list(gx.keys())[:4]} rejected"
+                if not gy_ok:
+                    reason += f" Y-labels={list(gy.keys())[:4]} rejected"
+                if not reason:
+                    reason = f"not better than {old_intersections}"
+                print(f"  [GTB] Grid count-hint retry: keeping original —{reason}")
         except Exception as e:
             print(f"  [GTB] WARN: grid count-hint retry failed: {e}")
 
@@ -779,6 +813,42 @@ class GroundTruthBuilder:
             facts["floor_heights_mm"] = heights
             facts["_floor_source"] = "forensic_text"
             print(f"  [GTB] Floor heights from forensic text: {len(heights)} levels — {heights}")
+
+    def _extract_levels_from_schedule_heights(self, scanner_output: dict, facts: dict) -> None:
+        """
+        Cluster column height_mm values from schedule page_results → floor-to-floor height.
+        Fallback when elevation LLM and forensic text both fail to find real heights.
+        """
+        from collections import Counter
+        heights = []
+        for pr in scanner_output.get("page_results", {}).values():
+            for member in (pr.get("members") or []):
+                mtype = str(member.get("type") or "").lower()
+                if mtype not in ("column", "col"):
+                    continue
+                h = member.get("height_mm") or member.get("height")
+                if h:
+                    try:
+                        val = float(h)
+                        if 500 <= val <= 15000:
+                            heights.append(int(val))
+                    except (ValueError, TypeError):
+                        pass
+        if len(heights) < 3:
+            return
+        # Round to nearest 250mm → find dominant floor-to-floor height
+        rounded = [round(h / 250) * 250 for h in heights]
+        counts = Counter(rounded)
+        f2f = counts.most_common(1)[0][0]
+        if not (2500 <= f2f <= 6000):
+            return
+        n_levels = max(2, min(8, round(max(heights) / f2f) + 1))
+        levels = {f"Level {i + 1}": i * f2f for i in range(n_levels)}
+        facts["floor_heights_mm"] = levels
+        facts["floor_to_floor_mm"] = f2f
+        facts["_floor_source"] = "schedule_height_cluster"
+        print(f"  [GTB] Levels from column height clustering: "
+              f"{len(levels)} @ {f2f}mm f2f — {levels}")
 
     def _extract_column_count(self, renderer: VisionRenderer, schedule_pages: List[int],
                                facts: dict):

@@ -219,11 +219,12 @@ class ScheduleVerifier:
                     if val > counts.get(etype, 0):
                         counts[etype] = val
 
-        # Count table rows as a fallback: count occurrences of member marks
-        # e.g., C1, C2, C3... B1, B2...
-        col_marks = set(re.findall(r"\bC\d+\b", text))
-        beam_marks = set(re.findall(r"\bB\d+\b", text))
-        pile_marks = set(re.findall(r"\bP\d+\b", text))
+        # Count unique member marks — use set() to deduplicate across repeated refs.
+        # e.g., "C1" may appear many times on a schedule page but represents 1 column.
+        col_marks    = set(re.findall(r"\bC\d+\b", text))
+        beam_marks   = set(re.findall(r"\bB\d+\b", text))
+        pile_marks   = set(re.findall(r"\bP\d+\b", text))
+        brace_marks  = set(re.findall(r"\b(?:BR|SB|KB|DB|BRC)\d+\b", text, re.I))
 
         if len(col_marks) > counts.get("columns", 0):
             counts["columns"] = len(col_marks)
@@ -231,6 +232,8 @@ class ScheduleVerifier:
             counts["beams"] = len(beam_marks)
         if len(pile_marks) > counts.get("footings", 0):
             counts["footings"] = len(pile_marks)
+        if len(brace_marks) > counts.get("bracing", 0):
+            counts["bracing"] = len(brace_marks)
 
         return counts
 

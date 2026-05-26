@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 from core.llm_wrapper import call_llm
 from core.vision_renderer import VisionRenderer
 
-MAX_PASSES = 2
+MAX_PASSES = 3          # bracing/beams can be dense; 3 passes needed
 MULTIPASS_WORKERS = 5
 
 # Which page types to re-scan for each element type
@@ -28,7 +28,7 @@ ELEMENT_PAGE_MAP = {
     "columns": ["PLAN", "SCHEDULE"],
     "beams": ["PLAN", "SECTION", "ELEVATION", "SCHEDULE"],
     "footings": ["FOUNDATION", "PLAN", "SECTION", "SCHEDULE"],
-    "bracing": ["ELEVATION", "SECTION", "PLAN"],
+    "bracing": ["SCHEDULE", "ELEVATION", "SECTION", "PLAN"],  # SCHEDULE first for bracing
     "slabs": ["PLAN", "SECTION"],
     "walls": ["PLAN", "ELEVATION"],
 }
@@ -72,6 +72,20 @@ class MultiPassExtractor:
 
         print(f"[MULTIPASS] Starting targeted re-extraction for: "
               f"{[d['type'] for d in needs_repass]}")
+
+        # Pre-seed bracing from schedule text (zero-cost: no LLM, just regex on cached text)
+        if any(d["type"] == "bracing" for d in needs_repass):
+            seed_bracing = self._extract_bracing_from_schedule_text(scanner_output)
+            if seed_bracing:
+                pre_count = len(structural_model.get("members", {}).get("bracing", []))
+                self._merge_elements(structural_model, "bracing", seed_bracing)
+                post_count = len(structural_model.get("members", {}).get("bracing", []))
+                if post_count > pre_count:
+                    print(f"  [MULTIPASS-SEED] Bracing from schedule text: "
+                          f"{pre_count} → {post_count} (+{post_count - pre_count})")
+                    for d in needs_repass:
+                        if d["type"] == "bracing":
+                            d["deficit"] = max(0, d["deficit"] - (post_count - pre_count))
 
         for pass_num in range(1, MAX_PASSES + 1):
             print(f"[MULTIPASS] Pass {pass_num}/{MAX_PASSES}")
@@ -138,6 +152,34 @@ class MultiPassExtractor:
         # Rebuild model summary
         self._rebuild_summary(structural_model)
         return structural_model
+
+    def _extract_bracing_from_schedule_text(self, scanner_output: dict) -> List[dict]:
+        """
+        Harvest bracing marks directly from schedule page raw text — zero LLM cost.
+        Finds unique marks like BR1, SB2, KB3, DB4, BRC5 and creates stub records.
+        These stubs pre-seed the model so LLM passes only need to fill gaps.
+        """
+        found: List[dict] = []
+        seen_marks: set = set()
+        _BRACE_PAT = re.compile(r'\b((?:BR|SB|KB|DB|BRC)\d+)\b', re.I)
+        for pr in scanner_output.get("page_results", {}).values():
+            if pr.get("page_type") != "SCHEDULE":
+                continue
+            raw = pr.get("_raw_text") or pr.get("raw_text") or pr.get("llm_response") or ""
+            if not re.search(r'brac', raw, re.I):
+                continue
+            for m in _BRACE_PAT.finditer(raw):
+                mark = m.group(1).upper()
+                if mark not in seen_marks:
+                    seen_marks.add(mark)
+                    found.append({
+                        "id": mark,
+                        "mark": mark,
+                        "type": "bracing",
+                        "_from_schedule": True,
+                        "_stub": True,  # section/connectivity filled later
+                    })
+        return found
 
     def _targeted_scan(
         self,
