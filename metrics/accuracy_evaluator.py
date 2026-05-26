@@ -1,15 +1,17 @@
 """
 =============================================================================
-ACCURACY EVALUATOR — Recall-First Accuracy Metric for LOD300/350
+ACCURACY EVALUATOR — Composite Quality Metric for LOD300/350
 =============================================================================
-Measures extraction quality by comparing extracted element counts
-against expected counts from schedule tables.
+Primary metric: composite_score = 0.40 × recall + 0.60 × geometry_score
 
-Primary metric: element_recall
-  recall(type) = extracted_count(type) / schedule_count(type)
-  overall_accuracy = mean(recall across all types present in schedule) * 100%
+  recall     = weighted element count vs schedule (presence only)
+  geometry   = avg(section_rate, beam_connectivity, col_xy_quality)
+               section_rate:     % of members with real steel section names
+               beam_connectivity: % of beams with from_col/to_col filled
+               col_xy_quality:   % of columns not force-assigned to grid
 
-Target: ≥ 90%
+Grade: A≥85  B≥70  C≥55  F<55 (based on composite, not recall alone)
+Target: composite ≥ 70% (was recall ≥ 90% — that was misleadingly easy to pass)
 =============================================================================
 """
 
@@ -93,24 +95,29 @@ class AccuracyEvaluator:
 
         # Overall weighted recall
         if weight_total > 0:
-            overall_recall = weighted_sum / weight_total
+            recall_ratio = weighted_sum / weight_total
         else:
             # No schedule data — use element presence heuristic
             present_types = sum(1 for t in ELEMENT_TYPES if extracted.get(t, 0) > 0)
-            overall_recall = present_types / len(ELEMENT_TYPES)
+            recall_ratio = present_types / len(ELEMENT_TYPES)
 
-        overall_pct = round(overall_recall * 100, 1)
+        recall_pct = round(recall_ratio * 100, 1)
 
-        # Spatial accuracy — proxy via _confidence field (set by SynthesizerV7._assign_confidence)
-        spatial_score = self._spatial_accuracy(members)
-        spatial_pct = round(spatial_score * 100, 1)
+        # Geometry quality — 3 sub-scores
+        quality_detail = self._geometry_quality(members)
+        geometry_score = quality_detail["geometry_score"]
+        geometry_pct   = round(geometry_score * 100, 1)
 
-        # Grade — both count recall AND spatial must be ≥90% for Grade A
-        if overall_pct >= 90 and spatial_pct >= 75:
+        # Composite score — geometry weighted 60%, recall 40%
+        composite = 0.40 * recall_ratio + 0.60 * geometry_score
+        composite_pct = round(composite * 100, 1)
+
+        # Grade based on composite (not recall alone)
+        if composite_pct >= 85:
             grade = "A"
-        elif overall_pct >= 75:
+        elif composite_pct >= 70:
             grade = "B"
-        elif overall_pct >= 60:
+        elif composite_pct >= 55:
             grade = "C"
         else:
             grade = "F"
@@ -126,54 +133,80 @@ class AccuracyEvaluator:
                 })
 
         return {
-            "overall_score": overall_pct,
-            "spatial_score": spatial_pct,
-            "grade": grade,
-            "target_met": overall_pct >= 90,
-            "per_type": per_type,
-            "gaps": sorted(gaps, key=lambda g: g["recall"]),
+            "overall_score": composite_pct,   # PRIMARY — composite quality
+            "recall_score":  recall_pct,       # element count recall
+            "spatial_pct":   geometry_pct,     # geometry quality
+            "spatial_score": geometry_pct,     # alias (backward compat)
+            "grade":         grade,
+            "target_met":    composite_pct >= 70,
+            "per_type":      per_type,
+            "gaps":          sorted(gaps, key=lambda g: g["recall"]),
             "extracted_total": sum(extracted.values()),
             "has_schedule_reference": bool(schedule_counts),
+            "quality_detail": quality_detail,
+        }
+
+    def _geometry_quality(self, members: dict) -> dict:
+        """
+        Geometry quality — 3 sub-scores:
+          1. col_xy_quality:     % of columns not force-assigned to grid (real XY)
+          2. section_rate:       % of ALL members with real steel section prefixes
+          3. beam_connectivity:  % of beams with from_col/to_col filled
+
+        Returns dict with individual scores + weighted geometry_score.
+        """
+        cols   = members.get("columns", [])
+        beams  = members.get("beams", [])
+        brace  = members.get("bracing", [])
+        _SECTION_PFXS = ('CHS', 'SHS', 'RHS', 'UB', 'UC', 'PFC', 'FB', 'WB', 'WC',
+                          'TFB', 'EA', 'UA', 'PF', 'BFC', 'RFL')
+
+        # Sub-score 1: column XY quality
+        col_xy = (
+            sum(1 for c in cols if not c.get("_force_assigned") and c.get("_confidence", 0) >= 0.7)
+            / len(cols)
+        ) if cols else 1.0
+
+        # Sub-score 2: section realism
+        all_members = cols + beams + brace
+        col_sec = (
+            sum(1 for c in cols if any(str(c.get("section") or "").upper().startswith(p) for p in _SECTION_PFXS))
+            / len(cols)
+        ) if cols else 0.0
+        beam_sec = (
+            sum(1 for b in beams if any(str(b.get("section") or "").upper().startswith(p) for p in _SECTION_PFXS))
+            / len(beams)
+        ) if beams else 0.0
+        section_rate = (
+            sum(1 for m in all_members if any(str(m.get("section") or "").upper().startswith(p) for p in _SECTION_PFXS))
+            / len(all_members)
+        ) if all_members else 0.0
+
+        # Sub-score 3: beam connectivity
+        beam_conn = (
+            sum(1 for b in beams if (b.get("from_col") or b.get("from")) and (b.get("to_col") or b.get("to")))
+            / len(beams)
+        ) if beams else 0.0
+
+        # Weighted geometry score: connectivity matters most, then sections, then XY
+        geometry_score = (
+            0.30 * col_xy +
+            0.40 * section_rate +
+            0.30 * beam_conn
+        )
+
+        return {
+            "geometry_score":    round(geometry_score, 3),
+            "col_xy_quality":    round(col_xy, 3),
+            "col_section_pct":   round(col_sec, 3),
+            "beam_section_pct":  round(beam_sec, 3),
+            "section_rate":      round(section_rate, 3),
+            "beam_connectivity": round(beam_conn, 3),
         }
 
     def _spatial_accuracy(self, members: dict) -> float:
-        """
-        Geometry-aware spatial accuracy — 3 sub-scores averaged:
-        1. Column XY confidence (from _source / _force_assigned flag)
-        2. Section realism (members with real non-default section > 100mm)
-        3. Beam connectivity (beams that have valid column references)
-        """
-        cols  = members.get("columns", [])
-        beams = members.get("beams", [])
-        scores = []
-
-        # Sub-score 1: column XY quality
-        if cols:
-            good_xy = sum(
-                1 for c in cols
-                if not c.get("_force_assigned") and c.get("_confidence", 0) >= 0.7
-            )
-            scores.append(good_xy / len(cols))
-
-        # Sub-score 2: section realism (at least 100mm from a real designation)
-        _SECTION_PFXS = ('CHS','SHS','RHS','UB','UC','PFC','FB','WB','WC','TFB','EA','UA')
-        all_members = cols + beams + members.get("bracing", [])
-        if all_members:
-            real_sec = sum(
-                1 for m in all_members
-                if any(str(m.get("section") or "").upper().startswith(p) for p in _SECTION_PFXS)
-            )
-            scores.append(real_sec / len(all_members))
-
-        # Sub-score 3: beam connectivity (has from_col / to_col references)
-        if beams:
-            connected = sum(
-                1 for b in beams
-                if (b.get("from_col") or b.get("from")) and (b.get("to_col") or b.get("to"))
-            )
-            scores.append(connected / len(beams))
-
-        return sum(scores) / len(scores) if scores else 1.0
+        """Backward-compat wrapper."""
+        return self._geometry_quality(members)["geometry_score"]
 
     def evaluate_from_model(self, structural_model: dict) -> dict:
         """Shortcut: evaluate using only the structural model (no external schedule)."""
@@ -247,13 +280,24 @@ class AccuracyEvaluator:
     @staticmethod
     def format_report(result: dict) -> str:
         """Format accuracy result as human-readable string."""
-        spatial = result.get("spatial_score")
-        spatial_str = f"{spatial}%" if spatial is not None else "N/A"
+        composite = result.get("overall_score", 0)
+        recall    = result.get("recall_score", result.get("overall_score", 0))
+        spatial   = result.get("spatial_pct",  result.get("spatial_score", 0))
+        qd        = result.get("quality_detail", {})
+
         lines = [
-            f"Recall Score:   {result['overall_score']}% (Grade {result['grade']}) — element count vs schedule",
-            f"Spatial Score:  {spatial_str} — XY quality + section realism + beam connectivity",
-            f"Recall ≥90%: {'✅ MET' if result['target_met'] else '❌ NOT MET'}",
-            "",
+            f"Composite Score: {composite}% (Grade {result['grade']}) "
+            f"{'✅ TARGET MET' if result['target_met'] else '❌ Below 70%'}",
+            f"  = 40% × Recall({recall}%) + 60% × Geometry({spatial}%)",
+            f"",
+            f"Geometry breakdown:",
+            f"  col_section:     {qd.get('col_section_pct',0)*100:.0f}%  (target ≥50%)",
+            f"  beam_section:    {qd.get('beam_section_pct',0)*100:.0f}%  (target ≥50%)",
+            f"  beam_connect:    {qd.get('beam_connectivity',0)*100:.0f}%  (target ≥50%)",
+            f"  col_xy_quality:  {qd.get('col_xy_quality',0)*100:.0f}%  (target ≥75%)",
+            f"",
+            f"Recall Score:    {recall}% — element count vs schedule",
+            f"",
             "Per-type Recall:",
         ]
         for etype, info in result["per_type"].items():
@@ -267,7 +311,7 @@ class AccuracyEvaluator:
             else:
                 lines.append(f"  {etype:<10}  extracted={ext}  (no schedule ref)")
 
-        if result["gaps"]:
+        if result.get("gaps"):
             lines.append("")
             lines.append("Gaps (recall < 70%):")
             for g in result["gaps"]:

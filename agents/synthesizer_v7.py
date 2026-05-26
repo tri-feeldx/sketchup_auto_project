@@ -23,6 +23,7 @@ import time
 from typing import Dict, List, Optional
 
 from core.llm_wrapper import call_llm
+from core.agent_logger import AgentLogger
 from pipelines.prompt_factory import PromptFactory
 
 ASNZS_STRUCTURAL_SECTIONS = """
@@ -107,11 +108,15 @@ class SynthesizerV7:
                 model = self._enrich_from_plan(model, plan_positions)
                 model = self._apply_ground_truth_lock(model, ground_truth)
                 model = self._fix_mark_in_section_fields(model)
+                model = self._recover_column_sections(model, valid_results)
+                model = self._link_beam_connectivity(model)
+                model = self._apply_section_defaults_to_null(model)
                 model = self._dedup_beams(model)
                 model = self._ensure_walls(model)
                 model["members"] = self._assign_confidence(model["members"])
                 model["synthesis_method"] = "llm"
                 model["elapsed_s"] = round(time.time() - t0, 1)
+                self._log_synth_summary(model)
                 return model
         except Exception as e:
             print(f"[SYNTH] LLM synthesis failed: {e}")
@@ -124,11 +129,47 @@ class SynthesizerV7:
         model = self._enrich_from_plan(model, plan_positions)
         model = self._apply_ground_truth_lock(model, ground_truth)
         model = self._fix_mark_in_section_fields(model)
+        model = self._recover_column_sections(model, valid_results)
+        model = self._link_beam_connectivity(model)
+        model = self._apply_section_defaults_to_null(model)
         model = self._dedup_beams(model)
         model = self._ensure_walls(model)
         model["synthesis_method"] = "deterministic"
         model["elapsed_s"] = round(time.time() - t0, 1)
+        self._log_synth_summary(model)
         return model
+
+    def _log_synth_summary(self, model: dict) -> None:
+        """Print AgentLogger quality summary box for SynthesizerV7."""
+        _SECTION_PFXS = ('CHS','SHS','RHS','UB','UC','PFC','FB','WB','WC','TFB','EA','UA','PF')
+        m = model.get("members", {})
+        cols   = m.get("columns", [])
+        beams  = m.get("beams", [])
+        brace  = m.get("bracing", [])
+        all_m  = cols + beams + brace
+
+        col_sec = sum(1 for c in cols if any(
+            str(c.get("section") or "").upper().startswith(p) for p in _SECTION_PFXS)) / max(len(cols), 1)
+        beam_sec = sum(1 for b in beams if any(
+            str(b.get("section") or "").upper().startswith(p) for p in _SECTION_PFXS)) / max(len(beams), 1)
+        beam_conn = sum(1 for b in beams if (b.get("from_col") or b.get("from")) and
+                        (b.get("to_col") or b.get("to"))) / max(len(beams), 1)
+        force_pct = sum(1 for c in cols if c.get("_force_assigned")) / max(len(cols), 1)
+
+        log = AgentLogger("SYNTH")
+        log.stat("columns",           len(cols))
+        log.stat("beams",             len(beams))
+        log.stat("col_section_pct",   round(col_sec, 2))
+        log.stat("beam_section_pct",  round(beam_sec, 2))
+        log.stat("beam_connectivity", round(beam_conn, 2))
+        log.stat("force_assigned_pct",round(force_pct, 2))
+        gates = {
+            "col_section≥50%":    col_sec  >= 0.50,
+            "beam_section≥50%":   beam_sec >= 0.50,
+            "beam_connect≥50%":   beam_conn >= 0.50,
+            "force_assign≤25%":   force_pct <= 0.25,
+        }
+        log.summary(gates=gates)
 
     # ── DETERMINISTIC MERGE (NO LLM) ────────────────────────
     def _deterministic_merge(self, page_results: List[dict],
@@ -1167,6 +1208,138 @@ class SynthesizerV7:
                     pass
         if cleared:
             print(f"  [SECTION-FIX] Cleared {cleared} mark-in-section fields → span-based defaults will apply")
+        return model
+
+    # Span → AS/NZS section name defaults (UB series)
+    _SPAN_SECTION_MAP = [
+        (3000,  "UB150"),
+        (5000,  "UB180"),
+        (7000,  "UB250"),
+        (9000,  "UB310"),
+        (12000, "UB360"),
+        (99999, "UB410"),
+    ]
+
+    def _span_to_section_name(self, span_mm: int) -> str:
+        for threshold, name in self._SPAN_SECTION_MAP:
+            if span_mm <= threshold:
+                return name
+        return "UB410"
+
+    def _apply_section_defaults_to_null(self, model: dict) -> dict:
+        """After mark-in-section clearing, fill null beam sections with span-based defaults.
+        Columns get UC defaults based on height. Only fills when section is truly None/empty."""
+        _COL_H_MAP = [(3500, "UC150"), (4200, "UC200"), (6000, "UC250"), (99999, "UC310")]
+        filled_beams = 0
+        filled_cols  = 0
+        members = model.get("members", {})
+
+        for beam in members.get("beams", []):
+            if beam.get("section"):
+                continue
+            span = beam.get("span_mm") or 0
+            if span > 100:
+                beam["section"] = self._span_to_section_name(int(span))
+                beam["_section_source"] = "span_default"
+                filled_beams += 1
+
+        for col in members.get("columns", []):
+            if col.get("section") and col["section"] not in (
+                "circular, not specified", "square, not specified", "null", ""
+            ):
+                continue
+            h = abs(float(col.get("z_top_mm") or col.get("z_top") or 3500) -
+                    float(col.get("z_base_mm") or col.get("z_base") or 0))
+            for threshold, name in _COL_H_MAP:
+                if h <= threshold:
+                    col["section"] = name
+                    col["_section_source"] = "height_default"
+                    filled_cols += 1
+                    break
+
+        if filled_beams or filled_cols:
+            print(f"  [SECTION-DEFAULT] Applied span/height defaults: "
+                  f"{filled_beams} beams + {filled_cols} columns")
+        return model
+
+    def _recover_column_sections(self, model: dict, page_results: list) -> dict:
+        """Cross-reference column marks against schedule page data to recover real sections."""
+        _SECTION_PFXS = ('CHS', 'SHS', 'RHS', 'UB', 'UC', 'PFC', 'FB', 'WB', 'WC',
+                          'TFB', 'EA', 'UA', 'PF', 'BFC', 'RFL')
+
+        # Build section_map from all schedule pages
+        section_map: dict = {}
+        for pr in page_results:
+            if pr.get("page_type") not in ("SCHEDULE", "PLAN", "DETAIL"):
+                continue
+            for mtype in ("columns", "beams", "bracing"):
+                for m in pr.get(mtype, []):
+                    if not isinstance(m, dict):
+                        continue
+                    mid = str(m.get("id") or m.get("mark") or "").strip().upper()
+                    sec = str(m.get("section") or m.get("section_size") or "").strip()
+                    if mid and sec and any(sec.upper().startswith(p) for p in _SECTION_PFXS):
+                        section_map[mid] = sec
+
+        if not section_map:
+            return model
+
+        recovered = 0
+        for col in model.get("members", {}).get("columns", []):
+            if col.get("section") and col["section"] not in (
+                "circular, not specified", "square, not specified"
+            ):
+                continue
+            key = str(col.get("id") or col.get("mark") or "").strip().upper()
+            if key in section_map:
+                col["section"] = section_map[key]
+                col["_section_source"] = "schedule_recovery"
+                recovered += 1
+
+        if recovered:
+            print(f"  [COL-SECTION] Recovered {recovered} column sections from schedule data")
+        return model
+
+    def _link_beam_connectivity(self, model: dict) -> dict:
+        """Link beams to from_col/to_col using grid intersections or span endpoints."""
+        beams = model.get("members", {}).get("beams", [])
+        cols  = model.get("members", {}).get("columns", [])
+        if not beams or not cols:
+            return model
+
+        # col_grid_map: (grid_x, grid_y) → col_id
+        col_grid_map: dict = {}
+        for c in cols:
+            gx  = str(c.get("grid_x") or "").strip().upper()
+            gy  = str(c.get("grid_y") or "").strip().upper()
+            cid = c.get("id") or c.get("mark") or ""
+            if gx and gy and cid:
+                col_grid_map[(gx, gy)] = cid
+
+        linked = 0
+        for beam in beams:
+            if beam.get("from_col") and beam.get("to_col"):
+                continue
+
+            sgx = str(beam.get("start_grid_x") or beam.get("from_grid_x") or "").upper()
+            sgy = str(beam.get("start_grid_y") or beam.get("from_grid_y") or "").upper()
+            egx = str(beam.get("end_grid_x")   or beam.get("to_grid_x")   or "").upper()
+            egy = str(beam.get("end_grid_y")   or beam.get("to_grid_y")   or "").upper()
+
+            if sgx and sgy and not beam.get("from_col"):
+                cid = col_grid_map.get((sgx, sgy))
+                if cid:
+                    beam["from_col"] = cid
+            if egx and egy and not beam.get("to_col"):
+                cid = col_grid_map.get((egx, egy))
+                if cid:
+                    beam["to_col"] = cid
+
+            if beam.get("from_col") and beam.get("to_col"):
+                linked += 1
+
+        if linked:
+            print(f"  [BEAM-LINK] Linked {linked}/{len(beams)} beams to column endpoints")
         return model
 
     def _dedup_beams(self, model: dict) -> dict:

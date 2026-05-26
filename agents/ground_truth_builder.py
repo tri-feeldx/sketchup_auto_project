@@ -20,6 +20,7 @@ from typing import List, Optional
 from core.llm_wrapper import call_llm
 from config import GEMINI_MODEL_PRO as _GTB_MODEL
 from core.vision_renderer import VisionRenderer
+from core.agent_logger import AgentLogger
 
 
 _GRID_SYSTEM_PROMPT = """\
@@ -318,6 +319,25 @@ class GroundTruthBuilder:
 
         self._compute_confidence(facts)
         self._print_summary(facts)
+
+        # AgentLogger quality summary
+        _log = AgentLogger("GTB")
+        _log.stat("grid_x_count", len(facts.get("grid_x_mm") or {}))
+        _log.stat("grid_y_count", len(facts.get("grid_y_mm") or {}))
+        _log.stat("level_real",   len(facts.get("floor_heights_mm") or {}))
+        _log.stat("col_expected", facts.get("col_count_expected") or 0)
+        _log.stat("confidence",   facts.get("confidence", 0))
+        _col_exp = facts.get("col_count_expected") or 0
+        _gx = len(facts.get("grid_x_mm") or {})
+        _gy = len(facts.get("grid_y_mm") or {})
+        _gates = {
+            "grid_x≥4":             _gx >= 4,
+            "grid_y≥4":             _gy >= 4,
+            "level_real≥2":         len(facts.get("floor_heights_mm") or {}) >= 2,
+            "grid_covers_cols≥75%": _col_exp == 0 or (_gx * _gy) >= _col_exp * 0.75,
+        }
+        _log.summary(gates=_gates)
+
         return facts
 
     # ── Private helpers ──────────────────────────────────────────────────────

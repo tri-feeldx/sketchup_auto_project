@@ -9,6 +9,7 @@ import math
 import re
 from typing import List, Optional
 from pipelines.prompt_factory import PromptFactory
+from core.agent_logger import AgentLogger
 
 
 class RubyGeneratorV5:
@@ -89,6 +90,19 @@ class RubyGeneratorV5:
         print(f"  [QUALITY] col_section={cs}% beam_section={bs}% col_xy={cx}% level_real={lr}% | {grade}")
         if overall < 40:
             print(f"  [QUALITY] WARNING: {100-overall}% of model is guessed/defaulted — spatial accuracy likely low")
+
+        _log = AgentLogger("RUBYGEN")
+        _log.stat("col_section_pct",  round(col_sec / max(len(cols), 1), 2))
+        _log.stat("beam_section_pct", round(beam_sec / max(len(beams), 1), 2))
+        _log.stat("col_xy_pct",       round(col_xy / max(len(cols), 1), 2))
+        _log.stat("level_real",       lvl_real)
+        _log.stat("guessed_ratio",    round((100 - overall) / 100, 2))
+        _gates = {
+            "col_section≥50%":  cs >= 50,
+            "beam_section≥50%": bs >= 50,
+            "guessed≤40%":      overall >= 60,
+        }
+        _log.summary(gates=_gates)
 
     def _deterministic_script(self, model: dict) -> str:
         # Resolve grid → coordinate snapping

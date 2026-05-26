@@ -35,6 +35,7 @@ from generators.ruby_generator_v5 import RubyGeneratorV5
 from generators.ruby_validator import RubyValidator
 from generators.ifc_generator import IFCGenerator, _ifc_available
 from metrics.accuracy_evaluator import AccuracyEvaluator
+from core.agent_logger import stage_header, stage_footer, AgentLogger
 
 ARR_ACCURACY_THRESHOLD = 95.0
 ARR_MAX_RETRIES = 1
@@ -204,7 +205,7 @@ class PipelineV8:
             _arr_principal = ARRPrincipal()
 
             # ── STAGE 0-2: ScannerV6 ─────────────────────────
-            print("[V8 STAGE 0-2] ScannerV6: Forensic + Routing + Scanning...")
+            _t_scan = stage_header("0-2", "ScannerV6: Forensic + Routing + Scanning")
             scanner = ScannerV6(
                 pdf_path, dpi=self.dpi, region=self.region,
                 language=self.language, max_pages=self.max_pages,
@@ -265,8 +266,9 @@ class PipelineV8:
             print(f"  -> {num_pages} pages, {len(page_results)} scanned, "
                   f"types: {list(routing.get('types', {}).keys())}")
 
+            stage_footer("0-2", _t_scan, True)
             # ── STAGE 0.5: Coversheet Parser ─────────────────
-            print("[V8 STAGE 0.5] CoversheetParser: Reading project title block...")
+            _t_csp = stage_header("0.5", "CoversheetParser: Reading project title block")
             try:
                 from agents.coversheet_parser import CoversheetParser
                 _csp = CoversheetParser(str(pdf_path), region=self.region)
@@ -276,8 +278,9 @@ class PipelineV8:
                 project_meta = {"project_name": "Structural Model", "revision": "A",
                                 "standard": "AS/NZS"}
 
+            stage_footer("0.5", _t_csp, True)
             # ── STAGE 1.5: CAD Vector Extraction ─────────────
-            print("[V8 STAGE 1.5] CADVectorExtractor: Reading vector grid + column XY from PDF...")
+            _t_cad = stage_header("1.5", "CADVectorExtractor: Reading vector grid + column XY")
             cad_data: dict = {}
             try:
                 from core.cad_vector_extractor import CADVectorExtractor
@@ -305,8 +308,9 @@ class PipelineV8:
                 print(f"  [CAD-VEC] WARN: vector extraction failed ({_cve_err}) — skipping")
                 cad_data = {}
 
+            stage_footer("1.5", _t_cad, True)
             # ── STAGE 2.5: Plan Page Column Extractor ────────
-            print("[V8 STAGE 2.5] PlanPageExtractor: Reading plan pages for column XY...")
+            _t_plan = stage_header("2.5", "PlanPageExtractor: Reading plan pages for column XY")
             try:
                 from agents.plan_page_extractor import PlanPageColumnExtractor
                 _pex = PlanPageColumnExtractor(
@@ -320,8 +324,9 @@ class PipelineV8:
                 plan_positions = {}
             result.plan_positions = plan_positions
 
+            stage_footer("2.5", _t_plan, True)
             # ── STAGE 2.6: Detail Page Extractor ─────────────
-            print("[V8 STAGE 2.6] DetailPageExtractor: Reading connection details...")
+            _t_det = stage_header("2.6", "DetailPageExtractor: Reading connection details")
             try:
                 from agents.detail_page_extractor import DetailPageExtractor
                 _dex = DetailPageExtractor(str(pdf_path), region=self.region)
@@ -330,8 +335,9 @@ class PipelineV8:
                 print(f"  [DETAIL-EXT] WARN: {_dex_err} — skipping")
                 detail_specs = {}
 
+            stage_footer("2.6", _t_det, True)
             # ── STAGE 0.6: Ground Truth Builder ──────────────
-            print("[V8 STAGE 0.6] GroundTruthBuilder: Establishing locked ProjectFacts...")
+            _t_gtb = stage_header("0.6", "GroundTruthBuilder: Establishing locked ProjectFacts")
             ground_truth: dict = {}
             try:
                 from agents.ground_truth_builder import GroundTruthBuilder
@@ -343,8 +349,9 @@ class PipelineV8:
             except Exception as _gtb_err:
                 print(f"  [GTB] WARN: GroundTruthBuilder failed ({_gtb_err}) — skipping")
 
+            stage_footer("0.6", _t_gtb, True)
             # ── STAGE 3: Synthesize ───────────────────────────
-            print("[V8 STAGE 3] SynthesizerV7: Building structural model...")
+            _t_synth = stage_header("3", "SynthesizerV7: Building structural model")
             model = self.synthesizer.synthesize(
                 scanner_output,
                 plan_positions=plan_positions,
@@ -366,6 +373,7 @@ class PipelineV8:
                   f"{len(m.get('footings',[]))}f "
                   f"{len(m.get('bracing',[]))}br")
 
+            stage_footer("3", _t_synth, True)
             # ── STAGE 3.5: pdfplumber schedule table parse ────
             _sch_page_indices = sorted([
                 int(k) for k, v in scanner_output.get("page_results", {}).items()
@@ -393,7 +401,7 @@ class PipelineV8:
                     print(f"  [SCHED-TABLE] WARN: {_stp_err}")
 
             # ── STAGE 4: Schedule Verification (NEW) ─────────
-            print("[V8 STAGE 4] ScheduleVerifier: Cross-checking against schedules...")
+            _t_sv = stage_header("4", "ScheduleVerifier: Cross-checking against schedules")
             verifier = ScheduleVerifier(region=self.region)
             verification = verifier.verify(scanner_output, model, ground_truth=ground_truth)
             result.verification = verification
@@ -402,6 +410,7 @@ class PipelineV8:
                 print(f"  -> Overall recall: {overall_recall:.0%} "
                       f"({'✓' if overall_recall >= 0.70 else '⚠'})")
 
+            stage_footer("4", _t_sv, True)
             # ── STAGE 5: Multi-Pass Extraction (NEW) ─────────
             if not self.skip_multipass and verification.get("needs_repass"):
                 print("[V8 STAGE 5] MultiPassExtractor: Re-scanning for missing elements...")
@@ -455,13 +464,14 @@ class PipelineV8:
                               f"({_model_cols_after - _model_cols:+d})")
 
             # ── STAGE 6: Validate Model ───────────────────────
-            print("[V8 STAGE 6] ValidatorV7: Checking model geometry...")
+            _t_val = stage_header("6", "ValidatorV7: Checking model geometry")
             val = self.validator.validate(model)
             result.validation = val.to_dict()
             print(f"  -> {'PASSED' if val.passed else 'FAILED'} (score={val.score:.2f})")
 
+            stage_footer("6", _t_val, val.passed)
             # ── STAGE 7: Generate Ruby ────────────────────────
-            print("[V8 STAGE 7] RubyGeneratorV5: Building .rb script...")
+            _t_ruby = stage_header("7", "RubyGeneratorV5: Building .rb script")
             # Inject metadata and detail specs into model for LOD350 generator
             model.setdefault("project", {}).update(project_meta)
             model["detail_specs"] = detail_specs
@@ -474,15 +484,17 @@ class PipelineV8:
             _gate_gen = _arr_principal.gate_post_generate(model)
             ARRPrincipal._print_gate("POST-GENERATE", _gate_gen)
 
+            stage_footer("7", _t_ruby, True)
             # ── STAGE 8: Validate Ruby ────────────────────────
-            print("[V8 STAGE 8] RubyValidator: Checking script...")
+            _t_rv = stage_header("8", "RubyValidator: Checking .rb script")
             rv = self.ruby_val.validate(ruby)
             result.ruby_validation = rv.to_dict()
             print(f"  -> {'PASSED' if rv.passed else 'FAILED'} "
                   f"(entities~{rv.estimated_entities})")
 
-            # ── STAGE 9: Accuracy Score (NEW) ─────────────────
-            print("[V8 STAGE 9] AccuracyEvaluator: Computing recall-based score...")
+            stage_footer("8", _t_rv, rv.passed)
+            # ── STAGE 9: Accuracy Score ────────────────────────
+            _t_acc = stage_header("9", "AccuracyEvaluator: Computing quality score")
             schedule_counts = verification.get("schedule_counts", {})
             # Prefer pdfplumber counts (more reliable) when available
             if _pdfplumber_counts.get("columns"):
@@ -519,6 +531,7 @@ class PipelineV8:
                 except Exception as _vs_err:
                     print(f"  [VISUAL-SIM] WARN: {_vs_err}")
 
+            stage_footer("9", _t_acc, accuracy.get("target_met", False))
             # ── STAGE 9.5: ARR — Architect Review & Refine ───
             accuracy_score = (result.accuracy or {}).get("overall_score", 0) or 0
             rv_pass = result.ruby_validation.get("passed", True) if result.ruby_validation else True
@@ -603,7 +616,7 @@ class PipelineV8:
                       f"(accuracy={accuracy_score}% ≥ {ARR_ACCURACY_THRESHOLD}%, no 3D issues)")
 
             # ── STAGE 10: Save outputs ────────────────────────
-            print("[V8 STAGE 10] Saving outputs...")
+            _t_save = stage_header("10", "Saving outputs")
             rb_path = os.path.join(output_dir, f"{base_name}_structural.rb")
             with open(rb_path, "w", encoding="utf-8") as f:
                 f.write(ruby)
@@ -621,6 +634,7 @@ class PipelineV8:
             summary_path = os.path.join(output_dir, f"{base_name}_summary.json")
             with open(summary_path, "w", encoding="utf-8") as f:
                 json.dump(result.to_dict(), f, indent=2, ensure_ascii=False, default=str)
+            stage_footer("10", _t_save, True)
             print(f"  -> Ruby: {rb_path}")
             print(f"  -> JSON: {json_path}")
             print(f"  -> Summary: {summary_path}")
@@ -646,9 +660,37 @@ class PipelineV8:
         finally:
             result.duration_sec = time.time() - t0
             status = "SUCCESS" if result.success else "FAILED"
-            acc_score = (result.accuracy or {}).get("overall_score", "N/A")
+            acc = result.accuracy or {}
+            acc_score = acc.get("overall_score", "N/A")
+
+            # ── QUALITY DASHBOARD ─────────────────────────────
+            _pipeline_log = AgentLogger("PIPELINE")
+            m_final = (result.structural_model or {}).get("members", {})
+            _pipeline_log.stat("columns", len(m_final.get("columns", [])))
+            _pipeline_log.stat("beams", len(m_final.get("beams", [])))
+            _pipeline_log.stat("bracing", len(m_final.get("bracing", [])))
+            _pipeline_log.stat("recall_score", f"{acc.get('overall_score', 0)}%")
+            _pipeline_log.stat("spatial_score", f"{acc.get('spatial_pct', 0)}%")
+            _vsim_d = acc.get("visual_similarity") or {}
+            _vscore = (_vsim_d.get("similarity_score") or 0) if isinstance(_vsim_d, dict) else 0
+            _pipeline_log.stat("visual_sim", f"{_vscore*100:.1f}%")
+            _pipeline_log.stat("duration_s", f"{result.duration_sec:.0f}s")
+            _qd = acc.get("quality_detail") or {}
+            if _qd:
+                _pipeline_log.stat("col_section", f"{_qd.get('col_section_pct',0)*100:.0f}%")
+                _pipeline_log.stat("beam_section", f"{_qd.get('beam_section_pct',0)*100:.0f}%")
+                _pipeline_log.stat("beam_connect", f"{_qd.get('beam_connectivity',0)*100:.0f}%")
+                _pipeline_log.stat("level_real", f"{_qd.get('level_real_pct',0)*100:.0f}%")
+            _gates = {
+                "recall≥90%":      (acc.get("overall_score") or 0) >= 90,
+                "spatial≥60%":     (acc.get("spatial_pct") or 0) >= 60,
+                "visual_sim≥25%":  _vscore * 100 >= 25,
+            }
+            _pipeline_log.summary(gates=_gates)
+
             print(f"\n{'='*60}")
-            print(f"PIPELINE V8 {status} in {result.duration_sec:.1f}s | Accuracy: {acc_score}%")
+            print(f"PIPELINE V8 {status} in {result.duration_sec:.1f}s | "
+                  f"Recall: {acc_score}% | Spatial: {acc.get('spatial_pct',0)}%")
             print(f"{'='*60}")
             result.log_path = _log_path
             print(f"\n[LOG] Run log saved → {_log_path}")
