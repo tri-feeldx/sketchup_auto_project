@@ -575,6 +575,30 @@ class GroundTruthBuilder:
                 except (ValueError, TypeError):
                     pass
 
+            # If JSON levels empty, parse raw LLM response text for RL patterns
+            if not facts.get("floor_heights_mm"):
+                import re as _re_el
+                _RL_PAT_FB = _re_el.compile(r'RL\s*\+?\s*([\d]{1,3}\.[\d]{1,3})', _re_el.I)
+                _raw_rl_fb: set = set()
+                for _m in _RL_PAT_FB.finditer(str(resp)):
+                    try:
+                        _raw_rl_fb.add(float(_m.group(1)))
+                    except ValueError:
+                        pass
+                if len(_raw_rl_fb) >= 2:
+                    _sorted_fb = sorted(_raw_rl_fb)
+                    _base_fb   = _sorted_fb[0]
+                    _levels_fb: dict = {}
+                    for _rv in _sorted_fb:
+                        _rel_mm = int((_rv - _base_fb) * 1000)
+                        if 0 <= _rel_mm <= 50_000:
+                            _levels_fb[f"RL {_rv:.3f}"] = _rel_mm
+                    if len(_levels_fb) >= 2:
+                        facts["floor_heights_mm"] = _levels_fb
+                        facts["source_pages"]["elevation"] = page_idx
+                        facts["_floor_source"] = "elevation_llm_raw"
+                        print(f"  [GTB] Levels from elevation raw text: {len(_levels_fb)} — {_levels_fb}")
+
         except Exception as e:
             print(f"  [GTB] WARN: elevation extraction failed: {e}")
 

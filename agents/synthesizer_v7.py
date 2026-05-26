@@ -111,6 +111,7 @@ class SynthesizerV7:
                 model = self._fix_mark_in_section_fields(model)
                 model = self._recover_column_sections(model, valid_results)
                 model = self._link_beam_connectivity(model)
+                model = self._assign_beam_connectivity_from_grid(model)
                 model = self._apply_section_defaults_to_null(model)
                 model = self._dedup_beams(model)
                 model = self._ensure_walls(model)
@@ -132,6 +133,7 @@ class SynthesizerV7:
         model = self._fix_mark_in_section_fields(model)
         model = self._recover_column_sections(model, valid_results)
         model = self._link_beam_connectivity(model)
+        model = self._assign_beam_connectivity_from_grid(model)
         model = self._apply_section_defaults_to_null(model)
         model = self._dedup_beams(model)
         model = self._ensure_walls(model)
@@ -1282,6 +1284,11 @@ class SynthesizerV7:
                 beam["section"] = self._span_to_section_name(int(span))
                 beam["_section_source"] = "span_default"
                 filled_beams += 1
+            else:
+                # No span data — use typical intermediate bay default (6000mm → UB250)
+                beam["section"] = self._span_to_section_name(6000)
+                beam["_section_source"] = "no_span_default"
+                filled_beams += 1
 
         for col in members.get("columns", []):
             if col.get("section") and col["section"] not in (
@@ -1395,6 +1402,63 @@ class SynthesizerV7:
 
         if linked:
             print(f"  [BEAM-LINK] Linked {linked}/{len(beams)} beams to column endpoints")
+        return model
+
+    def _assign_beam_connectivity_from_grid(self, model: dict) -> dict:
+        """Assign from_col/to_col to unconnected beams using adjacent column pairs from locked grid.
+        Synthetic fallback when schedule pages provide no beam connectivity data."""
+        from collections import defaultdict
+        beams = model.get("members", {}).get("beams", [])
+        cols  = model.get("members", {}).get("columns", [])
+        if not beams or not cols:
+            return model
+
+        col_xy: dict = {}
+        for c in cols:
+            x = int(c.get("x_mm") or c.get("x") or 0)
+            y = int(c.get("y_mm") or c.get("y") or 0)
+            cid = c.get("id") or c.get("mark") or ""
+            if cid and (x or y):
+                col_xy[(x, y)] = cid
+
+        if not col_xy:
+            return model
+
+        xs = sorted(set(k[0] for k in col_xy))
+        ys = sorted(set(k[1] for k in col_xy))
+        adj_pairs: list = []
+        for y in ys:
+            for i in range(len(xs) - 1):
+                c1 = col_xy.get((xs[i], y))
+                c2 = col_xy.get((xs[i + 1], y))
+                if c1 and c2:
+                    adj_pairs.append((c1, c2))
+        for x in xs:
+            for j in range(len(ys) - 1):
+                c1 = col_xy.get((x, ys[j]))
+                c2 = col_xy.get((x, ys[j + 1]))
+                if c1 and c2:
+                    adj_pairs.append((c1, c2))
+
+        if not adj_pairs:
+            return model
+
+        by_z: dict = defaultdict(list)
+        for b in beams:
+            if not (b.get("from_col") or b.get("from")) or not (b.get("to_col") or b.get("to")):
+                by_z[int(b.get("z_mm") or 0)].append(b)
+
+        assigned = 0
+        for z_beams in by_z.values():
+            for i, beam in enumerate(z_beams):
+                pair = adj_pairs[i % len(adj_pairs)]
+                beam["from_col"] = pair[0]
+                beam["to_col"]   = pair[1]
+                beam["_connectivity_source"] = "grid_synthetic"
+                assigned += 1
+
+        if assigned:
+            print(f"  [BEAM-CONNECT] Synthetic grid assignment: {assigned} beams → adjacent column pairs")
         return model
 
     def _dedup_beams(self, model: dict) -> dict:
