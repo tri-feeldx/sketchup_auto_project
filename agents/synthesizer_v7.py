@@ -145,6 +145,27 @@ class SynthesizerV7:
         self._log_synth_summary(model)
         return model
 
+    def post_process_after_multipass(self, model: dict,
+                                      page_results: list = None,
+                                      ground_truth: dict = None) -> dict:
+        """
+        Re-run section recovery + connectivity after MultiPassExtractor adds elements.
+        MultiPass merges raw LLM output without running the enrichment chain, so new
+        columns/beams have no sections and no connectivity.  Call this immediately after
+        extractor.run() before Z re-assignment.
+        """
+        if page_results is None:
+            page_results = []
+        model = self._normalize_section_formats(model)
+        model = self._recover_column_sections(model, page_results)
+        model = self._link_beam_connectivity(model)
+        model = self._assign_beam_connectivity_from_grid(model)
+        model = self._apply_section_defaults_to_null(model)
+        model = self._dedup_columns(model, ground_truth)
+        model = self._dedup_beams(model)
+        self._log_synth_summary(model)
+        return model
+
     def _log_synth_summary(self, model: dict) -> None:
         """Print AgentLogger quality summary box for SynthesizerV7."""
         _SECTION_PFXS = ('CHS','SHS','RHS','UB','UC','PFC','FB','WB','WC','TFB','EA','UA','PF')

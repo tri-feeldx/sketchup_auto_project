@@ -414,14 +414,36 @@ class PipelineV8:
             # ── STAGE 5: Multi-Pass Extraction (NEW) ─────────
             if not self.skip_multipass and verification.get("needs_repass"):
                 print("[V8 STAGE 5] MultiPassExtractor: Re-scanning for missing elements...")
+
+                # Cap column target to grid ceiling so MultiPass can't hallucinate
+                # more columns than the physical grid can accommodate.
+                _gt_gx = len((ground_truth or {}).get("grid_x_mm") or {})
+                _gt_gy = len((ground_truth or {}).get("grid_y_mm") or {})
+                if _gt_gx > 0 and _gt_gy > 0:
+                    _grid_ceiling = _gt_gx * _gt_gy * 2
+                    for _disc in verification["discrepancies"]:
+                        if _disc["type"] == "columns" and _disc.get("expected", 0) > _grid_ceiling:
+                            print(f"  [MULTIPASS-CAP] Column target {_disc['expected']} "
+                                  f"→ capped at {_grid_ceiling} ({_gt_gx}×{_gt_gy}×2)")
+                            _disc["expected"] = _grid_ceiling
+                            _disc["deficit"] = max(0, _grid_ceiling - _disc["got"])
+                            _disc["needs_repass"] = _disc["deficit"] > 0
+
                 extractor = MultiPassExtractor(pdf_path, dpi=self.dpi)
                 model = extractor.run(
                     model,
                     verification["discrepancies"],
                     scanner_output,
                 )
-                # Re-apply Z assignment to cover newly-added members from MultiPass
+
+                # Re-run full enrichment chain: new elements have no sections or connectivity
                 _page_results_list = list(scanner_output.get("page_results", {}).values())
+                print("  [MULTIPASS-POST] Re-running section recovery + connectivity...")
+                model = self.synthesizer.post_process_after_multipass(
+                    model, _page_results_list, ground_truth
+                )
+
+                # Re-apply Z assignment to cover newly-added members from MultiPass
                 _lmap = self.synthesizer._resolve_level_elevations(
                     model.get("levels", []), _page_results_list
                 )

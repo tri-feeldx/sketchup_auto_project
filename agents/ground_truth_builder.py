@@ -140,6 +140,33 @@ Rules:
 - Include roof level if shown
 """
 
+_ELEVATION_RL_PROMPT = """\
+You are a senior structural engineer reading an Australian structural elevation drawing.
+
+Australian drawings use RL (Reduced Level) values in AHD (Australian Height Datum).
+Example: RL 414.200 means 414.200 metres above Australian Height Datum.
+
+TASK: Find EVERY RL value annotated on this elevation drawing.
+List them as-is (do NOT convert — just report the raw values you see).
+
+Output JSON only:
+{
+  "rl_values": {
+    "Ground Floor": 414.200,
+    "Level 1": 417.700,
+    "Level 2": 421.200,
+    "Lower Roof": 424.600,
+    "Upper Roof": 427.800
+  },
+  "confidence": 0.9
+}
+
+- Keys = level name (or "Level N" if unnamed)
+- Values = the RL number exactly as printed on drawing
+- Include ALL RL annotations — parapets, ridge, FFL, soffit
+- If no RL values found, return {"rl_values": {}, "confidence": 0.1}
+"""
+
 _SCHEDULE_COUNT_SYSTEM_PROMPT = """\
 You are reading a structural column schedule or member schedule.
 
@@ -559,26 +586,44 @@ class GroundTruthBuilder:
             data = _parse_json(resp)
             if not data:
                 print(f"  [GTB] WARN: elevation parse failed for page {page_idx}")
-                return
-            if self.debug:
-                print(f"  [GTB-DEBUG] Elevation raw: {data}")
+            else:
+                if self.debug:
+                    print(f"  [GTB-DEBUG] Elevation raw: {data}")
 
-            levels = data.get("levels") or {}
-            if levels and isinstance(levels, dict):
-                facts["floor_heights_mm"] = _int_values(levels)
-                facts["source_pages"]["elevation"] = page_idx
-                print(f"  [GTB] Levels: {len(levels)} — {facts['floor_heights_mm']}")
+                levels = data.get("levels") or {}
 
-            if data.get("floor_to_floor_mm"):
-                try:
-                    facts["floor_to_floor_mm"] = int(float(data["floor_to_floor_mm"]))
-                except (ValueError, TypeError):
-                    pass
+                # Handle list format: [{"name": "GL", "elevation_mm": 0}, ...]
+                if isinstance(levels, list):
+                    levels = {
+                        item.get("name") or item.get("level") or f"L{i+1}":
+                        item.get("elevation_mm") or item.get("height_mm") or item.get("rl") or 0
+                        for i, item in enumerate(levels) if isinstance(item, dict)
+                    }
 
-            # If JSON levels empty, parse raw LLM response text for RL patterns
+                # Filter out None/zero-confidence entries
+                if isinstance(levels, dict):
+                    levels = {k: v for k, v in levels.items() if v is not None}
+
+                if levels and isinstance(levels, dict) and len(levels) >= 2:
+                    # Check if values look like absolute AHD (e.g. 414200 mm) — normalise
+                    vals = sorted(int(float(v)) for v in levels.values() if v is not None)
+                    if vals and vals[0] > 50_000:  # absolute AHD in mm
+                        base = vals[0]
+                        levels = {k: int(float(v)) - base for k, v in levels.items() if v is not None}
+                    facts["floor_heights_mm"] = _int_values(levels)
+                    facts["source_pages"]["elevation"] = page_idx
+                    print(f"  [GTB] Levels: {len(levels)} — {facts['floor_heights_mm']}")
+
+                if data.get("floor_to_floor_mm"):
+                    try:
+                        facts["floor_to_floor_mm"] = int(float(data["floor_to_floor_mm"]))
+                    except (ValueError, TypeError):
+                        pass
+
+            # Pass 2: scan raw LLM text for RL patterns (catches "RL 414.200" etc.)
             if not facts.get("floor_heights_mm"):
                 import re as _re_el
-                _RL_PAT_FB = _re_el.compile(r'RL\s*\+?\s*([\d]{1,3}\.[\d]{1,3})', _re_el.I)
+                _RL_PAT_FB = _re_el.compile(r'RL\s*\+?\s*([\d]{1,4}\.[\d]{1,3})', _re_el.I)
                 _raw_rl_fb: set = set()
                 for _m in _RL_PAT_FB.finditer(str(resp)):
                     try:
@@ -599,8 +644,68 @@ class GroundTruthBuilder:
                         facts["_floor_source"] = "elevation_llm_raw"
                         print(f"  [GTB] Levels from elevation raw text: {len(_levels_fb)} — {_levels_fb}")
 
+            # Pass 3: dedicated RL-focused retry for Australian AHD drawings
+            if not facts.get("floor_heights_mm"):
+                self._extract_elevations_rl_retry(renderer, page_idx, img, facts)
+
         except Exception as e:
             print(f"  [GTB] WARN: elevation extraction failed: {e}")
+
+    def _extract_elevations_rl_retry(self, renderer: VisionRenderer, page_idx: int,
+                                      img: bytes, facts: dict) -> None:
+        """Third attempt — dedicated RL/AHD prompt for Australian elevation drawings."""
+        try:
+            resp2 = call_llm(
+                f"Page {page_idx}. Find ALL RL (Reduced Level / AHD) values on this drawing. "
+                "List every annotated RL number. Output JSON only.",
+                system=_ELEVATION_RL_PROMPT,
+                images=[img],
+                model=_GTB_MODEL,
+            )
+            data2 = _parse_json(resp2)
+            rl_vals: dict = {}
+            if data2 and isinstance(data2, dict):
+                rl_vals = data2.get("rl_values") or {}
+                if isinstance(rl_vals, list):
+                    rl_vals = {f"L{i+1}": v for i, v in enumerate(rl_vals) if isinstance(v, (int, float))}
+
+            # Also scrape raw numbers from the response text (e.g. "414.200", "417.700")
+            import re as _re2
+            _NUM_PAT = _re2.compile(r'\b([\d]{3,4}\.[\d]{1,3})\b')
+            raw_nums: set = set()
+            for _m in _NUM_PAT.finditer(str(resp2)):
+                try:
+                    raw_nums.add(float(_m.group(1)))
+                except ValueError:
+                    pass
+            # Merge rl_vals dict values + raw scraped numbers
+            all_rl: set = set()
+            for v in rl_vals.values():
+                if isinstance(v, (int, float)) and 1 <= v <= 9999:
+                    all_rl.add(float(v))
+            for v in raw_nums:
+                if 100 <= v <= 9999:
+                    all_rl.add(v)
+
+            if len(all_rl) >= 2:
+                sorted_rl = sorted(all_rl)
+                base = sorted_rl[0]
+                levels: dict = {}
+                # Try to use rl_vals keys; fallback to generic names
+                key_map = {float(v): k for k, v in rl_vals.items()
+                           if isinstance(v, (int, float))} if rl_vals else {}
+                for rv in sorted_rl:
+                    rel_mm = int((rv - base) * 1000)
+                    if 0 <= rel_mm <= 50_000:
+                        name = key_map.get(rv, f"RL {rv:.3f}")
+                        levels[name] = rel_mm
+                if len(levels) >= 2:
+                    facts["floor_heights_mm"] = levels
+                    facts["source_pages"]["elevation"] = page_idx
+                    facts["_floor_source"] = "elevation_rl_retry"
+                    print(f"  [GTB] Levels from RL retry: {len(levels)} — {levels}")
+        except Exception as e:
+            print(f"  [GTB] WARN: RL retry failed: {e}")
 
     def _extract_heights_from_text(self, scanner_output: dict, facts: dict) -> None:
         """Scan all forensic page texts for floor height patterns when LLM elevation fails."""

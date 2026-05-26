@@ -60,14 +60,6 @@ class ScheduleVerifier:
         # Step 1: Extract expected counts from schedule pages
         schedule_counts = self._extract_schedule_counts(page_results, batches, scanner_output)
 
-        # Use GTB ground truth as authoritative column count — its LLM vision prompt
-        # explicitly filters hardware and counts structural columns per page, making it
-        # more reliable than the heuristic regex that can over-count mark instances.
-        if ground_truth:
-            gtb_cols = ground_truth.get("col_count_expected")
-            if gtb_cols and gtb_cols > 0:
-                schedule_counts["columns"] = gtb_cols
-
         # Also check if scanner already recorded schedule_counts in page results
         for pr in page_results.values():
             sc = pr.get("schedule_counts", {})
@@ -75,6 +67,29 @@ class ScheduleVerifier:
                 if etype in ELEMENT_TYPES and cnt:
                     cur = schedule_counts.get(etype, 0)
                     schedule_counts[etype] = max(cur, int(cnt))
+
+        # GTB count is AUTHORITATIVE — apply AFTER the page loop so heuristic over-counts
+        # (e.g. 18 schedule pages × mark references = 90 "C" tokens) don't override it.
+        # GTB uses LLM vision to count unique structural columns, not token frequency.
+        if ground_truth:
+            gtb_cols = ground_truth.get("col_count_expected")
+            if gtb_cols and gtb_cols > 0:
+                raw = schedule_counts.get("columns", 0)
+                if raw > gtb_cols * 2:
+                    print(f"  [VERIFY] Column count capped: {raw} → {gtb_cols} (GTB authoritative)")
+                schedule_counts["columns"] = gtb_cols
+
+        # Hard cap: col expected ≤ grid_intersections × 2 (physics: can't have more columns
+        # than grid supports × 2 safety margin for off-grid members)
+        if ground_truth:
+            _gx = len(ground_truth.get("grid_x_mm") or {})
+            _gy = len(ground_truth.get("grid_y_mm") or {})
+            if _gx > 0 and _gy > 0:
+                grid_cap = _gx * _gy * 2
+                if schedule_counts.get("columns", 0) > grid_cap:
+                    print(f"  [VERIFY] Column target {schedule_counts['columns']} > "
+                          f"grid cap {grid_cap} ({_gx}×{_gy}×2) — capping")
+                    schedule_counts["columns"] = grid_cap
 
         # Step 2: Get extracted counts from structural model
         members = structural_model.get("members", {})
