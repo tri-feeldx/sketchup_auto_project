@@ -104,6 +104,7 @@ class SynthesizerV7:
             if model:
                 model = self._merge_members(model, valid_results, forensic)
                 model = self._merge_column_continuity(model)
+                model = self._dedup_columns(model, ground_truth)
                 model = self._enrich_from_cad(model, cad_data)
                 model = self._enrich_from_plan(model, plan_positions)
                 model = self._apply_ground_truth_lock(model, ground_truth)
@@ -699,7 +700,7 @@ class SynthesizerV7:
             for pr in page_results:
                 if pr.get("page_type") != "ELEVATION":
                     continue
-                raw = pr.get("raw_text") or str(pr.get("llm_response") or "")
+                raw = pr.get("_raw_text") or pr.get("raw_text") or str(pr.get("llm_response") or "")
                 rl_vals = sorted(set(float(x) for x in re.findall(r'RL\s*([\d.]+)', raw)))
                 if rl_vals:
                     base = rl_vals[0]
@@ -726,7 +727,7 @@ class SynthesizerV7:
             ]
             found_mm: set = set()
             for pr in page_results:
-                raw = pr.get("raw_text") or str(pr.get("llm_response") or "")
+                raw = pr.get("_raw_text") or pr.get("raw_text") or str(pr.get("llm_response") or "")
                 for pat in _HEIGHT_PATTERNS:
                     for m in re.finditer(pat, raw, re.IGNORECASE):
                         try:
@@ -836,6 +837,45 @@ class SynthesizerV7:
             print(f"  [CONTINUITY] {len(cols)} column segments → "
                   f"{len(merged)} continuous columns "
                   f"({splice_total} splices recorded)")
+        return model
+
+    def _dedup_columns(self, model: dict, ground_truth: dict = None) -> dict:
+        """Deduplicate columns accumulated from multiple schedule pages.
+        Step 1: dedup by normalised mark (same mark = same column type).
+        Step 2: if still over col_count_expected × 1.5, dedup by grid position.
+        """
+        cols = model.get("members", {}).get("columns", [])
+        if not cols:
+            return model
+        seen_marks: set = set()
+        unique: list = []
+        for col in cols:
+            mark = self._norm_id(col.get("mark") or col.get("id") or "")
+            if mark and mark in seen_marks:
+                continue
+            if mark:
+                seen_marks.add(mark)
+            unique.append(col)
+        before = len(cols)
+        expected = (ground_truth or {}).get("col_count_expected") or 0
+        if expected > 0 and len(unique) > expected * 1.5:
+            seen_grid: set = set()
+            grid_unique: list = []
+            for col in unique:
+                gxl = str(col.get("grid_x") or "")
+                gyl = str(col.get("grid_y") or "")
+                gx = round((col.get("x_mm") or col.get("x") or 0) / 1000)
+                gy = round((col.get("y_mm") or col.get("y") or 0) / 1000)
+                grid_key = (gxl, gyl) if (gxl and gyl) else (gx, gy)
+                if grid_key != ("", "") and grid_key != (0, 0) and grid_key in seen_grid:
+                    continue
+                seen_grid.add(grid_key)
+                grid_unique.append(col)
+            unique = grid_unique
+        if len(unique) < before:
+            print(f"  [DEDUP-COL] {before} → {len(unique)} columns "
+                  f"(removed {before - len(unique)} duplicates)")
+        model["members"]["columns"] = unique
         return model
 
     def _enrich_from_cad(self, model: dict, cad_data: dict) -> dict:
@@ -1298,6 +1338,21 @@ class SynthesizerV7:
 
         if recovered:
             print(f"  [COL-SECTION] Recovered {recovered} column sections from schedule data")
+
+        # Also apply section_map to beams — same map already collects beam sections above
+        _BEAM_PFXS = ('UB', 'UC', 'CHS', 'RHS', 'SHS', 'PFC', 'WB', 'WC', 'FB', 'TFB')
+        recovered_beams = 0
+        for beam in model.get("members", {}).get("beams", []):
+            existing_sec = str(beam.get("section") or "").strip().upper()
+            if existing_sec and any(existing_sec.startswith(p) for p in _BEAM_PFXS):
+                continue
+            key = str(beam.get("id") or beam.get("mark") or "").strip().upper()
+            if key in section_map:
+                beam["section"] = section_map[key]
+                beam["_section_source"] = "schedule_recovery"
+                recovered_beams += 1
+        if recovered_beams:
+            print(f"  [BEAM-SECTION] Recovered {recovered_beams} beam sections from schedule data")
         return model
 
     def _link_beam_connectivity(self, model: dict) -> dict:

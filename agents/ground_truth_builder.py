@@ -581,17 +581,45 @@ class GroundTruthBuilder:
     def _extract_heights_from_text(self, scanner_output: dict, facts: dict) -> None:
         """Scan all forensic page texts for floor height patterns when LLM elevation fails."""
         import re as _re_h
+        page_texts = scanner_output.get("forensic", {}).get("page_texts", {})
+
+        # --- RL (Reduced Level) handler — normalise relative to base first ---
+        # Handles Australian RL values like 414.200 (3 digits, Tamworth is ~414m AHD)
+        # Must normalise BEFORE filtering by range to avoid rejecting valid absolute RLs.
+        _RL_PAT = _re_h.compile(r'RL\s*\+?\s*([\d]{1,3}\.[\d]{1,3})', _re_h.I)
+        _raw_rl: set = set()
+        for pr in scanner_output.get("page_results", {}).values():
+            raw_pr = str(pr.get("_raw_text") or pr.get("raw_text") or pr.get("llm_response") or "")
+            for m in _RL_PAT.finditer(raw_pr):
+                try:
+                    _raw_rl.add(float(m.group(1)))
+                except ValueError:
+                    pass
+        for txt in page_texts.values():
+            for m in _RL_PAT.finditer(str(txt)):
+                try:
+                    _raw_rl.add(float(m.group(1)))
+                except ValueError:
+                    pass
+
+        found_mm: set = set()
+        if len(_raw_rl) >= 2:
+            _sorted_rl = sorted(_raw_rl)
+            _base_rl = _sorted_rl[0]
+            for _rl_val in _sorted_rl:
+                _rel_mm = int((_rl_val - _base_rl) * 1000)
+                if 0 <= _rel_mm <= 50000:
+                    found_mm.add(_rel_mm)
+
+        # --- General height pattern scan (FFL, AFFL, Level=, etc.) ---
         _HEIGHT_PATS = [
-            (_re_h.compile(r'RL\s*\+?\s*([\d]{1,2}\.[\d]{1,3})', _re_h.I), "metres"),
             (_re_h.compile(r'(?:FFL|AFFL|AFL|FFH)\s*[=:]?\s*([\d.]+)', _re_h.I), "auto"),
             (_re_h.compile(r'\+\s*([\d]{1,2}\.\d{3})'), "metres"),
             (_re_h.compile(r'(?:LEVEL|LVL|FL)\s*\d+\s*[=:]\s*\+?\s*([\d.]+)', _re_h.I), "auto"),
             (_re_h.compile(r'(?:GL|GF|GROUND)\s*[=:+]?\s*([\d.]+)', _re_h.I), "auto"),
         ]
-        found_mm: set = set()
-        page_texts = scanner_output.get("forensic", {}).get("page_texts", {})
         for pr in scanner_output.get("page_results", {}).values():
-            raw = str(pr.get("raw_text") or pr.get("llm_response") or "")
+            raw = str(pr.get("_raw_text") or pr.get("raw_text") or pr.get("llm_response") or "")
             for pat, mode in _HEIGHT_PATS:
                 for m in pat.finditer(raw):
                     try:
@@ -601,7 +629,6 @@ class GroundTruthBuilder:
                             found_mm.add(mm)
                     except (ValueError, IndexError):
                         pass
-        # Also scan raw forensic text
         for txt in page_texts.values():
             for pat, mode in _HEIGHT_PATS:
                 for m in pat.finditer(str(txt)):
@@ -612,6 +639,7 @@ class GroundTruthBuilder:
                             found_mm.add(mm)
                     except (ValueError, IndexError):
                         pass
+
         if len(found_mm) >= 2:
             sorted_mm = sorted(found_mm)
             base = sorted_mm[0]

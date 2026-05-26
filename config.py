@@ -17,8 +17,7 @@ load_dotenv(_env_file)
 
 # ---- MODEL LOCK ----
 GEMINI_MODEL     = "gemini-2.5-flash"       # Default: fast + cheap for all text tasks
-GEMINI_MODEL_PRO = "gemini-3-flash-preview" # High-accuracy vision: GTB grid/elevation, schedule pages
-# If gemini-3-flash-preview is unavailable on Vertex AI, change to "gemini-2.5-pro"
+GEMINI_MODEL_PRO = "gemini-2.5-pro"         # High-accuracy vision: GTB grid/elevation, schedule pages
 
 # ---- VERTEX AI AUTH ----
 import os as _os
