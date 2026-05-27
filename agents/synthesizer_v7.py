@@ -114,8 +114,10 @@ class SynthesizerV7:
                 model = self._recover_column_sections(model, valid_results)
                 model = self._link_beam_connectivity(model)
                 model = self._assign_beam_connectivity_from_grid(model)
+                model = self._assign_bracing_connectivity_from_grid(model)
                 model = self._apply_section_defaults_to_null(model)
                 model = self._dedup_beams(model)
+                model = self._generate_footings_from_columns(model)
                 model = self._ensure_walls(model)
                 model["members"] = self._assign_confidence(model["members"])
                 model["synthesis_method"] = "llm"
@@ -137,8 +139,10 @@ class SynthesizerV7:
         model = self._recover_column_sections(model, valid_results)
         model = self._link_beam_connectivity(model)
         model = self._assign_beam_connectivity_from_grid(model)
+        model = self._assign_bracing_connectivity_from_grid(model)
         model = self._apply_section_defaults_to_null(model)
         model = self._dedup_beams(model)
+        model = self._generate_footings_from_columns(model)
         model = self._ensure_walls(model)
         model["synthesis_method"] = "deterministic"
         model["elapsed_s"] = round(time.time() - t0, 1)
@@ -160,9 +164,11 @@ class SynthesizerV7:
         model = self._recover_column_sections(model, page_results)
         model = self._link_beam_connectivity(model)
         model = self._assign_beam_connectivity_from_grid(model)
+        model = self._assign_bracing_connectivity_from_grid(model)
         model = self._apply_section_defaults_to_null(model)
         model = self._dedup_columns(model, ground_truth)
         model = self._dedup_beams(model)
+        model = self._generate_footings_from_columns(model)
         self._log_synth_summary(model)
         return model
 
@@ -690,20 +696,23 @@ class SynthesizerV7:
         levels = []
         seen_ids = set()
 
-        # First priority: level_elevations from scanner ELEVATION page extraction
+        # First priority: level_elevations / building_levels from scanner ELEVATION page
         elev_pages = [pr for pr in page_results if pr.get("page_type") == "ELEVATION"]
         print(f"  [Z-DEBUG] {len(elev_pages)} ELEVATION page(s) — "
-              f"level_elevations: {[ep.get('level_elevations') for ep in elev_pages]}")
+              f"level_elevations: {[ep.get('level_elevations') or ep.get('building_levels') for ep in elev_pages]}")
         for pr in page_results:
-            for le in pr.get("level_elevations", []):
+            raw_levels = pr.get("level_elevations") or pr.get("building_levels") or []
+            for le in raw_levels:
                 if not isinstance(le, dict):
                     continue
-                lvl_id = le.get("id") or le.get("label", "")
+                lvl_id = (le.get("id") or le.get("label") or
+                          le.get("level_name", ""))
                 if lvl_id and lvl_id not in seen_ids:
-                    rl = le.get("rl_mm") or le.get("ffl_mm") or 0
+                    rl = (le.get("rl_mm") or le.get("ffl_mm") or
+                          le.get("ssl_mm") or 0)
                     levels.append({
                         "id": lvl_id,
-                        "name": le.get("label", lvl_id),
+                        "name": le.get("label") or le.get("level_name", lvl_id),
                         "height_from_datum_mm": int(rl),
                         "elevation_mm": int(rl),
                         "floor_to_floor_mm": le.get("floor_to_floor_mm"),
@@ -1585,6 +1594,66 @@ class SynthesizerV7:
             print(f"  [BEAM-CONNECT] Synthetic grid assignment: {assigned} beams → adjacent column pairs")
         return model
 
+    def _assign_bracing_connectivity_from_grid(self, model: dict) -> dict:
+        """Assign from_col/to_col to unconnected bracing using diagonal column pairs."""
+        from collections import defaultdict
+        bracing = model.get("members", {}).get("bracing", [])
+        cols    = model.get("members", {}).get("columns", [])
+        if not bracing or not cols:
+            return model
+
+        col_xy: dict = {}
+        for c in cols:
+            x = int(c.get("x_mm") or c.get("x") or 0)
+            y = int(c.get("y_mm") or c.get("y") or 0)
+            cid = c.get("id") or c.get("mark") or ""
+            if cid and (x or y):
+                col_xy[(x, y)] = cid
+
+        xs = sorted(set(k[0] for k in col_xy))
+        ys = sorted(set(k[1] for k in col_xy))
+
+        diag_pairs: list = []
+        for yi in range(len(ys) - 1):
+            for xi in range(len(xs) - 1):
+                c1 = col_xy.get((xs[xi],     ys[yi]))
+                c2 = col_xy.get((xs[xi + 1], ys[yi + 1]))
+                if c1 and c2:
+                    diag_pairs.append((c1, c2))
+                c3 = col_xy.get((xs[xi + 1], ys[yi]))
+                c4 = col_xy.get((xs[xi],     ys[yi + 1]))
+                if c3 and c4:
+                    diag_pairs.append((c3, c4))
+        # Also straight horizontal pairs (floor bracing)
+        for y in ys:
+            for i in range(len(xs) - 1):
+                c1 = col_xy.get((xs[i], y))
+                c2 = col_xy.get((xs[i + 1], y))
+                if c1 and c2:
+                    diag_pairs.append((c1, c2))
+
+        if not diag_pairs:
+            return model
+
+        unconnected = [br for br in bracing
+                       if not br.get("from_col") and not br.get("to_col")]
+        by_z: dict = defaultdict(list)
+        for br in unconnected:
+            by_z[int(br.get("z_mm") or 0)].append(br)
+
+        assigned = 0
+        for z_brs in by_z.values():
+            for i, br in enumerate(z_brs):
+                pair = diag_pairs[i % len(diag_pairs)]
+                br["from_col"] = pair[0]
+                br["to_col"]   = pair[1]
+                br["_connectivity_source"] = "grid_synthetic"
+                assigned += 1
+
+        if assigned:
+            print(f"  [BRACE-CONNECT] Synthetic grid assignment: {assigned} bracing → column pairs")
+        return model
+
     @staticmethod
     def _beam_richness(beam: dict) -> int:
         """Score a beam by data quality — higher = more complete/trustworthy."""
@@ -1625,6 +1694,64 @@ class SynthesizerV7:
         if len(unique) < before:
             print(f"  [DEDUP-BEAM] {before} → {len(unique)} beams (removed {before - len(unique)} duplicates)")
         model["members"]["beams"] = unique
+        return model
+
+    def _generate_footings_from_columns(self, model: dict) -> dict:
+        """
+        Generate one pile-cap footing per column when footings < columns.
+        Uses pile diameter from foundation schedule if available, else 1200mm pad.
+        """
+        members = model.setdefault("members", {})
+        cols    = members.get("columns", [])
+        footings = members.setdefault("footings", [])
+        if not cols or len(footings) >= len(cols):
+            return model
+
+        # Determine pile/pad cap size from existing footings or foundation data
+        cap_w = 1500
+        cap_d = 1500
+        for f in footings:
+            dia = f.get("diameter_mm") or f.get("width_mm") or f.get("width")
+            if dia:
+                try:
+                    d = int(float(dia))
+                    if 500 <= d <= 3000:
+                        cap_w = cap_d = d + 600  # pile cap = pile dia + 600mm margins
+                        break
+                except (ValueError, TypeError):
+                    pass
+
+        existing_col_ids = {
+            f.get("column") or f.get("col_id") or ""
+            for f in footings
+        }
+
+        new_foots: list = []
+        for col in cols:
+            cid = col.get("id") or col.get("mark") or ""
+            if cid and cid in existing_col_ids:
+                continue
+            x  = int(col.get("x_mm") or col.get("x") or 0)
+            y  = int(col.get("y_mm") or col.get("y") or 0)
+            zb = int(col.get("z_base_mm") or col.get("z_base") or 0)
+            new_foots.append({
+                "id":         f"PC_{cid}" if cid else f"PC_{len(footings) + len(new_foots) + 1}",
+                "type":       "pile_cap",
+                "column":     cid,
+                "width_mm":   cap_w,
+                "depth_mm":   cap_d,
+                "height_mm":  600,
+                "x_mm":       x,
+                "y_mm":       y,
+                "z_top_mm":   zb,
+                "z_base_mm":  zb - 600,
+                "_source":    "synthetic_pile_cap",
+            })
+
+        if new_foots:
+            footings.extend(new_foots)
+            print(f"  [FOOTING-GEN] Generated {len(new_foots)} pile caps "
+                  f"({cap_w}×{cap_d}mm) for {len(cols)} columns")
         return model
 
     def _assign_confidence(self, members: dict) -> dict:
@@ -1719,6 +1846,18 @@ class SynthesizerV7:
         # Columns
         roof_elev = sorted_levels[-1][1] if sorted_levels else DEFAULT_F2F
         for col in members.get("columns", []):
+            # Preserve schedule-extracted height BEFORE Z assignment can overwrite it.
+            # Used for curved roof geometry where each column has a specific height.
+            _sched_h: float | None = None
+            try:
+                _raw_h = col.get("height_mm")
+                if _raw_h is not None:
+                    _v = float(_raw_h)
+                    if 1000 <= _v <= 20000:
+                        _sched_h = _v
+            except (ValueError, TypeError):
+                pass
+
             # Support both base_level/level_id and start_level/end_level naming
             base_lid = (col.get("base_level") or col.get("level_id") or
                         col.get("start_level", ""))
@@ -1758,8 +1897,15 @@ class SynthesizerV7:
                 else:
                     z_top = _next_level_elev(z_base)
             col["z_base_mm"] = z_base
-            col["z_top_mm"] = z_top
-            col["height_mm"] = z_top - z_base
+            # If column has a valid schedule height and no explicit structural level binding,
+            # use it to drive z_top (curved roof geometry).
+            if _sched_h and not top_lid:
+                col["z_top_mm"] = int(z_base + _sched_h)
+                col["height_mm"] = int(_sched_h)
+                col["_z_source"] = "schedule_height"
+            else:
+                col["z_top_mm"] = z_top
+                col["height_mm"] = z_top - z_base
 
         # Beams — sit at z_top of base-level columns
         col_base_map: dict = {}

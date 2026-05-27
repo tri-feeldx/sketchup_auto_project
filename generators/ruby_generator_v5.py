@@ -159,9 +159,10 @@ class RubyGeneratorV5:
             "  'beams' => model.layers.add('S_BEAM'),",
             "  'slabs' => model.layers.add('S_SLAB'),",
             "  'walls' => model.layers.add('S_WALL'),",
-            "  'ftgs'  => model.layers.add('S_FOOTING'),",
-            "  'stairs'=> model.layers.add('S_STAIR'),",
-            "  'shafts'=> model.layers.add('S_SHAFT'),",
+            "  'ftgs'    => model.layers.add('S_FOOTING'),",
+            "  'bracing' => model.layers.add('S_BRACING'),",
+            "  'stairs'  => model.layers.add('S_STAIR'),",
+            "  'shafts'  => model.layers.add('S_SHAFT'),",
             "}",
             "",
             "# ── Materials ──",
@@ -205,13 +206,14 @@ class RubyGeneratorV5:
         lines.append("ox = 0; oy = 0; oz = 0")
         lines.append("")
 
-        cols = members.get("columns", [])
-        beams = members.get("beams", [])
-        slabs = members.get("slabs", [])
-        walls = members.get("walls", [])
-        foots = members.get("footings", [])
-        stairs = members.get("stairs", [])
-        shafts = members.get("shafts", [])
+        cols    = members.get("columns", [])
+        beams   = members.get("beams", [])
+        slabs   = members.get("slabs", [])
+        walls   = members.get("walls", [])
+        foots   = members.get("footings", [])
+        bracing = members.get("bracing", [])
+        stairs  = members.get("stairs", [])
+        shafts  = members.get("shafts", [])
 
         # Build column lookup (id → resolved x,y,z) — all values forced to int
         col_positions = {}
@@ -289,6 +291,13 @@ class RubyGeneratorV5:
                 lines.extend(self._footing_ruby_v5(f, col_positions, i, mat_vars))
             lines.append("")
 
+        # ── Bracing ──
+        if bracing:
+            lines.append("# === Bracing ===")
+            for i, br in enumerate(bracing):
+                lines.extend(self._bracing_ruby_v5(br, col_positions, i, mat_vars))
+            lines.append("")
+
         # ── Stairs ──
         if stairs:
             lines.append("# === Stairs ===")
@@ -318,15 +327,15 @@ class RubyGeneratorV5:
 
         lod350_count = sum([
             len(cols), len(beams), len(slabs), len(walls),
-            len(foots), len(stairs), len(shafts)
+            len(foots), len(bracing), len(stairs), len(shafts)
         ])
         print(f"  [GEN] LOD350: {len(cols)}c {len(beams)}b {len(slabs)}s "
-              f"{len(walls)}w {len(foots)}f {len(stairs)}st {len(shafts)}sh "
-              f"— {lod350_count} total elements")
+              f"{len(walls)}w {len(foots)}f {len(bracing)}br "
+              f"{len(stairs)}st {len(shafts)}sh — {lod350_count} total elements")
         lines.append("model.commit_operation")
         lines.append(
             f"UI.messagebox('LOD350 Done: {len(cols)}c {len(beams)}b "
-            f"{len(slabs)}s {len(walls)}w {len(foots)}f "
+            f"{len(slabs)}s {len(walls)}w {len(foots)}f {len(bracing)}br "
             f"{len(stairs)}st {len(shafts)}sh')"
         )
         return "\n".join(lines)
@@ -838,6 +847,33 @@ class RubyGeneratorV5:
             f"  f_{i}.layer = layers['walls'] if f_{i}",
             f"  f_{i}.pushpull({h}) if f_{i}",
             f"end",
+        ]
+
+    def _bracing_ruby_v5(self, br: dict, col_positions: dict, idx: int,
+                         mat_vars: dict) -> List[str]:
+        from_id = br.get("from_col") or br.get("from")
+        to_id   = br.get("to_col")   or br.get("to")
+        if not from_id or not to_id:
+            return []
+        p1 = col_positions.get(from_id)
+        p2 = col_positions.get(to_id)
+        if not p1 or not p2:
+            return []
+        MM_TO_INCH = 1.0 / 25.4
+        x1 = round(self._n(p1.get("x"), 0) * MM_TO_INCH, 4)
+        y1 = round(self._n(p1.get("y"), 0) * MM_TO_INCH, 4)
+        x2 = round(self._n(p2.get("x"), 0) * MM_TO_INCH, 4)
+        y2 = round(self._n(p2.get("y"), 0) * MM_TO_INCH, 4)
+        z1 = round(self._n(p1.get("z_base"), 0) * MM_TO_INCH, 4)
+        z2 = round(self._n(p2.get("z_top"),  0) * MM_TO_INCH, 4)
+        br_id   = br.get("id") or br.get("mark") or f"BR{idx}"
+        section = br.get("section") or "CHS"
+        return [
+            f"# Bracing {br_id} ({section}): {from_id}->{to_id}",
+            f"br_pt1_{idx} = Geom::Point3d.new({x1}.inch, {y1}.inch, {z1}.inch)",
+            f"br_pt2_{idx} = Geom::Point3d.new({x2}.inch, {y2}.inch, {z2}.inch)",
+            f"br_e_{idx} = ents.add_line(br_pt1_{idx}, br_pt2_{idx})",
+            f"br_e_{idx}.layer = layers['bracing'] if br_e_{idx}",
         ]
 
     def _footing_ruby_v5(self, ftg: dict, col_map: dict, i: int,

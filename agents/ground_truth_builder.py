@@ -350,6 +350,10 @@ class GroundTruthBuilder:
                 # Some drawings embed elevations on second plan page
                 self._extract_elevations(renderer, plan_pages[1], facts)
 
+            # 3a-2. Read building_levels from scanner page_results (zero-cost, already scanned)
+            if not facts.get("floor_heights_mm"):
+                self._extract_levels_from_scanner_results(scanner_output, facts)
+
             # 3b. Forensic text fallback for floor heights when LLM elevation extraction failed
             if not facts.get("floor_heights_mm"):
                 self._extract_heights_from_text(scanner_output, facts)
@@ -817,6 +821,35 @@ class GroundTruthBuilder:
             facts["floor_heights_mm"] = heights
             facts["_floor_source"] = "forensic_text"
             print(f"  [GTB] Floor heights from forensic text: {len(heights)} levels — {heights}")
+
+    def _extract_levels_from_scanner_results(self, scanner_output: dict, facts: dict) -> None:
+        """
+        Read building_levels / level_elevations already extracted by the scanner.
+        Zero-cost: no LLM — reads cached page_results from the scan pass.
+        """
+        page_results = scanner_output.get("page_results", {})
+        levels: dict = {}
+        for pr in page_results.values():
+            raw = pr.get("building_levels") or pr.get("level_elevations") or []
+            for le in raw:
+                if not isinstance(le, dict):
+                    continue
+                name = (le.get("id") or le.get("label") or le.get("level_name") or "")
+                rl = (le.get("rl_mm") or le.get("ffl_mm") or le.get("ssl_mm") or
+                      le.get("elevation_mm") or 0)
+                if name:
+                    try:
+                        levels[name] = int(float(rl))
+                    except (ValueError, TypeError):
+                        levels[name] = 0
+        if len(levels) >= 2:
+            vals = sorted(levels.values())
+            if vals[0] > 50_000:  # absolute AHD mm → normalise
+                base = vals[0]
+                levels = {k: v - base for k, v in levels.items()}
+            facts["floor_heights_mm"] = levels
+            facts["_floor_source"] = "scanner_building_levels"
+            print(f"  [GTB] Levels from scanner building_levels: {len(levels)} — {levels}")
 
     def _extract_levels_from_schedule_heights(self, scanner_output: dict, facts: dict) -> None:
         """
